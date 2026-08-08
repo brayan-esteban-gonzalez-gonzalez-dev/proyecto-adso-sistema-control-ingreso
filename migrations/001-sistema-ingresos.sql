@@ -32,7 +32,7 @@ CREATE TABLE `aprendices` (
   `codigoRfid` varchar(50) DEFAULT NULL,
   `fk_usuarios_idUsuario` int(11) NOT NULL,
   `fk_fichas_idFicha` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -45,14 +45,14 @@ CREATE TABLE `excusasmedicas` (
   `fechaInicio` date NOT NULL,
   `fechaFin` date NOT NULL,
   `motivo` text NOT NULL,
-  `archivoAdjunto` varchar(45) NOT NULL,
+  `archivoAdjunto` varchar(255) NOT NULL,
   `estado` enum('Pendiente','Aprobada','Rechazada') DEFAULT 'Pendiente',
   `comentarioRevision` text DEFAULT NULL,
   `fechaSolicitud` timestamp NULL DEFAULT NULL,
   `aprendices_idAprendices` int(11) NOT NULL,
   `ingresos_asistencias_idIngreso` int(11) NOT NULL,
-  `instructor_usuarios_idUsuario` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+  `instructor_usuarios_idUsuario` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -65,7 +65,7 @@ CREATE TABLE `fichas` (
   `codigoFicha` varchar(45) NOT NULL,
   `nombrePrograma` varchar(150) NOT NULL,
   `fk_instructor_lider` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -80,7 +80,7 @@ CREATE TABLE `horarios` (
   `horaSalida` time NOT NULL,
   `toleranciaMinutos` int(11) DEFAULT 15,
   `fk_fichas_idFicha` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -97,7 +97,7 @@ CREATE TABLE `ingresos_asistencias` (
   `minutosRetardo` int(11) DEFAULT 0,
   `minutosSalidaAnticipada` int(11) DEFAULT 0,
   `fk_aprendices_idAprendices` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -108,7 +108,7 @@ CREATE TABLE `ingresos_asistencias` (
 CREATE TABLE `roles` (
   `idRol` int(11) NOT NULL,
   `nombre` varchar(45) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -126,7 +126,7 @@ CREATE TABLE `usuarios` (
   `estado` enum('activo','inactivo','pendiente','bloqueado') DEFAULT 'activo',
   `creadoEn` timestamp NOT NULL DEFAULT current_timestamp(),
   `fk_roles_idRol` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Índices para tablas volcadas
@@ -139,11 +139,6 @@ ALTER TABLE `aprendices`
   ADD PRIMARY KEY (`idAprendices`),
   ADD UNIQUE KEY `usuarios_idUsuario_UNIQUE` (`fk_usuarios_idUsuario`),
   ADD UNIQUE KEY `codigoRfid_UNIQUE` (`codigoRfid`),
-  ADD UNIQUE KEY `codigoRfid` (`codigoRfid`),
-  ADD UNIQUE KEY `codigoRfid_2` (`codigoRfid`),
-  ADD UNIQUE KEY `codigoRfid_3` (`codigoRfid`),
-  ADD UNIQUE KEY `codigoRfid_4` (`codigoRfid`),
-  ADD UNIQUE KEY `codigoRfid_5` (`codigoRfid`),
   ADD KEY `fk_aprendices_usuarios1_idx` (`fk_usuarios_idUsuario`),
   ADD KEY `fk_aprendices_fichas1_idx` (`fk_fichas_idFicha`);
 
