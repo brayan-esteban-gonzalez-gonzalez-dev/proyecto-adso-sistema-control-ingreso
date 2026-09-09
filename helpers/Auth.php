@@ -1,21 +1,19 @@
 <?php
 /**
  * Auth.php — Helper de autenticación y sesiones
- * 
  * Gestionar el inicio/cierre de sesion, verificación de roles
  * y protección de rutas según permisos.
  */
 class Auth {
 
-    /**
-     * Inicia la sesión si no está activa
+    /*
+        Inicia la sesión si no está activa
      */
     public static function init(): void {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
     }
-
     /**
      * Establece los datos de sesión al iniciar sesión
      */
