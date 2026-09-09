@@ -1,0 +1,9 @@
+RewriteEngine On
+RewriteBase /proyects/segundoCrud/SistemaControlIngresoAprendices-mvc/public/
+
+# Si el archivo o directorio existe, no reescribir
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Reescribir todo al index.php
+RewriteRule ^(.+)$ index.php?action=$1 [QSA,L]
