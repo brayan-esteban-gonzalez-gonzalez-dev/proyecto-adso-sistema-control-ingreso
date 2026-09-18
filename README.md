@@ -94,3 +94,8 @@ El sistema está diseñado para cumplir con los siguientes procesos fundamentale
 4. **Administración de Personal y Accesos**: Permite registrar a diferentes tipos de usuarios (como instructores o coordinadores) asignándoles permisos específicos. De este modo, se garantiza que solo el personal autorizado pueda modificar registros críticos o aprobar justificaciones.
 
 5. **Monitoreo General**: Al acceder, los administradores cuentan con un panel principal que resume la información más relevante del día, como el total de ingresos, novedades recientes o excusas pendientes de revisión. Esto facilita la toma de decisiones basada en datos actualizados.
+---
+# Faltan : 
+**RF**: el intructor puede gestionar horario donde [horario]->[fkFichas]
+**Caso de uso** : En caso de que toque con mas de 1 instructor se debe realizar doble validación sobre las excusas
+*validación de las asistencia* : para LA GESTION DE ASISTENCIA, EL INSTRUCTOR TIENE QUE INGRESAR, DESDE LA HORA DE REGTISTRO DEL INSTRUCTOR EL APRENDIZ TIENE 10 MINUTOS PARA QUE NO SE LE PONGA RETARDO.
