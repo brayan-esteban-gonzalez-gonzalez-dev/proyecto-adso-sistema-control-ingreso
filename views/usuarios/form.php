@@ -13,14 +13,15 @@
             </div>
             <div class="form-group">
                 <label class="form-label" for="id_rol">Rol *</label>
-                <select id="id_rol" name="id_rol" class="form-control" required>
-                    <?php foreach ($roles as $rol): ?>
-                    <option value="<?= $rol['id_rol'] ?>" 
-                            <?= (($usuario['id_rol'] ?? 3) == $rol['id_rol']) ? 'selected' : '' ?>>
+               <select id="id_rol" name="id_rol" class="form-control" required>
+                <?php foreach ($roles as $rol): ?>
+                        <?php if ($rol['nombre'] === 'Aprendiz') continue; ?>
+                        <option value="<?= $rol['id_rol'] ?>" 
+                        <?= (($usuario['id_rol'] ?? 2) == $rol['id_rol']) ? 'selected' : '' ?>>
                         <?= htmlspecialchars($rol['nombre']) ?>
                     </option>
                     <?php endforeach; ?>
-                </select>
+            </select>
             </div>
         </div>
 
