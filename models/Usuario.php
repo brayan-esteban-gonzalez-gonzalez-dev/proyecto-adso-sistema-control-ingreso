@@ -79,6 +79,57 @@ class Usuario {
     }
 
     /**
+     * Busca un instructor por coincidencia de nombre y apellido
+     */
+    public function getInstructorPorNombre(string $nombreBusqueda): ?array {
+        $instructores = $this->getInstructores();
+        $normalizar = function($str) {
+            $str = mb_strtolower(trim($str), 'UTF-8');
+            $str = str_replace(
+                ['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ü', 'Ñ'],
+                ['a', 'e', 'i', 'o', 'u', 'u', 'n', 'a', 'e', 'i', 'o', 'u', 'u', 'n'],
+                $str
+            );
+            return preg_replace('/\s+/', ' ', $str);
+        };
+
+        $busqueda = $normalizar($nombreBusqueda);
+        if (empty($busqueda)) {
+            return null;
+        }
+
+        // 1. Coincidencia exacta completa
+        foreach ($instructores as $inst) {
+            $nomCompleto1 = $normalizar($inst['nombre'] . ' ' . $inst['apellido']);
+            $nomCompleto2 = $normalizar($inst['apellido'] . ' ' . $inst['nombre']);
+
+            if ($nomCompleto1 === $busqueda || $nomCompleto2 === $busqueda) {
+                return $inst;
+            }
+        }
+
+        // 2. Coincidencia por partes de palabras
+        $partes = array_filter(explode(' ', $busqueda), fn($p) => mb_strlen($p) >= 3);
+        if (count($partes) >= 2) {
+            foreach ($instructores as $inst) {
+                $nomCompleto = $normalizar($inst['nombre'] . ' ' . $inst['apellido']);
+                $todasEncontradas = true;
+                foreach ($partes as $parte) {
+                    if (!str_contains($nomCompleto, $parte)) {
+                        $todasEncontradas = false;
+                        break;
+                    }
+                }
+                if ($todasEncontradas) {
+                    return $inst;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Obtiene todos los aprendices (rol 3) con datos de ficha
      */
     public function getAprendices(): array {

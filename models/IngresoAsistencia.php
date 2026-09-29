@@ -1,4 +1,5 @@
 <?php
+
 /**
  * IngresoAsistencia.php — Modelo de Asistencias
  *
@@ -7,18 +8,21 @@
  *   fecha, hora_entrada, hora_salida, Usuario_id, Sesion_id,
  *   registrado_por, estado, codigo_llavero, minutos_retardo, minutos_anticipacion.
  */
-class IngresoAsistencia {
+class IngresoAsistencia
+{
     private PDO $conn;
     private string $table = 'asistencia';
 
-    public function __construct(PDO $db) {
+    public function __construct(PDO $db)
+    {
         $this->conn = $db;
     }
 
     /**
      * Obtiene el historial de asistencia de una fecha (para Admin/Instructor)
      */
-    public function getHistorial(string $fecha): array {
+    public function getHistorial(string $fecha): array
+    {
         $sql = "SELECT a.*,
                        u.nombre, u.apellido, u.identificacion,
                        f.codigo         AS codigo_ficha,
@@ -42,7 +46,8 @@ class IngresoAsistencia {
     /**
      * Obtiene el historial de asistencia de un usuario (aprendiz) en un rango de fechas
      */
-    public function getHistorialAprendiz(int $idUsuario, string $fechaInicio, string $fechaFin): array {
+    public function getHistorialAprendiz(int $idUsuario, string $fechaInicio, string $fechaFin): array
+    {
         $sql = "SELECT a.*,
                        s.hora_inicio AS sesion_hora_inicio,
                        s.hora_fin    AS sesion_hora_fin
@@ -64,7 +69,8 @@ class IngresoAsistencia {
     /**
      * Obtiene estadísticas de asistencia de un usuario en un rango de fechas
      */
-    public function getEstadisticasAprendiz(int $idUsuario, string $fechaInicio, string $fechaFin): array {
+    public function getEstadisticasAprendiz(int $idUsuario, string $fechaInicio, string $fechaFin): array
+    {
         $sql = "SELECT
                     SUM(CASE WHEN a.minutos_retardo = 0 AND a.estado = 'Activo' THEN 1 ELSE 0 END) AS total_a_tiempo,
                     SUM(CASE WHEN a.minutos_retardo > 0 THEN 1 ELSE 0 END)                          AS total_retardos,
@@ -82,7 +88,7 @@ class IngresoAsistencia {
             ':id'     => $idUsuario,
             ':inicio' => $fechaInicio,
             ':fin'    => $fechaFin,
-            ':inicio2'=> $fechaInicio,
+            ':inicio2' => $fechaInicio,
             ':fin2'   => $fechaFin,
         ]);
 
@@ -98,7 +104,8 @@ class IngresoAsistencia {
     /**
      * Registra una asistencia (entrada)
      */
-    public function registrarEntrada(int $usuarioId, int $sesionId, int $registradoPor, string $codigoLlavero = null): bool {
+    public function registrarEntrada(int $usuarioId, int $sesionId, int $registradoPor, string $codigoLlavero = null): bool
+    {
         $sql = "INSERT INTO {$this->table}
                     (fecha, hora_entrada, Usuario_id, Sesion_id, registrado_por, codigo_llavero, estado)
                 VALUES
@@ -115,7 +122,8 @@ class IngresoAsistencia {
     /**
      * Marca la salida de una asistencia
      */
-    public function registrarSalida(int $asistenciaId): bool {
+    public function registrarSalida(int $asistenciaId): bool
+    {
         $sql = "UPDATE {$this->table}
                 SET hora_salida = CURTIME(), estado = 'Completado'
                 WHERE id = :id";
@@ -126,7 +134,8 @@ class IngresoAsistencia {
     /**
      * Marca una asistencia como justificada (compatible con ExcusaController)
      */
-    public function justificar(int $asistenciaId): bool {
+    public function justificar(int $asistenciaId): bool
+    {
         // En la nueva DB no hay estado 'Justificado' en asistencia;
         // la justificación se gestiona a través de la tabla excusa/estado_excusa.
         // Este método queda como stub para compatibilidad.
