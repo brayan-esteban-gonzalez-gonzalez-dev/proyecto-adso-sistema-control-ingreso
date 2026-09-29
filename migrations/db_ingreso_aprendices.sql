@@ -18,9 +18,24 @@ CREATE DATABASE IF NOT EXISTS `db_ingreso_aprendices`
 USE `db_ingreso_aprendices`;
 
 -- -----------------------------------------------------
+-- Eliminación de tablas en orden inverso para evitar error #1451
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `estado_excusa`;
+DROP TABLE IF EXISTS `excusa`;
+DROP TABLE IF EXISTS `inasistencia`;
+DROP TABLE IF EXISTS `asistencia`;
+DROP TABLE IF EXISTS `sesion`;
+DROP TABLE IF EXISTS `instructor_competencia`;
+DROP TABLE IF EXISTS `competencia`;
+DROP TABLE IF EXISTS `Usuario`;
+DROP TABLE IF EXISTS `Ficha`;
+DROP TABLE IF EXISTS `jornada`;
+DROP TABLE IF EXISTS `Programa`;
+DROP TABLE IF EXISTS `Rol`;
+
+-- -----------------------------------------------------
 -- 1. Tabla: Rol
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `Rol`;
 CREATE TABLE IF NOT EXISTS `Rol` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `nombre` VARCHAR(45) NOT NULL,
@@ -31,7 +46,6 @@ CREATE TABLE IF NOT EXISTS `Rol` (
 -- -----------------------------------------------------
 -- 2. Tabla: Programa
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `Programa`;
 CREATE TABLE IF NOT EXISTS `Programa` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `nombre` VARCHAR(100) NOT NULL,
@@ -42,7 +56,6 @@ CREATE TABLE IF NOT EXISTS `Programa` (
 -- -----------------------------------------------------
 -- 3. Tabla: Jornada
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `jornada`;
 CREATE TABLE IF NOT EXISTS `jornada` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `nombre` VARCHAR(45) NOT NULL,
@@ -55,7 +68,6 @@ CREATE TABLE IF NOT EXISTS `jornada` (
 -- -----------------------------------------------------
 -- 4. Tabla: Ficha
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `Ficha`;
 CREATE TABLE IF NOT EXISTS `Ficha` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `codigo` INT(7) NOT NULL,
@@ -87,7 +99,6 @@ CREATE TABLE IF NOT EXISTS `Ficha` (
 -- -----------------------------------------------------
 -- 5. Tabla: Usuario
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `Usuario`;
 CREATE TABLE IF NOT EXISTS `Usuario` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `nombre` VARCHAR(45) NOT NULL,
@@ -120,7 +131,6 @@ CREATE TABLE IF NOT EXISTS `Usuario` (
 -- -----------------------------------------------------
 -- 6. Tabla: Competencia
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `competencia`;
 CREATE TABLE IF NOT EXISTS `competencia` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `Programa_id` INT NOT NULL,
@@ -144,7 +154,6 @@ CREATE TABLE IF NOT EXISTS `competencia` (
 -- -----------------------------------------------------
 -- 7. Tabla: instructor_competencia (Legacy / Sincronización)
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `instructor_competencia`;
 CREATE TABLE IF NOT EXISTS `instructor_competencia` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `Instructor_id` INT NOT NULL,
@@ -166,7 +175,6 @@ CREATE TABLE IF NOT EXISTS `instructor_competencia` (
 -- -----------------------------------------------------
 -- 8. Tabla: Sesion
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `sesion`;
 CREATE TABLE IF NOT EXISTS `sesion` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `Ficha_id` INT NOT NULL,
@@ -201,7 +209,6 @@ CREATE TABLE IF NOT EXISTS `sesion` (
 -- -----------------------------------------------------
 -- 9. Tabla: Asistencia
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `asistencia`;
 CREATE TABLE IF NOT EXISTS `asistencia` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `fecha` DATE NOT NULL,
@@ -239,7 +246,6 @@ CREATE TABLE IF NOT EXISTS `asistencia` (
 -- -----------------------------------------------------
 -- 10. Tabla: Inasistencia
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `inasistencia`;
 CREATE TABLE IF NOT EXISTS `inasistencia` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `Usuario_id` INT NOT NULL,
@@ -272,7 +278,6 @@ CREATE TABLE IF NOT EXISTS `inasistencia` (
 -- -----------------------------------------------------
 -- 11. Tabla: Excusa
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `excusa`;
 CREATE TABLE IF NOT EXISTS `excusa` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `fecha` DATE NOT NULL,
@@ -309,7 +314,6 @@ CREATE TABLE IF NOT EXISTS `excusa` (
 -- -----------------------------------------------------
 -- 12. Tabla: Estado_Excusa
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `estado_excusa`;
 CREATE TABLE IF NOT EXISTS `estado_excusa` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `fecha` DATE NULL,
@@ -352,7 +356,6 @@ ON DUPLICATE KEY UPDATE
   `nombre` = VALUES(`nombre`),
   `hora_inicio` = VALUES(`hora_inicio`),
   `hora_fin` = VALUES(`hora_fin`);
-
 -- Usuarios iniciales de prueba (claves cifradas con password_hash: admin123, instructor123, aprendiz123)
 INSERT INTO `Usuario` (`id`, `nombre`, `apellido`, `identificacion`, `email`, `password`, `Rol_id`, `Ficha_id`, `codigo_llavero`, `estado`) VALUES
 (1, 'Admin', 'SENA', 1000000001, 'admin@sena.edu.co', '$2y$10$3g/ZtekvGBqB/3yyY.LoJeUdTaKpwDxgoyNLiy15Faw5JSn4cTsn2', 1, NULL, NULL, 'Activo'),
