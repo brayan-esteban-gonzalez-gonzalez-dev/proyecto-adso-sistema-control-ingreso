@@ -1,12 +1,13 @@
 <?php
 /**
  * Usuario.php — Modelo de Usuarios
- * 
- * CRUD completo para la tabla `usuarios` + autenticación.
+ *
+ * CRUD completo para la tabla `Usuario` + autenticación.
+ * Nueva DB: tabla `Usuario`, PK `id`, campos: identificacion, email, Rol_id, Ficha_id, codigo_llavero.
  */
 class Usuario {
     private PDO $conn;
-    private string $table = 'usuarios';
+    private string $table = 'Usuario';
 
     public function __construct(PDO $db) {
         $this->conn = $db;
@@ -18,8 +19,8 @@ class Usuario {
     public function getAll(): array {
         $sql = "SELECT u.*, r.nombre AS nombre_rol
                 FROM {$this->table} u
-                INNER JOIN roles r ON u.id_rol = r.id_rol
-                ORDER BY u.creado_en DESC";
+                INNER JOIN Rol r ON u.Rol_id = r.id
+                ORDER BY u.apellido, u.nombre";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll();
@@ -31,8 +32,8 @@ class Usuario {
     public function getById(int $id): ?array {
         $sql = "SELECT u.*, r.nombre AS nombre_rol
                 FROM {$this->table} u
-                INNER JOIN roles r ON u.id_rol = r.id_rol
-                WHERE u.id_usuario = :id";
+                INNER JOIN Rol r ON u.Rol_id = r.id
+                WHERE u.id = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':id' => $id]);
         $result = $stmt->fetch();
@@ -40,48 +41,96 @@ class Usuario {
     }
 
     /**
-     * Obtiene un usuario por número de documento
+     * Obtiene un usuario por número de identificación
      */
-    public function getByDocumento(string $documento): ?array {
+    public function getByDocumento(string $identificacion): ?array {
         $sql = "SELECT u.*, r.nombre AS nombre_rol
                 FROM {$this->table} u
-                INNER JOIN roles r ON u.id_rol = r.id_rol
-                WHERE u.num_documento = :doc";
+                INNER JOIN Rol r ON u.Rol_id = r.id
+                WHERE u.identificacion = :identificacion";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([':doc' => $documento]);
+        $stmt->execute([':identificacion' => $identificacion]);
         $result = $stmt->fetch();
         return $result ?: null;
     }
 
     /**
-     * Obtiene un usuario por correo electrónico
+     * Obtiene un usuario por correo electrónico (email)
      */
-    public function getByCorreo(string $correo): ?array {
+    public function getByCorreo(string $email): ?array {
         $sql = "SELECT u.*, r.nombre AS nombre_rol
                 FROM {$this->table} u
-                INNER JOIN roles r ON u.id_rol = r.id_rol
-                WHERE u.correo = :correo";
+                INNER JOIN Rol r ON u.Rol_id = r.id
+                WHERE u.email = :email";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([':correo' => $correo]);
+        $stmt->execute([':email' => $email]);
         $result = $stmt->fetch();
         return $result ?: null;
     }
 
     /**
-     * Obtiene todos los instructores (rol 2) activos
+     * Obtiene todos los instructores (roles 1 y 2) activos
      */
     public function getInstructores(): array {
-        $sql = "SELECT * FROM {$this->table} WHERE id_rol IN (1,2) AND estado = 'Activo' ORDER BY nombre";
+        $sql = "SELECT * FROM {$this->table} WHERE Rol_id IN (1,2) AND estado = 'Activo' ORDER BY nombre";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll();
     }
 
     /**
-     * Autentica un usuario por documento y contraseña
+     * Obtiene todos los aprendices (rol 3) con datos de ficha
      */
-    public function authenticate(string $documento, string $password): ?array {
-        $usuario = $this->getByDocumento($documento);
+    public function getAprendices(): array {
+        $sql = "SELECT u.*,
+                       f.codigo AS codigo_ficha,
+                       p.nombre AS nombre_programa,
+                       r.nombre AS nombre_rol
+                FROM {$this->table} u
+                INNER JOIN Rol r ON u.Rol_id = r.id
+                LEFT JOIN Ficha f ON u.Ficha_id = f.id
+                LEFT JOIN Programa p ON f.Programa_id = p.id
+                WHERE u.Rol_id = 3
+                ORDER BY u.apellido, u.nombre";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Obtiene aprendices por ficha
+     */
+    public function getAprendicesByFicha(int $fichaId): array {
+        $sql = "SELECT u.*
+                FROM {$this->table} u
+                WHERE u.Rol_id = 3 AND u.Ficha_id = :ficha_id AND u.estado = 'Activo'
+                ORDER BY u.apellido, u.nombre";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':ficha_id' => $fichaId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Obtiene un usuario por código de llavero (RFID)
+     */
+    public function getByCodigoLlavero(string $codigo): ?array {
+        $sql = "SELECT u.*, r.nombre AS nombre_rol,
+                       f.codigo AS codigo_ficha
+                FROM {$this->table} u
+                INNER JOIN Rol r ON u.Rol_id = r.id
+                LEFT JOIN Ficha f ON u.Ficha_id = f.id
+                WHERE u.codigo_llavero = :codigo AND u.estado = 'Activo'";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':codigo' => $codigo]);
+        $result = $stmt->fetch();
+        return $result ?: null;
+    }
+
+    /**
+     * Autentica un usuario por identificación y contraseña
+     */
+    public function authenticate(string $identificacion, string $password): ?array {
+        $usuario = $this->getByDocumento($identificacion);
         if ($usuario && $usuario['estado'] === 'Activo' && password_verify($password, $usuario['password'])) {
             return $usuario;
         }
@@ -92,17 +141,19 @@ class Usuario {
      * Crea un nuevo usuario
      */
     public function create(array $data): bool {
-        $sql = "INSERT INTO {$this->table} (id_rol, num_documento, nombre, apellido, correo, password, estado)
-                VALUES (:id_rol, :num_documento, :nombre, :apellido, :correo, :password, :estado)";
+        $sql = "INSERT INTO {$this->table} (Rol_id, identificacion, nombre, apellido, email, password, Ficha_id, codigo_llavero, estado)
+                VALUES (:Rol_id, :identificacion, :nombre, :apellido, :email, :password, :Ficha_id, :codigo_llavero, :estado)";
         $stmt = $this->conn->prepare($sql);
         return $stmt->execute([
-            ':id_rol'        => $data['id_rol'],
-            ':num_documento' => $data['num_documento'],
-            ':nombre'        => $data['nombre'],
-            ':apellido'      => $data['apellido'],
-            ':correo'        => $data['correo'],
-            ':password'      => password_hash($data['password'], PASSWORD_BCRYPT),
-            ':estado'        => $data['estado'] ?? 'Activo',
+            ':Rol_id'         => $data['Rol_id'],
+            ':identificacion' => $data['identificacion'],
+            ':nombre'         => $data['nombre'],
+            ':apellido'       => $data['apellido'],
+            ':email'          => $data['email'],
+            ':password'       => password_hash($data['password'], PASSWORD_BCRYPT),
+            ':Ficha_id'       => $data['Ficha_id'] ?? null,
+            ':codigo_llavero' => $data['codigo_llavero'] ?? null,
+            ':estado'         => $data['estado'] ?? 'Activo',
         ]);
     }
 
@@ -120,8 +171,8 @@ class Usuario {
         $fields = [];
         $params = [':id' => $id];
 
-        foreach (['id_rol', 'num_documento', 'nombre', 'apellido', 'correo', 'estado'] as $field) {
-            if (isset($data[$field])) {
+        foreach (['Rol_id', 'identificacion', 'nombre', 'apellido', 'email', 'Ficha_id', 'codigo_llavero', 'estado'] as $field) {
+            if (array_key_exists($field, $data)) {
                 $fields[] = "{$field} = :{$field}";
                 $params[":{$field}"] = $data[$field];
             }
@@ -137,7 +188,7 @@ class Usuario {
             return false;
         }
 
-        $sql = "UPDATE {$this->table} SET " . implode(', ', $fields) . " WHERE id_usuario = :id";
+        $sql = "UPDATE {$this->table} SET " . implode(', ', $fields) . " WHERE id = :id";
         $stmt = $this->conn->prepare($sql);
         return $stmt->execute($params);
     }
@@ -146,7 +197,7 @@ class Usuario {
      * Elimina un usuario por su ID
      */
     public function delete(int $id): bool {
-        $sql = "DELETE FROM {$this->table} WHERE id_usuario = :id";
+        $sql = "DELETE FROM {$this->table} WHERE id = :id";
         $stmt = $this->conn->prepare($sql);
         return $stmt->execute([':id' => $id]);
     }
@@ -164,10 +215,10 @@ class Usuario {
     /**
      * Cuenta usuarios por rol
      */
-    public function countByRol(int $idRol): int {
-        $sql = "SELECT COUNT(*) as total FROM {$this->table} WHERE id_rol = :id_rol AND estado = 'Activo'";
+    public function countByRol(int $rolId): int {
+        $sql = "SELECT COUNT(*) as total FROM {$this->table} WHERE Rol_id = :rol_id AND estado = 'Activo'";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([':id_rol' => $idRol]);
+        $stmt->execute([':rol_id' => $rolId]);
         return (int) $stmt->fetch()['total'];
     }
 }
