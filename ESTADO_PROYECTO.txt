@@ -1,0 +1,481 @@
+================================================================================
+  ESTADO DEL PROYECTO — SISTEMA DE CONTROL DE INGRESO DE APRENDICES (SENA)
+  Fecha de generación: 2026-09-29
+  Autor del análisis: Antigravity (asistente de desarrollo)
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 1 — DESCRIPCIÓN GENERAL DEL PROYECTO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Nombre:       Sistema de Control e Ingreso de Aprendices
+  Institución:  SENA (Servicio Nacional de Aprendizaje)
+  Stack:        PHP 8, MySQL (MariaDB), Vanilla CSS, Vanilla JS, Font Awesome
+  Arquitectura: MVC (Modelo-Vista-Controlador), Front Controller (index.php)
+  DB activa:    db_ingreso_aprendices (script: migrations/db_ingreso_aprendices.sql)
+
+  El sistema permite controlar la asistencia e ingreso de aprendices SENA
+  mediante registro de sesiones de clase, llaveros RFID, excusas y reportes.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 2 — ESTRUCTURA DE ARCHIVOS ACTUAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /
+  ├── index.php                        ← Front Controller
+  ├── config/
+  │   └── Database.php                ← Singleton PDO (db_ingreso_aprendices)
+  ├── helpers/
+  │   ├── Auth.php                    ← Autenticación, sesiones, CSRF, roles
+  │   ├── Router.php                  ← Enrutador ?action=controlador/metodo
+  │   └── Validator.php               ← Validaciones del servidor
+  ├── models/
+  │   ├── Rol.php                     ← Tabla Rol (id, nombre, descripcion)
+  │   ├── Usuario.php                 ← Tabla Usuario (auth + CRUD completo)
+  │   ├── Ficha.php                   ← Tabla Ficha + Programa + jornada
+  │   ├── Aprendiz.php                ← Wrapper de Usuario (Rol_id=3)
+  │   ├── IngresoAsistencia.php       ← Tabla asistencia + inasistencia
+  │   └── ExcusaMedica.php            ← Tablas excusa + estado_excusa
+  ├── controllers/
+  │   ├── AuthController.php          ← Login / Logout
+  │   ├── DashboardController.php     ← Estadísticas generales
+  │   ├── UsuarioController.php       ← CRUD Usuarios (Admin/Instructor)
+  │   ├── FichaController.php         ← CRUD Fichas
+  │   ├── AprendizController.php      ← CRUD Aprendices
+  │   ├── AsistenciaController.php    ← Historial de asistencia
+  │   └── ExcusaController.php        ← Gestión de excusas
+  ├── views/
+  │   ├── layouts/header.php          ← Plantilla de cabecera global
+  │   ├── layouts/footer.php          ← Plantilla de pie de página
+  │   ├── auth/login.php              ← Formulario de login
+  │   ├── dashboard/index.php         ← Panel principal con estadísticas
+  │   ├── usuarios/index.php          ← Lista de usuarios
+  │   ├── usuarios/form.php           ← Formulario crear/editar usuario
+  │   ├── fichas/index.php            ← Lista de fichas
+  │   ├── fichas/form.php             ← Formulario crear/editar ficha
+  │   ├── aprendices/index.php        ← Lista de aprendices
+  │   ├── aprendices/form.php         ← Formulario crear/editar aprendiz
+  │   ├── asistencia/historial.php    ← Historial de asistencia (tabla)
+  │   ├── asistencia/rfid.php         ← Vista de registro RFID
+  │   ├── excusas/index.php           ← Lista de excusas
+  │   ├── excusas/form.php            ← Formulario enviar excusa
+  │   └── excusas/revisar.php         ← Revisar/aprobar/rechazar excusa
+  ├── migrations/
+  │   ├── db_ingreso_aprendices.sql   ← Script CONSOLIDADO (DB nueva - USAR ESTE)
+  │   └── 001-sistema-ingresos.sql    ← Script ANTIGUO (no usar)
+  └── assets/                         ← CSS, JS, imágenes, uploads
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 3 — CAMBIOS REALIZADOS FRENTE A LA NUEVA BASE DE DATOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  La base de datos fue completamente rediseñada. A continuación el mapeo
+  entre la DB antigua (001-sistema-ingresos.sql) y la nueva (db_ingreso_aprendices.sql):
+
+  ┌──────────────────────────────┬──────────────────────────────────────────────┐
+  │  DB ANTIGUA                  │  DB NUEVA                                    │
+  ├──────────────────────────────┼──────────────────────────────────────────────┤
+  │  roles (idRol, nombre)       │  Rol (id, nombre, descripcion)               │
+  ├──────────────────────────────┼──────────────────────────────────────────────┤
+  │  usuarios                    │  Usuario                                     │
+  │    idUsuario                 │    id                                        │
+  │    numDocumento              │    identificacion (BIGINT)                   │
+  │    correoElectronico         │    email                                     │
+  │    fk_roles_idRol            │    Rol_id                                    │
+  │    (sin ficha directa)       │    Ficha_id (NULL para admin/instructor)     │
+  │    (sin RFID)                │    codigo_llavero                            │
+  │    creadoEn                  │    estado (ENUM Activo/Inactivo)             │
+  ├──────────────────────────────┼──────────────────────────────────────────────┤
+  │  fichas                      │  Ficha                                       │
+  │    idFicha                   │    id                                        │
+  │    codigoFicha (varchar)     │    codigo (INT 7 dígitos)                    │
+  │    nombrePrograma (en ficha) │    Programa_id → tabla Programa separada     │
+  │    fk_instructor_lider       │    instructor_id                             │
+  │    (sin jornada)             │    jornada_id → tabla jornada                │
+  │    (sin estado)              │    estado (ENUM Activo/Inactivo)             │
+  ├──────────────────────────────┼──────────────────────────────────────────────┤
+  │  aprendices (tabla propia)   │  NO EXISTE — aprendiz = Usuario con Rol_id=3│
+  │    idAprendices              │    (id del Usuario)                          │
+  │    codigoRfid                │    codigo_llavero (en tabla Usuario)         │
+  │    fk_usuarios_idUsuario     │    (el Usuario mismo)                        │
+  │    fk_fichas_idFicha         │    Ficha_id (en tabla Usuario)               │
+  ├──────────────────────────────┼──────────────────────────────────────────────┤
+  │  horarios (diaSemana, horas) │  jornada (hora_inicio, hora_fin, nombre)     │
+  │  ingresos_asistencias        │  asistencia + sesion + inasistencia          │
+  │    fk_aprendices_idAprendices│    Usuario_id + Sesion_id                    │
+  │    estado A_Tiempo/Retardo   │    minutos_retardo, minutos_anticipacion     │
+  ├──────────────────────────────┼──────────────────────────────────────────────┤
+  │  excusasmedicas              │  excusa + estado_excusa (tablas separadas)   │
+  │    fechaInicio / fechaFin    │    fecha (solo una fecha)                    │
+  │    archivoAdjunto            │    evidencia                                 │
+  │    aprendices_idAprendices   │    Usuario_id                                │
+  │    estado (en misma tabla)   │    estado_excusa.estado (tabla separada)     │
+  │    comentarioRevision        │    estado_excusa.respuesta                   │
+  │    (sin tabla de auditoría)  │    estado_excusa.Instructor_id, fecha        │
+  └──────────────────────────────┴──────────────────────────────────────────────┘
+
+  TABLAS NUEVAS SIN EQUIVALENTE EN LA DB ANTIGUA:
+  ─────────────────────────────────────────────────
+  • Programa (id, nombre, descripcion)
+      → Los programas ya no son texto libre en fichas, son entidades propias.
+      → CRUD de Programa: NO IMPLEMENTADO aún.
+
+  • jornada (id, nombre, hora_inicio, hora_fin)
+      → Reemplaza la tabla horarios (diaSemana + horas).
+      → Se eliminó el concepto de horario por día de la semana.
+      → CRUD de Jornada: NO IMPLEMENTADO aún.
+
+  • sesion (id, Ficha_id, Competencia_id, Instructor_id, fecha, hora_inicio,
+            hora_fin, estado)
+      → Cada sesión de clase es una entidad. La asistencia se asocia a sesiones.
+      → CRUD de Sesión: NO IMPLEMENTADO aún.
+
+  • competencia (id, Programa_id, Instructor_id, nombre, descripcion)
+      → Módulo de competencias por programa.
+      → CRUD de Competencia: NO IMPLEMENTADO aún.
+
+  • instructor_competencia (Instructor_id, Competencia_id)
+      → Tabla de relación instructor-competencia (legacy/sync).
+      → Gestión: NO IMPLEMENTADA aún.
+
+  • inasistencia (id, Usuario_id, Ficha_id, Sesion_id, fecha, generado_por)
+      → Las inasistencias son entidades propias.
+      → CRUD/generación automática: NO IMPLEMENTADO aún.
+
+  • estado_excusa (id, fecha, respuesta, estado, Excusa_id, Instructor_id)
+      → La aprobación/rechazo de excusas crea registros en esta tabla.
+      → Implementado en modelo ExcusaMedica::aprobar/rechazar.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 4 — ESTADO DE FUNCIONALIDADES (QUÉ ESTÁ Y QUÉ FALTA)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  LEYENDA: [✅ LISTO] [⚠️ PARCIAL] [❌ FALTA] [🔧 REQUIERE AJUSTE DE VISTA]
+
+  ─── MÓDULO 1: AUTENTICACIÓN Y SESIONES ─────────────────────────────────────
+
+  ✅  Login con identificacion + password (Auth::authenticate)
+  ✅  Logout con destrucción de sesión
+  ✅  Protección CSRF en todos los formularios POST
+  ✅  session_regenerate_id al iniciar sesión
+  ✅  password_hash (BCRYPT) al crear/actualizar usuarios
+  ✅  password_verify al autenticar
+  ✅  Bloqueo de usuarios con estado 'Inactivo' (solo entran usuarios 'Activo')
+  ✅  Protección de rutas (Auth::requireLogin / requireAdmin)
+  ⚠️  Auth::login mapea los nuevos campos (id, Rol_id, email, identificacion)
+      → AJUSTADO, pero las vistas aún podrían mostrar $usuario['correo'] o
+        $usuario['num_documento'] en lugar de 'email' e 'identificacion'.
+
+  ─── MÓDULO 2: CONTROL DE ACCESO POR ROLES ──────────────────────────────────
+
+  ✅  Rol 1 — Administrador: acceso total
+  ✅  Rol 2 — Instructor: gestión de fichas/aprendices
+  ✅  Rol 3 — Aprendiz: solo ve sus excusas y asistencia
+  ✅  Auth::isAdmin(), isInstructor(), isAprendiz(), isAdminOrInstructor()
+  ✅  Vistas diferenciadas por rol en dashboard y accesos rápidos
+
+  ─── MÓDULO 3: CRUD USUARIOS ─────────────────────────────────────────────────
+
+  ✅  Listar usuarios con rol (getAll + JOIN Rol)
+  ✅  Crear usuario (con validaciones: documento único, email, contraseña min 6)
+  ✅  Editar usuario (contraseña opcional al editar)
+  ✅  Eliminar usuario (con protección de auto-eliminación)
+  ✅  Conteo por rol (countByRol)
+  🔧  Vista form.php de Usuarios usa $usuario['id_usuario'] y $usuario['correo']
+      → DEBE ACTUALIZARSE a $usuario['id'] y $usuario['email']
+  🔧  Vista form.php muestra campo select rol con $rol['id_rol']
+      → DEBE ACTUALIZARSE a $rol['id']
+  ❌  Falta campo codigo_llavero en el formulario de usuarios (Admin/Instructor)
+
+  ─── MÓDULO 4: CRUD FICHAS ───────────────────────────────────────────────────
+
+  ✅  Listar fichas (con programa, jornada, instructor, total aprendices)
+  ✅  Crear ficha (con Programa_id, jornada_id, instructor_id, estado)
+  ✅  Editar ficha
+  ✅  Eliminar ficha
+  ✅  getProgramas() y getJornadas() disponibles en el modelo
+  🔧  Vista form.php de Fichas aún usa campos ANTIGUOS:
+      → codigo_ficha (text) → CAMBIAR a campo numérico 'codigo_ficha' (se envía como POST)
+      → nombre_programa (text libre) → CAMBIAR a <select> con lista de Programas
+      → id_instructor_lider → OK (ya mapeado en controlador)
+      → Falta <select> de Jornada en el formulario
+  🔧  Vista index.php de Fichas usa $f['codigo_ficha'] y $f['id_ficha']
+      → CAMBIAR a $f['codigo'] y $f['id']
+      → El enlace a Horarios (?action=horarios) apunta a un controlador inexistente
+
+  ─── MÓDULO 5: CRUD APRENDICES ───────────────────────────────────────────────
+
+  ✅  Listar aprendices (wrapper sobre Usuario con Rol_id=3)
+  ✅  Crear aprendiz (inserta en tabla Usuario con Rol_id=3)
+  ✅  Editar aprendiz (actualiza Ficha_id y codigo_llavero)
+  ✅  Eliminar aprendiz
+  ✅  getByRfid() para lectura de llavero
+  🔧  Vista form.php de Aprendices usa:
+      → $aprendiz['num_documento'] → CAMBIAR a $aprendiz['identificacion']
+      → $aprendiz['correo'] → CAMBIAR a $aprendiz['email']
+      → $aprendiz['id_aprendiz'] → OK (alias mantenido en modelo)
+      → $f['id_ficha'] en el select → CAMBIAR a $f['id']
+      → $f['codigo_ficha'] → CAMBIAR a $f['codigo']
+      → $aprendiz['codigo_rfid'] → CAMBIAR a $aprendiz['codigo_llavero']
+  🔧  Vista index.php de Aprendices: verificar campos mostrados en la tabla
+
+  ─── MÓDULO 6: HISTORIAL DE ASISTENCIA ──────────────────────────────────────
+
+  ✅  Vista historial.php existente
+  ✅  Filtro por fecha para Admin/Instructor
+  ✅  Filtro por rango de fechas para Aprendiz
+  ✅  Estadísticas: a tiempo, retardos, inasistencias, minutos retardo
+  ❌  getHistorial() usa tabla 'asistencia' → REQUIERE que existan sesiones primero
+  ❌  Sin CRUD de Sesiones, la asistencia no puede registrarse manualmente
+  ❌  La vista rfid.php (registro RFID) existe pero el controlador de registro
+      automático no está implementado (HorarioController no existe)
+  ❌  No hay lógica de generación automática de inasistencias
+
+  ─── MÓDULO 7: GESTIÓN DE EXCUSAS ────────────────────────────────────────────
+
+  ✅  Listar excusas (todas / pendientes / propias según rol)
+  ✅  Crear excusa con subida de archivo (evidencia en assets/uploads/excusas/)
+  ✅  Revisar excusa (admin/instructor)
+  ✅  Aprobar excusa (crea registro en estado_excusa)
+  ✅  Rechazar excusa (crea registro en estado_excusa)
+  ✅  countPendientes() para el dashboard
+  ⚠️  Vista form.php de excusas aún puede referenciar fecha_inicio/fecha_fin
+      → La nueva tabla 'excusa' solo tiene campo 'fecha' (una sola fecha)
+  ⚠️  La excusa debe referenciar Asistencia_id O Inasistencia_id (constraint CHECK)
+      → El formulario debe permitir al aprendiz seleccionar a cuál sesión aplica
+
+  ─── MÓDULO 8: DASHBOARD ─────────────────────────────────────────────────────
+
+  ✅  Tarjetas de estadísticas: usuarios, instructores, fichas, aprendices, excusas
+  ✅  Accesos rápidos diferenciados por rol
+  ❌  Sin gráficos dinámicos (Chart.js o similar)
+  ❌  Sin endpoint API JSON para datos de gráficos
+  ❌  Sin métricas de asistencia global (% asistencia, top inasistentes)
+
+  ─── MÓDULO 9: PROGRAMAS (TABLA NUEVA) ───────────────────────────────────────
+
+  ❌  Sin modelo Programa.php
+  ❌  Sin ProgramaController.php
+  ❌  Sin vistas para CRUD de Programas
+  ❌  Sin ruta en Router (falta 'programas' => 'ProgramaController')
+  ⚠️  FichaController carga getProgramas() para el <select>, pero la vista
+      fichas/form.php aún no usa la variable $programas
+
+  ─── MÓDULO 10: JORNADAS (TABLA NUEVA) ──────────────────────────────────────
+
+  ❌  Sin modelo Jornada.php independiente
+  ❌  Sin JornadaController.php
+  ❌  Sin vistas para CRUD de Jornadas
+      (Nota: getJornadas() sí existe en Ficha.php para cargar el <select>)
+
+  ─── MÓDULO 11: SESIONES (TABLA NUEVA) ──────────────────────────────────────
+
+  ❌  Sin modelo Sesion.php
+  ❌  Sin SesionController.php
+  ❌  Sin vistas para CRUD de Sesiones
+  ❌  Sin ruta en Router
+  ⚠️  CRÍTICO: sin sesiones, no se puede registrar asistencia
+
+  ─── MÓDULO 12: COMPETENCIAS (TABLA NUEVA) ──────────────────────────────────
+
+  ❌  Sin modelo Competencia.php
+  ❌  Sin CompetenciaController.php
+  ❌  Sin vistas para CRUD de Competencias
+  ❌  Sin gestión de relación instructor_competencia
+
+  ─── MÓDULO 13: REPORTES / EXPORTACIÓN ──────────────────────────────────────
+
+  ❌  Sin ReporteController.php (referenciado en Router pero el archivo no existe)
+  ❌  Sin generación de PDF (FPDF no instalado/configurado)
+  ❌  Sin exportación a CSV/Excel
+  ❌  Sin reporte de asistencia por ficha
+  ❌  Sin reporte de excusas por período
+
+  ─── MÓDULO 14: HORARIOS (REEMPLAZADO POR JORNADAS) ─────────────────────────
+
+  ❌  HorarioController referenciado en Router.php pero no existe el archivo
+  ❌  La vista fichas/index.php enlaza a ?action=horarios pero no funciona
+      → La lógica de horarios/jornadas debe rediseñarse para la nueva DB
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 5 — AJUSTES PENDIENTES EN VISTAS (CAMPOS RENOMBRADOS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Las vistas existentes fueron escritas para la DB antigua y aún usan los
+  nombres de campos viejos. Se deben actualizar así:
+
+  VISTA                       CAMPO ANTIGUO             CAMPO NUEVO (DB nueva)
+  ─────────────────────────── ───────────────────────── ──────────────────────
+  views/usuarios/form.php     $usuario['id_usuario']    $usuario['id']
+  views/usuarios/form.php     $usuario['correo']        $usuario['email']
+  views/usuarios/form.php     $usuario['num_documento'] $usuario['identificacion']
+  views/usuarios/form.php     $rol['id_rol']            $rol['id']
+  views/usuarios/index.php    $u['id_usuario']          $u['id']
+  views/usuarios/index.php    $u['correo']              $u['email']
+  views/usuarios/index.php    $u['num_documento']       $u['identificacion']
+  views/usuarios/index.php    $u['id_rol']              $u['Rol_id']
+
+  views/fichas/form.php       Campo text libre 'nombre_programa'  → <select> Programas
+  views/fichas/form.php       Campo text 'codigo_ficha'           → campo numérico 'codigo_ficha'
+  views/fichas/form.php       (falta) select de Jornada           → agregar <select> jornadas
+  views/fichas/form.php       $inst['id_usuario']                 → $inst['id']
+  views/fichas/form.php       $inst['num_documento']              → $inst['identificacion']
+  views/fichas/index.php      $f['id_ficha']                      → $f['id']
+  views/fichas/index.php      $f['codigo_ficha']                  → $f['codigo']
+
+  views/aprendices/form.php   $aprendiz['num_documento']          → $aprendiz['identificacion']
+  views/aprendices/form.php   $aprendiz['correo']                 → $aprendiz['email']
+  views/aprendices/form.php   $aprendiz['codigo_rfid']            → $aprendiz['codigo_llavero']
+  views/aprendices/form.php   $f['id_ficha'] (select)             → $f['id']
+  views/aprendices/form.php   $f['codigo_ficha'] (select label)   → $f['codigo']
+  views/aprendices/index.php  Verificar todos los campos usados
+
+  views/excusas/form.php      fecha_inicio + fecha_fin            → solo 'fecha'
+  views/excusas/form.php      (falta) selección de Asistencia_id  → agregar el campo
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 6 — PLAN DE IMPLEMENTACIÓN RECOMENDADO (PRIORIDADES)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  PRIORIDAD ALTA (bloquean el funcionamiento básico):
+  ────────────────────────────────────────────────────
+  [P1] Actualizar vistas (form.php / index.php) con los nuevos nombres de
+       campos de la DB. Sin esto, los formularios POST rompen o muestran vacíos.
+
+  [P2] Crear modelo Programa.php + ProgramaController.php + vistas CRUD.
+       Sin programas, no se pueden crear fichas (Programa_id es NOT NULL).
+
+  [P3] Actualizar fichas/form.php para usar <select> de Programas y Jornadas.
+
+  [P4] Crear modelo Sesion.php + SesionController.php + vistas CRUD.
+       Sin sesiones, la asistencia no tiene referencia (Sesion_id es FK NOT NULL).
+
+  [P5] Eliminar o corregir la ruta 'horarios' en Router.php (HorarioController
+       no existe y causa error 404).
+
+  PRIORIDAD MEDIA (funcionalidades core del sistema):
+  ────────────────────────────────────────────────────
+  [P6] Crear modelo Competencia.php + CompetenciaController.php.
+       Las sesiones requieren Competencia_id (FK NOT NULL en tabla sesion).
+
+  [P7] Implementar registro automático de asistencia por RFID
+       (leer codigo_llavero → buscar usuario → registrar en tabla asistencia).
+
+  [P8] Implementar generación automática de inasistencias al cerrar una sesión
+       (insertar en tabla 'inasistencia' los usuarios sin registro de asistencia).
+
+  [P9] Actualizar vista excusas/form.php:
+       - Cambiar fecha_inicio/fecha_fin por campo 'fecha'
+       - Agregar selector de Asistencia_id o Inasistencia_id
+
+  PRIORIDAD BAJA (enriquecimiento y reportes):
+  ─────────────────────────────────────────────
+  [P10] Crear ReporteController.php con exportación de asistencia a PDF/CSV.
+        (Instalar FPDF via Composer o descarga manual)
+
+  [P11] Agregar gráficos al Dashboard (Chart.js):
+        - Asistencia por mes
+        - Distribución por fichas
+        - Excusas aprobadas vs rechazadas
+
+  [P12] Implementar CRUD de Jornadas (modelo independiente + controlador + vistas).
+
+  [P13] Crear vista de gestión de relación instructor_competencia.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 7 — RESPONSABILIDADES POR MÓDULO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  MÓDULO                RESPONSABLE SUGERIDO   ARCHIVO(S) INVOLUCRADOS
+  ──────────────────── ───────────────────── ────────────────────────────────────
+  Autenticación        Desarrollador A       helpers/Auth.php, AuthController,
+                                            views/auth/login.php
+
+  CRUD Usuarios        Desarrollador A       models/Usuario.php,
+                                            controllers/UsuarioController.php,
+                                            views/usuarios/form.php,
+                                            views/usuarios/index.php
+
+  CRUD Programas       Desarrollador B       models/Programa.php (CREAR),
+                                            controllers/ProgramaController.php (CREAR),
+                                            views/programas/ (CREAR)
+
+  CRUD Fichas          Desarrollador B       models/Ficha.php,
+                                            controllers/FichaController.php,
+                                            views/fichas/form.php (ACTUALIZAR),
+                                            views/fichas/index.php (ACTUALIZAR)
+
+  CRUD Competencias    Desarrollador B       models/Competencia.php (CREAR),
+                                            controllers/CompetenciaController.php (CREAR),
+                                            views/competencias/ (CREAR)
+
+  CRUD Sesiones        Desarrollador C       models/Sesion.php (CREAR),
+                                            controllers/SesionController.php (CREAR),
+                                            views/sesiones/ (CREAR)
+
+  CRUD Aprendices      Desarrollador A       models/Aprendiz.php,
+                                            controllers/AprendizController.php,
+                                            views/aprendices/form.php (ACTUALIZAR),
+                                            views/aprendices/index.php (ACTUALIZAR)
+
+  Registro RFID        Desarrollador C       views/asistencia/rfid.php,
+                                            models/IngresoAsistencia.php,
+                                            (controlador de registro RFID en
+                                             AsistenciaController o nuevo)
+
+  Asistencia           Desarrollador C       models/IngresoAsistencia.php,
+                                            controllers/AsistenciaController.php,
+                                            views/asistencia/historial.php
+
+  Inasistencias        Desarrollador C       (lógica en cierre de sesión)
+                                            tabla inasistencia, generado_por
+
+  Excusas              Desarrollador A       models/ExcusaMedica.php,
+                                            controllers/ExcusaController.php,
+                                            views/excusas/form.php (ACTUALIZAR)
+
+  Reportes/PDF         Desarrollador B       controllers/ReporteController.php (CREAR),
+                                            views/reportes/ (CREAR),
+                                            (FPDF o librería similar)
+
+  Dashboard/Gráficos   Desarrollador A       controllers/DashboardController.php,
+                                            views/dashboard/index.php,
+                                            (Chart.js, endpoint API JSON)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 8 — RESUMEN EJECUTIVO DE ESTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  COMPLETADO (listo para usar con la nueva DB):
+  ✅ Login/Logout con CSRF y bcrypt
+  ✅ Sistema de roles (Admin, Instructor, Aprendiz)
+  ✅ CRUD Usuarios (backend listo, vista necesita ajuste de campos)
+  ✅ CRUD Fichas (backend listo, vista necesita rediseño)
+  ✅ CRUD Aprendices (como wrapper de Usuario Rol=3)
+  ✅ Gestión completa de Excusas (excusa + estado_excusa)
+  ✅ Dashboard con estadísticas básicas
+  ✅ Historial de asistencia (consultas adaptadas a nueva DB)
+  ✅ Modelos de base de datos todos actualizados a nueva DB
+  ✅ Nombre de DB actualizado en config/Database.php
+
+  PENDIENTE (requiere desarrollo):
+  ❌ Actualización de vistas con nuevos nombres de campos (URGENTE)
+  ❌ CRUD de Programas (tabla nueva, bloquea creación de fichas)
+  ❌ CRUD de Sesiones (tabla nueva, bloquea registro de asistencia)
+  ❌ CRUD de Competencias (requerido por sesiones)
+  ❌ Registro RFID automático de asistencia
+  ❌ Generación automática de inasistencias
+  ❌ Reportes/exportación PDF
+  ❌ Gráficos en dashboard (Chart.js)
+  ❌ CRUD de Jornadas (vista independiente)
+  ❌ Corrección de enlace a Horarios en fichas/index.php
+
+  PROGRESO ESTIMADO: 45% completado / 55% pendiente
+
+================================================================================
+  FIN DEL DOCUMENTO
+  Generado automáticamente por Antigravity IDE
+  Sistema: c:\xampp\htdocs\proyects\segundoCrud\git\
+           proyecto-adso-sistema-control-ingreso-main\
+           proyecto-adso-sistema-control-ingreso-main\
+================================================================================
