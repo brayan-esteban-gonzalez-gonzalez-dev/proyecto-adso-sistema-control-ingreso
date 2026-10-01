@@ -1,15 +1,16 @@
 <?php
 /**
  * UsuarioController.php — Controlador de Usuarios
- * 
+ *
  * CRUD de usuarios (solo accesible por administrador/instructor).
+ * Nueva DB: tabla `Usuario`, campos renombrados: Rol_id, identificacion, email.
  */
 class UsuarioController {
     private PDO $db;
     private Usuario $model;
 
     public function __construct(PDO $db) {
-        $this->db = $db;
+        $this->db    = $db;
         $this->model = new Usuario($db);
     }
 
@@ -18,7 +19,7 @@ class UsuarioController {
      */
     public function index(): void {
         Auth::requireAdmin();
-        $usuarios = $this->model->getAll();
+        $usuarios  = $this->model->getAll();
         $pageTitle = 'Gestión de Usuarios';
         require_once ROOT_PATH . '/views/usuarios/index.php';
     }
@@ -28,11 +29,11 @@ class UsuarioController {
      */
     public function crear(): void {
         Auth::requireAdmin();
-        $rolModel = new Rol($this->db);
-        $roles = $rolModel->getAll();
-        $usuario = null;
+        $rolModel   = new Rol($this->db);
+        $roles      = $rolModel->getAll();
+        $usuario    = null;
         $csrf_token = Auth::generateCSRF();
-        $pageTitle = 'Nuevo Usuario';
+        $pageTitle  = 'Nuevo Usuario';
         require_once ROOT_PATH . '/views/usuarios/form.php';
     }
 
@@ -41,7 +42,7 @@ class UsuarioController {
      */
     public function editar(): void {
         Auth::requireAdmin();
-        $id = (int) ($_GET['id'] ?? 0);
+        $id      = (int) ($_GET['id'] ?? 0);
         $usuario = $this->model->getById($id);
 
         if (!$usuario) {
@@ -50,10 +51,10 @@ class UsuarioController {
             exit;
         }
 
-        $rolModel = new Rol($this->db);
-        $roles = $rolModel->getAll();
+        $rolModel   = new Rol($this->db);
+        $roles      = $rolModel->getAll();
         $csrf_token = Auth::generateCSRF();
-        $pageTitle = 'Editar Usuario';
+        $pageTitle  = 'Editar Usuario';
         require_once ROOT_PATH . '/views/usuarios/form.php';
     }
 
@@ -77,23 +78,24 @@ class UsuarioController {
 
         $id = (int) ($_POST['id_usuario'] ?? 0);
 
-        // Recoger datos
+        // Recoger datos con los nuevos nombres de campo
         $data = [
-            'id_rol'        => (int) ($_POST['id_rol'] ?? 3),
-            'num_documento' => trim($_POST['num_documento'] ?? ''),
-            'nombre'        => trim($_POST['nombre'] ?? ''),
-            'apellido'      => trim($_POST['apellido'] ?? ''),
-            'correo'        => trim($_POST['correo'] ?? ''),
-            'estado'        => $_POST['estado'] ?? 'Activo',
+            'Rol_id'         => (int) ($_POST['id_rol'] ?? 3),
+            'identificacion' => trim($_POST['num_documento'] ?? ''),
+            'nombre'         => trim($_POST['nombre']        ?? ''),
+            'apellido'       => trim($_POST['apellido']      ?? ''),
+            'email'          => trim($_POST['correo']        ?? ''),
+            'codigo_llavero' => trim($_POST['codigo_llavero'] ?? '') ?: null,
+            'estado'         => $_POST['estado'] ?? 'Activo',
         ];
 
         // Validaciones
         Validator::reset();
-        Validator::required($data['num_documento'], 'número de documento');
-        Validator::required($data['nombre'], 'nombre');
-        Validator::required($data['apellido'], 'apellido');
-        Validator::required($data['correo'], 'correo');
-        Validator::email($data['correo']);
+        Validator::required($data['identificacion'], 'número de documento');
+        Validator::required($data['nombre'],         'nombre');
+        Validator::required($data['apellido'],       'apellido');
+        Validator::required($data['email'],          'correo');
+        Validator::email($data['email']);
 
         if ($id === 0) {
             // Nuevo usuario — contraseña obligatoria
@@ -126,7 +128,7 @@ class UsuarioController {
             }
         } catch (\PDOException $e) {
             if (str_contains($e->getMessage(), 'Duplicate')) {
-                Auth::setFlash('error', 'El documento o correo ya existe en el sistema.');
+                Auth::setFlash('error', 'El documento, correo o código de llavero ya existe en el sistema.');
             } else {
                 Auth::setFlash('error', 'Error al guardar: ' . $e->getMessage());
             }
