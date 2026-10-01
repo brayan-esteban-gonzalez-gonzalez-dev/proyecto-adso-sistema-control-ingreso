@@ -1,15 +1,17 @@
 <?php
 /**
- * ExcusaController.php — Controlador de Excusas Médicas
- * 
- * Gestiona el envío, visualización y revisión de excusas médicas.
+ * ExcusaController.php — Controlador de Excusas
+ *
+ * Gestiona el envío, visualización y revisión de excusas.
+ * Nueva DB: tablas `excusa` y `estado_excusa`.
+ * Los aprendices son Usuarios con Rol_id=3; ya no existe tabla `aprendices`.
  */
 class ExcusaController {
     private PDO $db;
     private ExcusaMedica $model;
 
     public function __construct(PDO $db) {
-        $this->db = $db;
+        $this->db    = $db;
         $this->model = new ExcusaMedica($db);
     }
 
@@ -26,12 +28,11 @@ class ExcusaController {
             } else {
                 $excusas = $this->model->getAll();
             }
-            $pageTitle = 'Gestión de Excusas Médicas';
+            $pageTitle = 'Gestión de Excusas';
         } else {
-            $aprendizModel = new Aprendiz($this->db);
-            $aprendiz = $aprendizModel->getByUsuario(Auth::getUserId());
-            $excusas = $aprendiz ? $this->model->getByAprendiz($aprendiz['id_aprendiz']) : [];
-            $pageTitle = 'Mis Excusas Médicas';
+            // El aprendiz consulta sus propias excusas usando su id de usuario directamente
+            $excusas   = $this->model->getByAprendiz(Auth::getUserId());
+            $pageTitle = 'Mis Excusas';
         }
 
         require_once ROOT_PATH . '/views/excusas/index.php';
@@ -50,12 +51,12 @@ class ExcusaController {
         }
 
         $csrf_token = Auth::generateCSRF();
-        $pageTitle = 'Nueva Excusa Médica';
+        $pageTitle  = 'Nueva Excusa';
         require_once ROOT_PATH . '/views/excusas/form.php';
     }
 
     /**
-     * Guarda una excusa médica
+     * Guarda una excusa
      */
     public function guardar(): void {
         Auth::requireLogin();
@@ -71,26 +72,15 @@ class ExcusaController {
             exit;
         }
 
-        $aprendizModel = new Aprendiz($this->db);
-        $aprendiz = $aprendizModel->getByUsuario(Auth::getUserId());
-
-        if (!$aprendiz) {
-            Auth::setFlash('error', 'No se encontró perfil de aprendiz.');
-            header('Location: ' . BASE_URL . '?action=excusas');
-            exit;
-        }
+        // En la nueva DB el aprendiz ES el usuario logueado (no hay tabla aprendices)
+        $idUsuario = Auth::getUserId();
 
         // Validaciones
         Validator::reset();
-        $fechaInicio = $_POST['fecha_inicio'] ?? '';
-        $fechaFin    = $_POST['fecha_fin'] ?? '';
-        $motivo      = trim($_POST['motivo'] ?? '');
-
-        Validator::required($fechaInicio, 'fecha de inicio');
-        Validator::required($fechaFin, 'fecha de fin');
+        $motivo = trim($_POST['motivo'] ?? '');
         Validator::required($motivo, 'motivo');
 
-        // Validar archivo adjunto
+        // Validar archivo adjunto (evidencia)
         if (!isset($_FILES['archivo']) || $_FILES['archivo']['error'] !== UPLOAD_ERR_OK) {
             Validator::required('', 'archivo adjunto');
         } else {
@@ -105,15 +95,15 @@ class ExcusaController {
             exit;
         }
 
-        // Subir archivo
+        // Subir archivo de evidencia
         $uploadDir = UPLOAD_PATH . 'excusas/';
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0755, true);
         }
 
-        $extension = pathinfo($_FILES['archivo']['name'], PATHINFO_EXTENSION);
-        $nombreArchivo = 'excusa_' . $aprendiz['id_aprendiz'] . '_' . time() . '.' . $extension;
-        $rutaArchivo = $uploadDir . $nombreArchivo;
+        $extension    = pathinfo($_FILES['archivo']['name'], PATHINFO_EXTENSION);
+        $nombreArchivo = 'excusa_' . $idUsuario . '_' . time() . '.' . $extension;
+        $rutaArchivo  = $uploadDir . $nombreArchivo;
 
         if (!move_uploaded_file($_FILES['archivo']['tmp_name'], $rutaArchivo)) {
             Auth::setFlash('error', 'Error al subir el archivo.');
@@ -121,19 +111,22 @@ class ExcusaController {
             exit;
         }
 
-        // Guardar excusa
+        // Determinar si está asociada a una asistencia o inasistencia
+        $asistenciaId   = !empty($_POST['Asistencia_id'])   ? (int) $_POST['Asistencia_id']   : null;
+        $inasistenciaId = !empty($_POST['Inasistencia_id']) ? (int) $_POST['Inasistencia_id'] : null;
+
         $data = [
-            'id_aprendiz'     => $aprendiz['id_aprendiz'],
-            'id_ingreso'      => !empty($_POST['id_ingreso']) ? (int) $_POST['id_ingreso'] : null,
-            'fecha_inicio'    => $fechaInicio,
-            'fecha_fin'       => $fechaFin,
-            'motivo'          => $motivo,
-            'archivo_adjunto' => 'assets/uploads/excusas/' . $nombreArchivo,
+            'usuario_id'       => $idUsuario,
+            'fecha'            => date('Y-m-d'),
+            'motivo'           => $motivo,
+            'evidencia'        => 'assets/uploads/excusas/' . $nombreArchivo,
+            'Asistencia_id'    => $asistenciaId,
+            'Inasistencia_id'  => $inasistenciaId,
         ];
 
         try {
             $this->model->create($data);
-            Auth::setFlash('success', 'Excusa médica enviada correctamente. Pendiente de revisión.');
+            Auth::setFlash('success', 'Excusa enviada correctamente. Pendiente de revisión.');
         } catch (\PDOException $e) {
             Auth::setFlash('error', 'Error al guardar la excusa: ' . $e->getMessage());
         }
@@ -147,7 +140,7 @@ class ExcusaController {
      */
     public function revisar(): void {
         Auth::requireAdmin();
-        $id = (int) ($_GET['id'] ?? 0);
+        $id     = (int) ($_GET['id'] ?? 0);
         $excusa = $this->model->getById($id);
 
         if (!$excusa) {
@@ -157,7 +150,7 @@ class ExcusaController {
         }
 
         $csrf_token = Auth::generateCSRF();
-        $pageTitle = 'Revisar Excusa Médica';
+        $pageTitle  = 'Revisar Excusa';
         require_once ROOT_PATH . '/views/excusas/revisar.php';
     }
 
@@ -178,9 +171,9 @@ class ExcusaController {
             exit;
         }
 
-        $idExcusa   = (int) ($_POST['id_excusa'] ?? 0);
-        $accion     = $_POST['accion'] ?? '';
-        $comentario = trim($_POST['comentario_revision'] ?? '');
+        $idExcusa   = (int) ($_POST['id_excusa']            ?? 0);
+        $accion     = $_POST['accion']                       ?? '';
+        $comentario = trim($_POST['comentario_revision']     ?? '');
 
         $excusa = $this->model->getById($idExcusa);
         if (!$excusa) {
@@ -192,13 +185,6 @@ class ExcusaController {
         try {
             if ($accion === 'aprobar') {
                 $this->model->aprobar($idExcusa, Auth::getUserId(), $comentario);
-
-                // Si la excusa tiene un ingreso asociado, marcarlo como justificado
-                if ($excusa['id_ingreso']) {
-                    $ingresoModel = new IngresoAsistencia($this->db);
-                    $ingresoModel->justificar($excusa['id_ingreso']);
-                }
-
                 Auth::setFlash('success', 'Excusa aprobada correctamente.');
             } elseif ($accion === 'rechazar') {
                 $this->model->rechazar($idExcusa, Auth::getUserId(), $comentario);
