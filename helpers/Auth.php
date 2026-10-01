@@ -19,12 +19,14 @@ class Auth {
      */
     public static function login(array $usuario): void {
         self::init();
-        $_SESSION['user_id']       = $usuario['id_usuario'];
-        $_SESSION['user_rol']      = $usuario['id_rol'];
+        // Compatibilidad con nueva DB: id (no id_usuario), Rol_id (no id_rol),
+        // email (no correo), identificacion (no num_documento)
+        $_SESSION['user_id']       = $usuario['id']             ?? $usuario['id_usuario']       ?? null;
+        $_SESSION['user_rol']      = $usuario['Rol_id']         ?? $usuario['id_rol']            ?? null;
         $_SESSION['user_nombre']   = $usuario['nombre'];
         $_SESSION['user_apellido'] = $usuario['apellido'];
-        $_SESSION['user_correo']   = $usuario['correo'];
-        $_SESSION['user_documento']= $usuario['num_documento'];
+        $_SESSION['user_correo']   = $usuario['email']          ?? $usuario['correo']            ?? '';
+        $_SESSION['user_documento']= $usuario['identificacion'] ?? $usuario['num_documento']     ?? '';
         session_regenerate_id(true);
     }
 
