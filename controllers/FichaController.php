@@ -1,15 +1,16 @@
 <?php
 /**
  * FichaController.php — Controlador de Fichas
- * 
+ *
  * CRUD de fichas de formación.
+ * Nueva DB: tabla `Ficha`, campos: codigo (INT), Programa_id, jornada_id, instructor_id, estado.
  */
 class FichaController {
     private PDO $db;
     private Ficha $model;
 
     public function __construct(PDO $db) {
-        $this->db = $db;
+        $this->db    = $db;
         $this->model = new Ficha($db);
     }
 
@@ -18,7 +19,7 @@ class FichaController {
      */
     public function index(): void {
         Auth::requireAdmin();
-        $fichas = $this->model->getAll();
+        $fichas    = $this->model->getAll();
         $pageTitle = 'Gestión de Fichas';
         require_once ROOT_PATH . '/views/fichas/index.php';
     }
@@ -30,9 +31,11 @@ class FichaController {
         Auth::requireAdmin();
         $usuarioModel = new Usuario($this->db);
         $instructores = $usuarioModel->getInstructores();
-        $ficha = null;
-        $csrf_token = Auth::generateCSRF();
-        $pageTitle = 'Nueva Ficha';
+        $programas    = $this->model->getProgramas();
+        $jornadas     = $this->model->getJornadas();
+        $ficha        = null;
+        $csrf_token   = Auth::generateCSRF();
+        $pageTitle    = 'Nueva Ficha';
         require_once ROOT_PATH . '/views/fichas/form.php';
     }
 
@@ -41,7 +44,7 @@ class FichaController {
      */
     public function editar(): void {
         Auth::requireAdmin();
-        $id = (int) ($_GET['id'] ?? 0);
+        $id    = (int) ($_GET['id'] ?? 0);
         $ficha = $this->model->getById($id);
 
         if (!$ficha) {
@@ -52,8 +55,10 @@ class FichaController {
 
         $usuarioModel = new Usuario($this->db);
         $instructores = $usuarioModel->getInstructores();
-        $csrf_token = Auth::generateCSRF();
-        $pageTitle = 'Editar Ficha';
+        $programas    = $this->model->getProgramas();
+        $jornadas     = $this->model->getJornadas();
+        $csrf_token   = Auth::generateCSRF();
+        $pageTitle    = 'Editar Ficha';
         require_once ROOT_PATH . '/views/fichas/form.php';
     }
 
@@ -74,16 +79,18 @@ class FichaController {
             exit;
         }
 
-        $id = (int) ($_POST['id_ficha'] ?? 0);
+        $id   = (int) ($_POST['id_ficha']   ?? 0);
         $data = [
-            'codigo_ficha'        => trim($_POST['codigo_ficha'] ?? ''),
-            'nombre_programa'     => trim($_POST['nombre_programa'] ?? ''),
-            'id_instructor_lider' => (int) ($_POST['id_instructor_lider'] ?? 0),
+            'codigo'        => (int) ($_POST['codigo_ficha']        ?? 0),
+            'Programa_id'   => (int) ($_POST['Programa_id']         ?? 0),
+            'jornada_id'    => (int) ($_POST['jornada_id']          ?? 0) ?: null,
+            'instructor_id' => (int) ($_POST['id_instructor_lider'] ?? 0) ?: null,
+            'estado'        => $_POST['estado'] ?? 'Activo',
         ];
 
         Validator::reset();
-        Validator::required($data['codigo_ficha'], 'código de ficha');
-        Validator::required($data['nombre_programa'], 'nombre del programa');
+        Validator::required((string)$data['codigo'],      'código de ficha');
+        Validator::required((string)$data['Programa_id'], 'programa');
 
         if (!Validator::isValid()) {
             Auth::setFlash('error', implode('<br>', Validator::getErrors()));
@@ -123,7 +130,7 @@ class FichaController {
             $this->model->delete($id);
             Auth::setFlash('success', 'Ficha eliminada correctamente.');
         } catch (\PDOException $e) {
-            Auth::setFlash('error', 'No se puede eliminar la ficha porque tiene aprendices u horarios asociados.');
+            Auth::setFlash('error', 'No se puede eliminar la ficha porque tiene usuarios u horarios asociados.');
         }
 
         header('Location: ' . BASE_URL . '?action=fichas');
