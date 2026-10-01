@@ -1,0 +1,661 @@
+================================================================================
+  TAREAS PENDIENTES — SISTEMA DE CONTROL DE INGRESO DE APRENDICES (SENA)
+  Fecha: 2026-09-29
+  Estado general del proyecto: 45% completado / 55% pendiente
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PARTE A — EL 55% QUE FALTA (agrupado por prioridad)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  PRIORIDAD: 🔴 CRÍTICA — bloquean funcionalidades existentes
+             🟡 MEDIA   — núcleo del sistema
+             🟢 BAJA    — enriquecimiento y reportes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GRUPO 1 🔴 — CORRECCIÓN DE VISTAS (campos renombrados por la nueva DB)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Las vistas fueron escritas para la DB antigua. Sin esta corrección, los
+  formularios muestran campos vacíos o envían datos incorrectos.
+
+  ── views/fichas/form.php ───────────────────────────────────────────────────
+  - Campo "nombre_programa" (texto libre)
+    → REEMPLAZAR por <select> cargado con $programas (variable del controlador)
+  - Campo "codigo_ficha" (texto)
+    → CAMBIAR a type="number" (en la nueva DB, codigo es INT de 7 dígitos)
+  - AGREGAR <select> de Jornada cargado con $jornadas
+  - $inst['id_usuario']     → $inst['id']
+  - $inst['num_documento']  → $inst['identificacion']
+  - $ficha['id_ficha']      → $ficha['id']
+
+  ── views/fichas/index.php ──────────────────────────────────────────────────
+  - $f['codigo_ficha']  → $f['codigo']
+  - $f['id_ficha']      → $f['id']
+  - Enlace ?action=horarios → CAMBIAR a ?action=sesiones
+    (HorarioController no existe, causa 404)
+
+  ── views/usuarios/form.php ─────────────────────────────────────────────────
+  - $usuario['id_usuario']   → $usuario['id']
+  - $usuario['correo']       → $usuario['email']
+  - $usuario['num_documento']→ $usuario['identificacion']
+  - $rol['id_rol']           → $rol['id']
+  - AGREGAR campo codigo_llavero en el formulario
+
+  ── views/usuarios/index.php ────────────────────────────────────────────────
+  - $u['id_usuario']    → $u['id']
+  - $u['correo']        → $u['email']
+  - $u['num_documento'] → $u['identificacion']
+  - $u['id_rol']        → $u['Rol_id']
+
+  ── views/aprendices/form.php ───────────────────────────────────────────────
+  - $aprendiz['num_documento'] → $aprendiz['identificacion']
+  - $aprendiz['correo']        → $aprendiz['email']
+  - $aprendiz['codigo_rfid']   → $aprendiz['codigo_llavero']
+  - $f['id_ficha'] (select)    → $f['id']
+  - $f['codigo_ficha'] (label) → $f['codigo']
+
+  ── views/aprendices/index.php ──────────────────────────────────────────────
+  - Revisar y corregir todos los campos mostrados en la tabla
+
+  ── views/excusas/form.php ──────────────────────────────────────────────────
+  - Eliminar campos fecha_inicio y fecha_fin
+  - AGREGAR campo 'fecha' (DATE, campo único en tabla excusa)
+  - AGREGAR selector de Asistencia_id o Inasistencia_id
+    (la excusa debe referenciar exactamente uno de los dos — constraint CHECK)
+
+  Archivos a modificar: 6 vistas existentes
+  Archivos nuevos:      0
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GRUPO 2 🔴 — CRUD DE PROGRAMAS (bloquea la creación de Fichas)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  La tabla Programa.Programa_id es FK NOT NULL en Ficha.
+  Sin registros en Programa, no se puede crear ni editar ninguna Ficha.
+
+  Tabla DB:
+    Programa (id INT PK, nombre VARCHAR(100) NOT NULL, descripcion TEXT NULL)
+
+  Archivos a CREAR:
+    models/Programa.php
+      - getAll(): array
+      - getById(int $id): ?array
+      - create(array $data): bool
+      - update(int $id, array $data): bool
+      - delete(int $id): bool
+      - count(): int
+
+    controllers/ProgramaController.php
+      - index()   → lista todos los programas
+      - crear()   → formulario de creación
+      - editar()  → formulario de edición
+      - guardar() → POST: crear o actualizar
+      - eliminar()→ GET: eliminar con protección (no eliminar si tiene fichas)
+
+    views/programas/index.php
+      → tabla con columnas: ID, Nombre, Descripción, Total Fichas, Acciones
+
+    views/programas/form.php
+      → campos: nombre (required), descripcion (textarea)
+
+  Modificar:
+    helpers/Router.php → añadir: 'programas' => 'ProgramaController'
+
+  Archivos a crear:    4 (modelo, controlador, 2 vistas)
+  Archivos a modificar: 1 (Router.php)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GRUPO 3 🔴 — CRUD DE COMPETENCIAS (bloquea la creación de Sesiones)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  La tabla sesion.Competencia_id es FK NOT NULL.
+  Sin competencias, no se puede crear ninguna sesión de clase.
+
+  Tabla DB:
+    competencia (id, Programa_id FK, Instructor_id FK NULL,
+                 nombre VARCHAR(100), descripcion TEXT)
+    instructor_competencia (id, Instructor_id FK, Competencia_id FK)
+
+  Archivos a CREAR:
+    models/Competencia.php
+      - getAll(): array                (con nombre de programa e instructor)
+      - getByPrograma(int $id): array  (filtra competencias del programa)
+      - getById(int $id): ?array
+      - create(array $data): bool
+      - update(int $id, array $data): bool
+      - delete(int $id): bool
+
+    controllers/CompetenciaController.php
+      - index(), crear(), editar(), guardar(), eliminar()
+
+    views/competencias/index.php
+      → tabla: Nombre, Programa, Instructor, Acciones
+
+    views/competencias/form.php
+      → campos: nombre, descripcion, Programa_id (select), Instructor_id (select)
+
+  Modificar:
+    helpers/Router.php → añadir: 'competencias' => 'CompetenciaController'
+
+  Archivos a crear:     4
+  Archivos a modificar: 1 (Router.php)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GRUPO 4 🔴 — CRUD DE SESIONES (bloquea el registro de asistencia)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  La tabla asistencia.Sesion_id es FK NOT NULL.
+  Sin sesiones, ningún aprendiz puede tener registro de asistencia.
+
+  Tabla DB:
+    sesion (id, Ficha_id FK, Competencia_id FK, Instructor_id FK,
+            fecha DATE, hora_inicio TIME, hora_fin TIME,
+            estado ENUM('Activo','Cancelado','Finalizada'))
+
+  Archivos a CREAR:
+    models/Sesion.php
+      - getAll(): array
+      - getByFicha(int $fichaId): array
+      - getSesionActiva(int $fichaId): ?array   ← sesión en curso
+      - getById(int $id): ?array
+      - create(array $data): bool
+      - update(int $id, array $data): bool
+      - cerrar(int $id): bool                   ← estado → Finalizada
+      - cancelar(int $id): bool                 ← estado → Cancelado
+      - delete(int $id): bool
+
+    controllers/SesionController.php
+      - index()    → lista sesiones (admin: todas, instructor: las suyas)
+      - crear()    → formulario nueva sesión
+      - editar()   → formulario edición
+      - guardar()  → POST
+      - cerrar()   → cierra sesión + genera inasistencias automáticas
+      - cancelar() → cancela la sesión
+      - eliminar() → elimina (solo si no tiene asistencias)
+
+    views/sesiones/index.php
+      → tabla: Ficha, Competencia, Fecha, Hora inicio/fin, Estado, Acciones
+
+    views/sesiones/form.php
+      → campos: Ficha_id (select), Competencia_id (select, filtrado por ficha),
+                Instructor_id (select), fecha, hora_inicio, hora_fin
+
+  Modificar:
+    helpers/Router.php → añadir: 'sesiones' => 'SesionController'
+
+  Archivos a crear:     4
+  Archivos a modificar: 1 (Router.php)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GRUPO 5 🟡 — REGISTRO DE ASISTENCIA POR RFID (llavero)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  La vista rfid.php existe pero sin lógica backend.
+  El flujo debe ser:
+    1. Aprendiz acerca el llavero al lector → POST con codigo_llavero
+    2. Buscar Usuario por codigo_llavero (getByCodigoLlavero)
+    3. Buscar la sesión activa de la Ficha del aprendiz (getSesionActiva)
+    4. Si no hay sesión activa → mostrar error
+    5. Si ya tiene registro de entrada hoy → registrar hora_salida
+    6. Si no tiene registro → insertar en asistencia:
+       fecha=HOY, hora_entrada=AHORA, Usuario_id, Sesion_id,
+       registrado_por=(sistema/admin), codigo_llavero (snapshot)
+    7. Calcular minutos_retardo = MAX(0, hora_entrada - sesion.hora_inicio)
+    8. Retornar JSON con resultado (para mostrar en pantalla del lector)
+
+  Modificar:
+    controllers/AsistenciaController.php → nuevo método registrarRfid()
+    models/IngresoAsistencia.php → método registrarEntrada() ya existe
+    helpers/Router.php → ruta 'asistencia/registrar'
+
+  Archivos a crear:     0
+  Archivos a modificar: 2
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GRUPO 6 🟡 — GENERACIÓN AUTOMÁTICA DE INASISTENCIAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Al cerrar una sesión (SesionController::cerrar), el sistema debe:
+    1. Obtener todos los aprendices activos de la Ficha de la sesión
+    2. Consultar quiénes tienen registro en tabla 'asistencia' para esa sesión
+    3. Los que NO tienen registro → insertar en tabla 'inasistencia':
+       Usuario_id, Ficha_id, Sesion_id, fecha, generado_por='sistema'
+    4. Cambiar estado de la sesión a 'Finalizada'
+
+  Modificar:
+    controllers/SesionController.php → método cerrar() implementar la lógica
+    models/IngresoAsistencia.php → método generarInasistencias(int $sesionId)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GRUPO 7 🟡 — CRUD DE JORNADAS (gestión independiente)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Tabla DB:
+    jornada (id, nombre VARCHAR(45) UNIQUE, hora_inicio TIME, hora_fin TIME)
+  Seed inicial: Mañana 06-12h, Tarde 12-18h, Noche 18-21h
+
+  Archivos a CREAR:
+    models/Jornada.php
+      - getAll(): array
+      - getById(int $id): ?array
+      - create(array $data): bool
+      - update(int $id, array $data): bool
+      - delete(int $id): bool
+
+    controllers/JornadaController.php
+      - index(), crear(), editar(), guardar(), eliminar()
+
+    views/jornadas/index.php
+    views/jornadas/form.php → campos: nombre, hora_inicio, hora_fin
+
+  Modificar:
+    helpers/Router.php → añadir: 'jornadas' => 'JornadaController'
+
+  Archivos a crear:     4
+  Archivos a modificar: 1
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GRUPO 8 🟢 — REPORTES Y EXPORTACIÓN PDF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Router.php ya tiene la ruta 'reportes' => 'ReporteController' pero el
+  archivo no existe. Genera error 404 al intentar acceder.
+
+  Archivos a CREAR:
+    lib/fpdf/                        ← descargar FPDF en esta carpeta
+    controllers/ReporteController.php
+      - asistencia()    → reporte de asistencia por ficha y período (PDF)
+      - excusas()       → reporte de excusas por período (PDF)
+      - aprendices()    → listado de aprendices por ficha (PDF)
+      Solo accesible por Administrador
+
+    views/reportes/index.php
+      → Formulario para seleccionar tipo de reporte, ficha y rango de fechas
+
+  Archivos a crear:     2 + carpeta lib/fpdf
+  Archivos a modificar: 0
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GRUPO 9 🟢 — DASHBOARD CON GRÁFICOS (Chart.js)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Archivos a CREAR:
+    api/datos_dashboard.php
+      → Endpoint que retorna JSON con:
+         { asistencia_por_mes, estado_excusas, aprendices_por_ficha }
+      → Sin autenticación de sesión (usar token simple o incluir en session)
+
+  Modificar:
+    views/dashboard/index.php
+      → Agregar 3 secciones de gráficos con <canvas> y Chart.js:
+         - Barras:  Asistencias vs Inasistencias por mes
+         - Dona:    Excusas Aprobadas / Rechazadas / Pendientes
+         - Líneas:  Tendencia de puntualidad últimos 30 días
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  RESUMEN PARTE A
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Grupo | Descripción                        | Prioridad | Archivos Nuevos
+  ───── | ────────────────────────────────── | ───────── | ───────────────
+    1   | Corrección de vistas (6 archivos)  | 🔴 Crítica | 0 (solo editar)
+    2   | CRUD Programas                     | 🔴 Crítica | 4 nuevos
+    3   | CRUD Competencias                  | 🔴 Alta    | 4 nuevos
+    4   | CRUD Sesiones                      | 🔴 Alta    | 4 nuevos
+    5   | Registro RFID                      | 🟡 Media   | 0 (solo editar)
+    6   | Inasistencias automáticas          | 🟡 Media   | 0 (solo editar)
+    7   | CRUD Jornadas                      | 🟡 Media   | 4 nuevos
+    8   | Reportes PDF                       | 🟢 Baja    | 2 nuevos
+    9   | Dashboard Chart.js                 | 🟢 Baja    | 1 nuevo
+  ───── | ────────────────────────────────── | ───────── | ───────────────
+        | TOTAL                              |           | 19 archivos
+
+================================================================================
+  PARTE B — NUEVA FUNCIONALIDAD: CARGA DE HORARIOS SEMESTRAL POR EXCEL
+================================================================================
+
+  Nombre del módulo: Importación Masiva de Sesiones desde Excel
+  Tipo:              Funcionalidad de carga de datos (Import)
+  Alcance:           Un archivo Excel define todas las sesiones de clase de
+                     una ficha durante 6 meses (un semestre completo).
+  Quién puede usar:  Administrador e Instructor
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  B.1 — DESCRIPCIÓN DEL FLUJO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. El instructor/admin descarga una plantilla Excel (.xlsx) desde el sistema.
+  2. Completa la plantilla con las sesiones del semestre (una fila = una sesión).
+  3. Sube el archivo al sistema a través de un formulario.
+  4. El servidor procesa el Excel fila por fila y genera registros en la
+     tabla 'sesion' de la base de datos.
+  5. El sistema muestra un resumen: sesiones importadas, filas con error,
+     sesiones duplicadas omitidas.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  B.2 — ESTRUCTURA DE LA PLANTILLA EXCEL (.xlsx)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  El archivo Excel debe tener exactamente una hoja llamada "Horarios".
+  La fila 1 son los encabezados (no se importa).
+  Cada fila siguiente representa una sesión de clase.
+
+  COLUMNA | ENCABEZADO       | TIPO        | EJEMPLO              | OBLIGATORIO
+  ─────── | ──────────────── | ─────────── | ──────────────────── | ───────────
+  A       | fecha            | YYYY-MM-DD  | 2026-08-04           | SÍ
+  B       | hora_inicio      | HH:MM       | 07:00                | SÍ
+  C       | hora_fin         | HH:MM       | 13:00                | SÍ
+  D       | competencia      | Texto       | Bases de datos        | SÍ
+  E       | instructor_email | Email       | ana@sena.edu.co       | SÍ
+  F       | estado           | Texto       | Activo               | NO (default Activo)
+
+  Notas de la plantilla:
+  - La Ficha se selecciona en el formulario de carga (no va dentro del Excel).
+  - La columna 'competencia' debe coincidir EXACTAMENTE con el nombre en BD.
+  - La columna 'instructor_email' debe coincidir con el email de un usuario
+    con Rol_id = 1 (Admin) o Rol_id = 2 (Instructor) en la BD.
+  - Las fechas deben estar dentro del rango del semestre seleccionado.
+  - Si una fila tiene fecha + hora_inicio + ficha que ya existe en BD,
+    se omite (no duplica) y se cuenta como "ya existente".
+
+  Ejemplo de filas válidas:
+  ┌────────────┬─────────────┬──────────┬───────────────────────┬───────────────────────┬────────┐
+  │ fecha      │ hora_inicio │ hora_fin │ competencia           │ instructor_email       │ estado │
+  ├────────────┼─────────────┼──────────┼───────────────────────┼───────────────────────┼────────┤
+  │ 2026-08-04 │ 07:00       │ 13:00    │ Bases de datos        │ ana@sena.edu.co        │ Activo │
+  │ 2026-08-05 │ 07:00       │ 13:00    │ Lógica de programación│ ana@sena.edu.co        │ Activo │
+  │ 2026-08-07 │ 13:00       │ 19:00    │ Bases de datos        │ pedro@sena.edu.co      │ Activo │
+  └────────────┴─────────────┴──────────┴───────────────────────┴───────────────────────┴────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  B.3 — VALIDACIONES REQUERIDAS AL IMPORTAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  VALIDACIÓN DEL ARCHIVO:
+  - El archivo debe ser .xlsx o .xls (no .csv, no .ods).
+  - Tamaño máximo del archivo: 5 MB.
+  - La hoja activa debe llamarse "Horarios" (o ser la primera hoja).
+  - El número de filas de datos no debe superar 500 por importación.
+  - La fila 1 debe tener los encabezados esperados (validar nombres exactos).
+
+  VALIDACIÓN DE CADA FILA:
+  - fecha:         formato YYYY-MM-DD, debe ser una fecha válida del calendario.
+  - fecha:         debe estar dentro del semestre seleccionado en el formulario.
+                   (fecha >= semestre_inicio AND fecha <= semestre_fin)
+  - hora_inicio:   formato HH:MM, 00:00 – 23:59.
+  - hora_fin:      formato HH:MM, debe ser MAYOR que hora_inicio.
+  - competencia:   el nombre debe existir en la tabla 'competencia' de la BD.
+                   Si no existe → marcar fila como error y continuar.
+  - instructor_email: debe existir en tabla 'Usuario' con Rol_id IN (1,2).
+                      Si no existe → marcar fila como error y continuar.
+  - estado:        si viene vacío → usar 'Activo' por defecto.
+                   Solo acepta: 'Activo', 'Cancelado', 'Finalizada'.
+  - Duplicado:     si ya existe una sesión con misma Ficha_id + fecha +
+                   hora_inicio → omitir fila, no insertar, reportar como omitida.
+
+  COMPORTAMIENTO ANTE ERRORES:
+  - La importación es PARCIAL: las filas válidas se insertan aunque haya errores.
+  - Al finalizar se muestra un reporte detallado fila por fila:
+      ✅ Fila 2: Sesión creada correctamente.
+      ⚠️ Fila 5: Omitida, ya existe una sesión para esa fecha y hora.
+      ❌ Fila 8: Error — competencia "Redes" no encontrada en el sistema.
+      ❌ Fila 12: Error — instructor "x@x.com" no existe o no tiene el rol correcto.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  B.4 — FORMULARIO DE CARGA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Campos del formulario de importación:
+
+  1. Ficha:           <select> → obligatorio. Determina a qué ficha pertenecen
+                       las sesiones del Excel.
+
+  2. Semestre (desde):<input type="date"> → fecha de inicio del semestre.
+                       Ejemplo: 2026-08-01
+
+  3. Semestre (hasta):<input type="date"> → fecha de fin del semestre.
+                       Ejemplo: 2027-01-31
+                       Validación: hasta >= desde, rango máximo = 6 meses (184 días).
+
+  4. Archivo Excel:   <input type="file" accept=".xlsx,.xls">
+                       Validación: tipo MIME, tamaño ≤ 5 MB.
+
+  5. Botón "Descargar Plantilla": enlace que descarga el archivo Excel de
+                       ejemplo con encabezados correctos y 3 filas de muestra.
+
+  6. Token CSRF:      <input type="hidden"> protección contra CSRF.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  B.5 — ARCHIVOS A CREAR Y MODIFICAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  LIBRERÍA EXTERNA (requerida):
+  ─────────────────────────────
+  PhpSpreadsheet (recomendada) o SimpleXLSX (alternativa liviana).
+
+  Opción A — PhpSpreadsheet (requiere Composer):
+    composer require phpoffice/phpspreadsheet
+    → se instala en vendor/
+
+  Opción B — SimpleXLSX (sin Composer, archivo único):
+    Descargar SimpleXLSX.php de https://github.com/shuchkin/simplexlsx
+    Colocar en lib/SimpleXLSX.php
+    → require_once ROOT_PATH . '/lib/SimpleXLSX.php';
+
+  RECOMENDACIÓN: Usar SimpleXLSX por simplicidad (sin Composer).
+
+  ARCHIVOS NUEVOS:
+  ─────────────────
+  lib/SimpleXLSX.php
+    → Librería de lectura de Excel (descargar externamente)
+
+  assets/plantillas/plantilla_horarios.xlsx
+    → Plantilla de ejemplo con encabezados y 3 filas de muestra.
+    → El sistema la sirve con un header Content-Disposition: attachment.
+
+  controllers/ImportarHorariosController.php
+    Métodos:
+      - formulario(): void
+          Carga vista con formulario de importación.
+          Requiere Auth::requireAdmin().
+          Carga lista de fichas disponibles.
+
+      - descargarPlantilla(): void
+          Sirve el archivo plantilla_horarios.xlsx para descarga.
+          header('Content-Type: application/vnd.openxmlformats...');
+          header('Content-Disposition: attachment; filename="plantilla_horarios.xlsx"');
+
+      - procesar(): void
+          Solo acepta POST. Valida CSRF.
+          1. Valida el archivo subido (.xlsx, ≤ 5MB).
+          2. Valida los campos del formulario (Ficha_id, fecha_inicio, fecha_fin).
+          3. Carga la librería SimpleXLSX.
+          4. Itera fila por fila (desde la fila 2).
+          5. Por cada fila: valida campos → busca competencia por nombre →
+             busca instructor por email → verifica duplicado → inserta en sesion.
+          6. Acumula resultados en array $resultados.
+          7. Elimina el archivo temporal del servidor.
+          8. Renderiza la vista de resultado.
+
+  views/importar/horarios_form.php
+    → Formulario con:
+       - Select de Ficha
+       - Inputs de fecha inicio/fin del semestre
+       - Input file para Excel
+       - Enlace "Descargar Plantilla"
+       - Token CSRF
+       - Instrucciones de uso
+
+  views/importar/horarios_resultado.php
+    → Tabla de resultados fila por fila:
+       - Total filas procesadas
+       - Sesiones creadas exitosamente
+       - Filas omitidas (duplicadas)
+       - Filas con error (con descripción del error)
+    → Botón "Volver" y botón "Ver sesiones importadas"
+
+  ARCHIVOS A MODIFICAR:
+  ──────────────────────
+  helpers/Router.php
+    → Añadir: 'importar' => 'ImportarHorariosController'
+    → Rutas disponibles:
+       ?action=importar/horarios        → formulario()
+       ?action=importar/plantilla       → descargarPlantilla()
+       ?action=importar/procesar        → procesar()
+
+  views/sesiones/index.php (cuando se cree)
+    → Añadir botón "Importar desde Excel" que enlace a
+      ?action=importar/horarios
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  B.6 — LÓGICA DE PROCESAMIENTO DEL EXCEL (pseudocódigo)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  procesar():
+  ───────────
+  $fichaId      = (int) $_POST['ficha_id']
+  $semInicio    = $_POST['semestre_inicio']   // YYYY-MM-DD
+  $semFin       = $_POST['semestre_fin']      // YYYY-MM-DD
+
+  // Validar rango semestral (máx 184 días)
+  if (days_between($semInicio, $semFin) > 184) → error
+
+  // Cargar Excel
+  $xlsx = SimpleXLSX::parse($_FILES['archivo']['tmp_name'])
+  $rows = $xlsx->rows()  // Array de arrays (fila 0 = encabezados)
+
+  $resultado = [creadas=0, omitidas=0, errores=[], detalles=[]]
+
+  foreach ($rows as $index => $row):
+    if $index == 0: continue  // saltar encabezados
+
+    $fecha       = trim($row[0])   // col A
+    $horaInicio  = trim($row[1])   // col B
+    $horaFin     = trim($row[2])   // col C
+    $nombreComp  = trim($row[3])   // col D
+    $emailInst   = trim($row[4])   // col E
+    $estado      = trim($row[5]) ?: 'Activo'  // col F
+
+    // Validaciones de fila
+    if NOT valid_date($fecha):
+      agregar a errores: "Fila $index: fecha inválida"
+      continue
+
+    if $fecha < $semInicio OR $fecha > $semFin:
+      agregar a errores: "Fila $index: fecha fuera del semestre"
+      continue
+
+    if NOT valid_time($horaInicio) OR NOT valid_time($horaFin):
+      agregar a errores: "Fila $index: hora inválida"
+      continue
+
+    if $horaFin <= $horaInicio:
+      agregar a errores: "Fila $index: hora_fin debe ser mayor que hora_inicio"
+      continue
+
+    // Buscar competencia por nombre
+    $competencia = Competencia::getByNombre($nombreComp)
+    if NOT $competencia:
+      agregar a errores: "Fila $index: competencia '$nombreComp' no encontrada"
+      continue
+
+    // Buscar instructor por email
+    $instructor = Usuario::getByCorreo($emailInst)
+    if NOT $instructor OR $instructor['Rol_id'] NOT IN [1,2]:
+      agregar a errores: "Fila $index: instructor '$emailInst' no válido"
+      continue
+
+    // Verificar duplicado
+    $existe = Sesion::existeSesion($fichaId, $fecha, $horaInicio)
+    if $existe:
+      $resultado['omitidas']++
+      agregar a detalles: "⚠️ Fila $index: omitida, sesión ya existe"
+      continue
+
+    // Insertar sesión
+    Sesion::create([
+      Ficha_id       => $fichaId,
+      Competencia_id => $competencia['id'],
+      Instructor_id  => $instructor['id'],
+      fecha          => $fecha,
+      hora_inicio    => $horaInicio,
+      hora_fin       => $horaFin,
+      estado         => $estado
+    ])
+
+    $resultado['creadas']++
+    agregar a detalles: "✅ Fila $index: sesión creada para $fecha $horaInicio"
+
+  endforeach
+
+  // Eliminar archivo temporal
+  unlink($_FILES['archivo']['tmp_name'])
+
+  // Pasar $resultado a la vista
+  require_once ROOT_PATH . '/views/importar/horarios_resultado.php'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  B.7 — MÉTODO ADICIONAL REQUERIDO EN MODELOS EXISTENTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  models/Competencia.php (crear):
+    + getByNombre(string $nombre): ?array
+      → SELECT * FROM competencia WHERE nombre = :nombre LIMIT 1
+
+  models/Sesion.php (crear):
+    + existeSesion(int $fichaId, string $fecha, string $horaInicio): bool
+      → SELECT COUNT(*) FROM sesion
+        WHERE Ficha_id=:fid AND fecha=:fecha AND hora_inicio=:hora
+        → retorna true si COUNT > 0
+
+  models/Usuario.php (ya existe):
+    + getByCorreo(string $email): ?array  ← ya implementado como getByCorreo()
+      → verificar que acepta el campo 'email' (nueva DB)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  B.8 — RESUMEN DE ARCHIVOS DEL MÓDULO EXCEL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ARCHIVO                                          ACCIÓN      NOTAS
+  ──────────────────────────────────────────────── ─────────── ────────────────
+  lib/SimpleXLSX.php                               DESCARGAR   Librería externa
+  assets/plantillas/plantilla_horarios.xlsx        CREAR       Plantilla ejemplo
+  controllers/ImportarHorariosController.php       CREAR       3 métodos
+  views/importar/horarios_form.php                 CREAR       Formulario carga
+  views/importar/horarios_resultado.php            CREAR       Tabla resultado
+  helpers/Router.php                               MODIFICAR   3 rutas nuevas
+  models/Competencia.php                           MODIFICAR   +getByNombre()
+  models/Sesion.php                                CREAR       +existeSesion()
+  ──────────────────────────────────────────────── ─────────── ────────────────
+  Total archivos nuevos:      5
+  Total archivos a modificar: 2 (+ descargar 1 librería)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  RESUMEN GLOBAL DEL PROYECTO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Grupo | Descripción                        | Prior.    | N.Archivos
+  ───── | ────────────────────────────────── | ───────── | ──────────
+    1   | Corrección de vistas               | 🔴 Crítica | 0 (editar)
+    2   | CRUD Programas                     | 🔴 Crítica | 4
+    3   | CRUD Competencias                  | 🔴 Alta    | 4
+    4   | CRUD Sesiones                      | 🔴 Alta    | 4
+    5   | Registro RFID asistencia           | 🟡 Media   | 0 (editar)
+    6   | Inasistencias automáticas          | 🟡 Media   | 0 (editar)
+    7   | CRUD Jornadas                      | 🟡 Media   | 4
+    8   | Reportes PDF                       | 🟢 Baja    | 2
+    9   | Dashboard Chart.js                 | 🟢 Baja    | 1
+   10   | Importación Excel (semestral)      | 🟡 Media   | 5
+  ───── | ────────────────────────────────── | ───────── | ──────────
+        | TOTAL                              |           | 24 archivos nuevos
+
+  Dependencia de implementación (orden sugerido):
+    Grupo 1 → Grupo 2 → Grupo 7 → Grupo 3 → Grupo 4 → Grupo 10
+    → Grupo 5 → Grupo 6 → Grupo 8 → Grupo 9
+
+================================================================================
+  FIN DEL DOCUMENTO — PENDIENTE_IMPLEMENTAR.txt
+  Proyecto: Sistema de Control de Ingreso de Aprendices (SENA)
+  Generado: 2026-09-29 | Revisado por: Antigravity IDE
+================================================================================
