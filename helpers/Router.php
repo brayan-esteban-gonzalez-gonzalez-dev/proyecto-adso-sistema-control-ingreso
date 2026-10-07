@@ -14,6 +14,7 @@ class Router {
         'usuarios'   => 'UsuarioController',
         'fichas'     => 'FichaController',
         'horarios'   => 'HorarioController',
+        'importar'   => 'HorarioController',
         'aprendices' => 'AprendizController',
         'asistencia' => 'AsistenciaController',
         'excusas'    => 'ExcusaController',

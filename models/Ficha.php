@@ -55,6 +55,26 @@ class Ficha {
     }
 
     /**
+     * Obtiene una ficha por su código numérico (ej. 3064749)
+     */
+    public function getByCodigo(int $codigo): ?array {
+        $sql = "SELECT f.*,
+                       p.nombre AS nombre_programa,
+                       p.descripcion AS descripcion_programa,
+                       j.nombre AS nombre_jornada,
+                       CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor
+                FROM {$this->table} f
+                INNER JOIN Programa p ON f.Programa_id = p.id
+                LEFT JOIN jornada j ON f.jornada_id = j.id
+                LEFT JOIN Usuario u ON f.instructor_id = u.id
+                WHERE f.codigo = :codigo";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':codigo' => $codigo]);
+        $result = $stmt->fetch();
+        return $result ?: null;
+    }
+
+    /**
      * Obtiene fichas por instructor
      */
     public function getByInstructor(int $instructorId): array {

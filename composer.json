@@ -1,0 +1,8 @@
+{
+    "config": {
+        "vendor-dir": "librerias"
+    },
+    "require": {
+        "phpoffice/phpspreadsheet": "^5.10"
+    }
+}
