@@ -1,9 +1,4 @@
 <?php
-/**
- * AprendizController.php — Controlador de Aprendices
- * 
- * CRUD de aprendices con asignación de código RFID y ficha.
- */
 class AprendizController {
     private PDO $db;
     private Aprendiz $model;
@@ -14,26 +9,19 @@ class AprendizController {
     }
 
     /**
-     * Lista todos los aprendices
+     * Redirige al módulo unificado de Usuarios filtrado por Aprendices
      */
     public function index(): void {
-        Auth::requireAdmin();
-        $aprendices = $this->model->getAll();
-        $pageTitle = 'Gestión de Aprendices';
-        require_once ROOT_PATH . '/views/aprendices/index.php';
+        header('Location: ' . BASE_URL . '?action=usuarios&rol=3');
+        exit;
     }
 
     /**
-     * Formulario de creación
+     * Redirige al formulario unificado de creación de usuarios
      */
     public function crear(): void {
-        Auth::requireAdmin();
-        $fichaModel = new Ficha($this->db);
-        $fichas = $fichaModel->getAll();
-        $aprendiz = null;
-        $csrf_token = Auth::generateCSRF();
-        $pageTitle = 'Nuevo Aprendiz';
-        require_once ROOT_PATH . '/views/aprendices/form.php';
+        header('Location: ' . BASE_URL . '?action=usuarios/crear');
+        exit;
     }
 
     /**
@@ -46,7 +34,7 @@ class AprendizController {
 
         if (!$aprendiz) {
             Auth::setFlash('error', 'Aprendiz no encontrado.');
-            header('Location: ' . BASE_URL . '?action=aprendices');
+            header('Location: ' . BASE_URL . '?action=usuarios&rol=3');
             exit;
         }
 
@@ -64,13 +52,13 @@ class AprendizController {
         Auth::requireAdmin();
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: ' . BASE_URL . '?action=aprendices');
+            header('Location: ' . BASE_URL . '?action=usuarios&rol=3');
             exit;
         }
 
         if (!Auth::validateCSRF($_POST['csrf_token'] ?? '')) {
             Auth::setFlash('error', 'Token de seguridad inválido.');
-            header('Location: ' . BASE_URL . '?action=aprendices');
+            header('Location: ' . BASE_URL . '?action=usuarios&rol=3');
             exit;
         }
 
@@ -157,7 +145,7 @@ class AprendizController {
             }
         }
 
-        header('Location: ' . BASE_URL . '?action=aprendices');
+        header('Location: ' . BASE_URL . '?action=usuarios&rol=3');
         exit;
     }
 
@@ -181,7 +169,7 @@ class AprendizController {
             Auth::setFlash('error', 'No se puede eliminar el aprendiz porque tiene registros asociados.');
         }
 
-        header('Location: ' . BASE_URL . '?action=aprendices');
+        header('Location: ' . BASE_URL . '?action=usuarios&rol=3');
         exit;
     }
 }
