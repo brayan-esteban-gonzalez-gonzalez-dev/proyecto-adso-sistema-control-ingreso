@@ -1,9 +1,5 @@
 <?php
-/**
- * ExcusaController.php — Controlador de Excusas Médicas
- * 
- * Gestiona el envío, visualización y revisión de excusas médicas.
- */
+
 class ExcusaController {
     private PDO $db;
     private ExcusaMedica $model;

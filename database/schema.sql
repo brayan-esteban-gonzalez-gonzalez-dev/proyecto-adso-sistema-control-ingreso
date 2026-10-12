@@ -1,9 +1,3 @@
--- ============================================================
--- Sistema de Control de Ingreso de Aprendices (RFID)
--- Base de datos: sistema_asistencia_rfid
--- Motor: InnoDB | Charset: utf8mb4
--- ============================================================
-
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET AUTOCOMMIT = 0;
 START TRANSACTION;
@@ -16,17 +10,14 @@ CREATE DATABASE IF NOT EXISTS `sistema_asistencia_rfid`
 
 USE `sistema_asistencia_rfid`;
 
--- ============================================================
+
 -- Tabla: roles
--- ============================================================
 CREATE TABLE IF NOT EXISTS `roles` (
     `id_rol`  INT AUTO_INCREMENT PRIMARY KEY,
     `nombre`  VARCHAR(30) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
 -- Tabla: usuarios
--- ============================================================
 CREATE TABLE IF NOT EXISTS `usuarios` (
     `id_usuario`     INT AUTO_INCREMENT PRIMARY KEY,
     `id_rol`         INT NOT NULL,
@@ -48,9 +39,8 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
         ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
+
 -- Tabla: fichas
--- ============================================================
 CREATE TABLE IF NOT EXISTS `fichas` (
     `id_ficha`              INT AUTO_INCREMENT PRIMARY KEY,
     `codigo_ficha`          VARCHAR(20)  NOT NULL,
@@ -65,9 +55,7 @@ CREATE TABLE IF NOT EXISTS `fichas` (
         ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
 -- Tabla: horarios
--- ============================================================
 CREATE TABLE IF NOT EXISTS `horarios` (
     `id_horario`           INT AUTO_INCREMENT PRIMARY KEY,
     `id_ficha`             INT NOT NULL,
@@ -83,9 +71,8 @@ CREATE TABLE IF NOT EXISTS `horarios` (
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
+
 -- Tabla: aprendices
--- ============================================================
 CREATE TABLE IF NOT EXISTS `aprendices` (
     `id_aprendiz`  INT AUTO_INCREMENT PRIMARY KEY,
     `id_usuario`   INT NOT NULL,
@@ -104,9 +91,8 @@ CREATE TABLE IF NOT EXISTS `aprendices` (
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
+
 -- Tabla: ingresos_asistencia
--- ============================================================
 CREATE TABLE IF NOT EXISTS `ingresos_asistencia` (
     `id_ingreso`                INT AUTO_INCREMENT PRIMARY KEY,
     `id_aprendiz`               INT NOT NULL,
@@ -126,9 +112,7 @@ CREATE TABLE IF NOT EXISTS `ingresos_asistencia` (
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
 -- Tabla: excusas_medicas
--- ============================================================
 CREATE TABLE IF NOT EXISTS `excusas_medicas` (
     `id_excusa`              INT AUTO_INCREMENT PRIMARY KEY,
     `id_aprendiz`            INT NOT NULL,
@@ -157,9 +141,6 @@ CREATE TABLE IF NOT EXISTS `excusas_medicas` (
         ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
--- Datos iniciales
--- ============================================================
 
 -- Roles del sistema
 INSERT INTO `roles` (`id_rol`, `nombre`) VALUES
@@ -167,12 +148,11 @@ INSERT INTO `roles` (`id_rol`, `nombre`) VALUES
 (2, 'Instructor'),
 (3, 'Aprendiz');
 
+
 -- Usuario administrador por defecto
 -- Credenciales: documento=admin | contraseña=Admin123*
 INSERT INTO `usuarios` (`id_rol`, `num_documento`, `nombre`, `apellido`, `correo`, `password`, `estado`) VALUES
 (1, 'admin', 'Administrador', 'Sistema', 'admin@sistema.local',
  '$2y$10$h0izUo8DRzAh1frZlc3xkOZmlcvMPmRkBpVaDOubrqO7/bvAogykK', 'Activo');
--- NOTA: El hash anterior corresponde a 'password'. Cambiar en producción.
--- Para generar un hash seguro: php -r "echo password_hash('Admin123*', PASSWORD_BCRYPT);"
 
 COMMIT;

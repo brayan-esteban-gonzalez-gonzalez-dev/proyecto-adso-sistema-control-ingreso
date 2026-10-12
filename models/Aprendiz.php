@@ -1,9 +1,5 @@
 <?php
-/**
- * Aprendiz.php — Modelo de Aprendices
- * 
- * CRUD para la tabla `aprendices` con relaciones a usuario y ficha.
- */
+
 class Aprendiz {
     private PDO $conn;
     private string $table = 'aprendices';

@@ -1,9 +1,4 @@
 <?php
-/**
- * ExcusaMedica.php — Modelo de Excusas Médicas
- * 
- * CRUD y flujo de aprobación para la tabla `excusas_medicas`.
- */
 class ExcusaMedica {
     private PDO $conn;
     private string $table = 'excusas_medicas';
