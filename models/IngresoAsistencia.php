@@ -66,12 +66,12 @@ class IngresoAsistencia {
     /**
      * Obtiene el ingreso de hoy para un aprendiz
      */
-    public function getIngresoHoy(int $idUsuario): ?array {
+    public function getIngresoHoy(int $idAprendiz): ?array {
         $sql = "SELECT * FROM {$this->table}
-                WHERE id_usuario = :id_usuario AND fecha = CURDATE()
+                WHERE id_aprendiz = :id_aprendiz AND fecha = CURDATE()
                 ORDER BY id_ingreso DESC LIMIT 1";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([':id_usuario' => $idUsuario]);
+        $stmt->execute([':id_aprendiz' => $idAprendiz]);
         $result = $stmt->fetch();
         return $result ?: null;
     }
@@ -79,9 +79,9 @@ class IngresoAsistencia {
     /**
      * Obtiene el historial de un aprendiz con filtros opcionales
      */
-    public function getByAprendiz(int $idUsuario, ?string $fechaInicio = null, ?string $fechaFin = null): array {
-        $sql = "SELECT * FROM {$this->table} WHERE id_usuario = :id_usuario";
-        $params = [':id_usuario' => $idUsuario];
+    public function getByAprendiz(int $idAprendiz, ?string $fechaInicio = null, ?string $fechaFin = null): array {
+        $sql = "SELECT * FROM {$this->table} WHERE id_aprendiz = :id_aprendiz";
+        $params = [':id_aprendiz' => $idAprendiz];
 
         if ($fechaInicio) {
             $sql .= " AND fecha >= :fecha_inicio";
@@ -104,10 +104,10 @@ class IngresoAsistencia {
     public function getByFecha(string $fecha): array {
         $sql = "SELECT i.*, 
                        u.nombre, u.apellido, u.num_documento,
-                       u.codigo_rfid, f.codigo_ficha
+                       a.codigo_rfid, f.codigo_ficha
                 FROM {$this->table} i
-                INNER JOIN usuarios u ON i.id_usuario = u.id_usuario
-                LEFT JOIN aprendices a ON u.id_usuario = a.id_usuario
+                INNER JOIN aprendices a ON i.id_aprendiz = a.id_aprendiz
+                INNER JOIN usuarios u ON a.id_usuario = u.id_usuario
                 LEFT JOIN fichas f ON a.id_ficha = f.id_ficha
                 WHERE i.fecha = :fecha
                 ORDER BY i.hora_entrada";
@@ -122,10 +122,10 @@ class IngresoAsistencia {
     public function getById(int $id): ?array {
         $sql = "SELECT i.*, 
                        u.nombre, u.apellido, u.num_documento,
-                       u.codigo_rfid, f.codigo_ficha, f.nombre_programa
+                       a.codigo_rfid, f.codigo_ficha, f.nombre_programa
                 FROM {$this->table} i
-                INNER JOIN usuarios u ON i.id_usuario = u.id_usuario
-                LEFT JOIN aprendices a ON u.id_usuario = a.id_usuario
+                INNER JOIN aprendices a ON i.id_aprendiz = a.id_aprendiz
+                INNER JOIN usuarios u ON a.id_usuario = u.id_usuario
                 LEFT JOIN fichas f ON a.id_ficha = f.id_ficha
                 WHERE i.id_ingreso = :id";
         $stmt = $this->conn->prepare($sql);
@@ -140,11 +140,11 @@ class IngresoAsistencia {
     public function getReporte(?int $idFicha = null, ?string $fechaInicio = null, ?string $fechaFin = null, ?string $estado = null): array {
         $sql = "SELECT i.*, 
                        u.nombre, u.apellido, u.num_documento,
-                       u.codigo_rfid, a.id_ficha,
+                       a.codigo_rfid, a.id_ficha,
                        f.codigo_ficha, f.nombre_programa
                 FROM {$this->table} i
-                INNER JOIN usuarios u ON i.id_usuario = u.id_usuario
-                LEFT JOIN aprendices a ON u.id_usuario = a.id_usuario
+                INNER JOIN aprendices a ON i.id_aprendiz = a.id_aprendiz
+                INNER JOIN usuarios u ON a.id_usuario = u.id_usuario
                 LEFT JOIN fichas f ON a.id_ficha = f.id_ficha
                 WHERE 1=1";
         $params = [];
@@ -175,7 +175,7 @@ class IngresoAsistencia {
     /**
      * Obtiene estadísticas de retardos por aprendiz
      */
-    public function getEstadisticasRetardo(int $idUsuario, ?string $fechaInicio = null, ?string $fechaFin = null): array {
+    public function getEstadisticasRetardo(int $idAprendiz, ?string $fechaInicio = null, ?string $fechaFin = null): array {
         $sql = "SELECT 
                     COUNT(CASE WHEN estado = 'Retardo' THEN 1 END) AS total_retardos,
                     COALESCE(SUM(minutos_retardo), 0) AS total_minutos_retardo,
@@ -185,8 +185,8 @@ class IngresoAsistencia {
                     COUNT(CASE WHEN estado = 'Justificado' THEN 1 END) AS total_justificados,
                     COUNT(*) AS total_registros
                 FROM {$this->table}
-                WHERE id_usuario = :id_usuario";
-        $params = [':id_usuario' => $idUsuario];
+                WHERE id_aprendiz = :id_aprendiz";
+        $params = [':id_aprendiz' => $idAprendiz];
 
         if ($fechaInicio) {
             $sql .= " AND fecha >= :fecha_inicio";
@@ -199,7 +199,16 @@ class IngresoAsistencia {
 
         $stmt = $this->conn->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetch();
+        $res = $stmt->fetch();
+        return $res ?: [
+            'total_retardos' => 0,
+            'total_minutos_retardo' => 0,
+            'total_inasistencias' => 0,
+            'total_salidas_tempranas' => 0,
+            'total_a_tiempo' => 0,
+            'total_justificados' => 0,
+            'total_registros' => 0
+        ];
     }
 
     /**
@@ -244,14 +253,14 @@ class IngresoAsistencia {
         $diaSemana = $dias[$dayName];
 
         // Buscar aprendices que tengan horario ese día y no tengan registro
-        $sql = "INSERT INTO {$this->table} (id_usuario, fecha, estado)
-                SELECT u.id_usuario, :fecha, 'Inasistencia'
+        $sql = "INSERT INTO {$this->table} (id_aprendiz, fecha, estado)
+                SELECT a.id_aprendiz, :fecha, 'Inasistencia'
                 FROM aprendices a
                 INNER JOIN usuarios u ON a.id_usuario = u.id_usuario
                 INNER JOIN horarios h ON a.id_ficha = h.id_ficha AND h.dia_semana = :dia
                 WHERE u.estado = 'Activo'
-                AND u.id_usuario NOT IN (
-                    SELECT id_usuario FROM {$this->table} WHERE fecha = :fecha2
+                AND a.id_aprendiz NOT IN (
+                    SELECT id_aprendiz FROM {$this->table} WHERE fecha = :fecha2
                 )";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':fecha' => $fecha, ':dia' => $diaSemana, ':fecha2' => $fecha]);
