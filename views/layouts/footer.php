@@ -5,9 +5,8 @@
  * Cierra la estructura HTML y carga los scripts JS.
  */
 ?>
-        </div><!-- /.content-wrapper o /.auth-layout -->
-
 <?php if (Auth::isLoggedIn()): ?>
+        </div><!-- /.content-wrapper -->
     </main><!-- /.main-content -->
 <?php else: ?>
     </div><!-- /.auth-layout -->
