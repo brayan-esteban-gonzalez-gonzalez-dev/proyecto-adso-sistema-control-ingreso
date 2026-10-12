@@ -26,13 +26,13 @@ require_once ROOT_PATH . '/helpers/Router.php';
 // Iniciar sesion
 Auth::init();
 
-//Cargar Modelos base 
-require_once ROOT_PATH . '/models/Rol.php';
-require_once ROOT_PATH . '/models/Usuario.php';
-require_once ROOT_PATH . '/models/Ficha.php';
-require_once ROOT_PATH . '/models/Aprendiz.php';
-require_once ROOT_PATH . '/models/ExcusaMedica.php';
-require_once ROOT_PATH . '/models/Sesion.php';
+// Cargar Modelos dinámicamente
+$modelsDir = ROOT_PATH . '/models/';
+if (is_dir($modelsDir)) {
+    foreach (glob($modelsDir . '*.php') as $modelFile) {
+        require_once $modelFile;
+    }
+}
 
 //Conexion a la base de datos 
 $database = Database::getInstance();
