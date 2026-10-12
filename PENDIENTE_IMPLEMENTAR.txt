@@ -3,7 +3,13 @@
   Fecha: 2026-09-29
   Estado general del proyecto: 45% completado / 55% pendiente
 ================================================================================
+//
+  ### Pendientes importantes:
 
+  • Lógica de retardo (10 min desde el registro del instructor)
+  • Doble validación de excusas cuando hay múltiples instructores
+  • Módulo de gestión de horarios por instructor
+//
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   PARTE A — EL 55% QUE FALTA (agrupado por prioridad)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

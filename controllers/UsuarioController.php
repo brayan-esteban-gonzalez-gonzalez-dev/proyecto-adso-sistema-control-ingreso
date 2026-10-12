@@ -140,14 +140,12 @@ class UsuarioController {
             header('Location: ' . BASE_URL . '?action=usuarios');
             exit;
         }
-
         try {
             $this->model->delete($id);
             Auth::setFlash('success', 'Usuario eliminado correctamente.');
         } catch (\PDOException $e) {
             Auth::setFlash('error', 'No se puede eliminar el usuario porque tiene registros asociados.');
         }
-
         header('Location: ' . BASE_URL . '?action=usuarios');
         exit;
     }

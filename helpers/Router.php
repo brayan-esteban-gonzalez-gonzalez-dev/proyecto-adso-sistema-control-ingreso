@@ -69,14 +69,11 @@ class Router {
             $this->show404();
             return;
         }
-
         // Rutas públicas (no requieren autenticación)
         $publicRoutes = ['auth/login', 'auth/doLogin', 'auth/logout'];
-
         if (!in_array($action, $publicRoutes)) {
             Auth::requireLogin();
         }
-
         // Ejecutar el método del controlador
         $controller->$method();
     }
