@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * AsistenciaController.php — Controlador de Asistencia/RFID
  * 
@@ -9,12 +11,16 @@ class AsistenciaController {
     private IngresoAsistencia $ingresoModel;
     private Aprendiz $aprendizModel;
     private Horario $horarioModel;
+    private Ficha $fichaModel;
+    private Usuario $usuarioModel;
 
     public function __construct(PDO $db) {
         $this->db = $db;
         $this->ingresoModel  = new IngresoAsistencia($db);
         $this->aprendizModel = new Aprendiz($db);
         $this->horarioModel  = new Horario($db);
+        $this->fichaModel    = new Ficha($db);
+        $this->usuarioModel  = new Usuario($db);
     }
 
     /**
@@ -40,43 +46,93 @@ class AsistenciaController {
             return;
         }
 
-        // Buscar aprendiz por RFID
-        $aprendiz = $this->aprendizModel->getByRfid($codigoRfid);
+        // Buscar usuario por RFID
+        $usuario = $this->usuarioModel->getByRfid($codigoRfid);
 
-        if (!$aprendiz) {
+        if (!$usuario) {
             echo json_encode([
                 'success' => false,
-                'message' => 'No se encontró un aprendiz con este código RFID.',
+                'message' => 'No se encontró un usuario con este código RFID.',
                 'tipo'    => 'error'
-            ]);
-            return;
-        }
-
-        // Obtener horario del día
-        $horario = $this->horarioModel->getHorarioHoy($aprendiz['id_ficha']);
-
-        if (!$horario) {
-            echo json_encode([
-                'success' => false,
-                'message' => 'No hay horario configurado para hoy.',
-                'tipo'    => 'warning',
-                'aprendiz' => $aprendiz['nombre'] . ' ' . $aprendiz['apellido']
             ]);
             return;
         }
 
         $fecha     = date('Y-m-d');
         $horaActual = date('H:i:s');
+        $ingresoHoy = $this->ingresoModel->getIngresoHoy($usuario['id_usuario']);
+        $nombreCompleto = $usuario['nombre'] . ' ' . $usuario['apellido'];
 
-        // Verificar si ya tiene registro hoy
-        $ingresoHoy = $this->ingresoModel->getIngresoHoy($aprendiz['id_aprendiz']);
+        // Si es Instructor (rol 2) u otro personal que no sea aprendiz
+        if ($usuario['id_rol'] != 3) {
+            if (!$ingresoHoy) {
+                // Entrada
+                $this->ingresoModel->registrarEntrada($usuario['id_usuario'], $fecha, $horaActual, 'A_Tiempo', 0);
+                echo json_encode([
+                    'success'    => true,
+                    'message'    => '✅ Entrada de personal registrada.',
+                    'tipo'       => 'success',
+                    'accion'     => 'entrada',
+                    'estado'     => 'A_Tiempo',
+                    'aprendiz'   => $nombreCompleto,
+                    'documento'  => $usuario['num_documento'],
+                    'ficha'      => 'N/A',
+                    'hora'       => $horaActual,
+                ]);
+            } else if ($ingresoHoy['hora_salida'] === null) {
+                // Salida
+                $this->ingresoModel->registrarSalida($ingresoHoy['id_ingreso'], $horaActual, 0);
+                echo json_encode([
+                    'success'    => true,
+                    'message'    => '✅ Salida de personal registrada.',
+                    'tipo'       => 'success',
+                    'accion'     => 'salida',
+                    'aprendiz'   => $nombreCompleto,
+                    'documento'  => $usuario['num_documento'],
+                    'ficha'      => 'N/A',
+                    'hora'       => $horaActual,
+                ]);
+            } else {
+                echo json_encode([
+                    'success' => false, 'message' => 'ℹ️ Ya tiene registro completo de hoy.',
+                    'tipo' => 'info', 'aprendiz' => $nombreCompleto
+                ]);
+            }
+            return;
+        }
+
+        // Si es aprendiz (rol 3)
+        $aprendiz = $this->aprendizModel->getByUsuario($usuario['id_usuario']);
+        if (!$aprendiz) {
+            echo json_encode(['success' => false, 'message' => 'Error: Aprendiz no configurado.', 'tipo' => 'error']);
+            return;
+        }
+
+        // Obtener horario del día
+        $horario = $this->horarioModel->getHorarioHoy($aprendiz['id_ficha']);
+        if (!$horario) {
+            echo json_encode([
+                'success' => false, 'message' => 'No hay horario configurado para hoy.',
+                'tipo'    => 'warning', 'aprendiz' => $nombreCompleto
+            ]);
+            return;
+        }
 
         if (!$ingresoHoy) {
-            // ─── REGISTRAR ENTRADA ───
-            $resultado = $this->calcularEstadoEntrada($horaActual, $horario);
+            // ─── REGISTRAR ENTRADA APRENDIZ ───
+            $horaLlegadaInstructor = null;
+            $ficha = $this->fichaModel->getById($aprendiz['id_ficha']);
+            if ($ficha && $ficha['id_instructor_lider']) {
+                $ingresoInst = $this->ingresoModel->getIngresoHoy($ficha['id_instructor_lider']);
+                if ($ingresoInst) {
+                    $horaLlegadaInstructor = $ingresoInst['hora_entrada'];
+                }
+            }
+
+            $resultado = $this->calcularEstadoEntrada($horaActual, $horario, $horaLlegadaInstructor);
 
             $this->ingresoModel->registrarEntrada(
-                $aprendiz['id_aprendiz'],
+                $usuario['id_usuario'],
                 $fecha,
                 $horaActual,
                 $resultado['estado'],
@@ -94,14 +150,14 @@ class AsistenciaController {
                 'tipo'       => $resultado['estado'] === 'A_Tiempo' ? 'success' : 'warning',
                 'accion'     => 'entrada',
                 'estado'     => $resultado['estado'],
-                'aprendiz'   => $aprendiz['nombre'] . ' ' . $aprendiz['apellido'],
-                'documento'  => $aprendiz['num_documento'],
+                'aprendiz'   => $nombreCompleto,
+                'documento'  => $usuario['num_documento'],
                 'ficha'      => $aprendiz['codigo_ficha'],
                 'hora'       => $horaActual,
             ]);
 
         } elseif ($ingresoHoy['hora_salida'] === null) {
-            // ─── REGISTRAR SALIDA ───
+            // ─── REGISTRAR SALIDA APRENDIZ ───
             $resultado = $this->calcularEstadoSalida($horaActual, $horario);
 
             $this->ingresoModel->registrarSalida(
@@ -123,8 +179,8 @@ class AsistenciaController {
                 'message'    => $mensaje,
                 'tipo'       => $tipo,
                 'accion'     => 'salida',
-                'aprendiz'   => $aprendiz['nombre'] . ' ' . $aprendiz['apellido'],
-                'documento'  => $aprendiz['num_documento'],
+                'aprendiz'   => $nombreCompleto,
+                'documento'  => $usuario['num_documento'],
                 'ficha'      => $aprendiz['codigo_ficha'],
                 'hora'       => $horaActual,
             ]);
@@ -135,7 +191,7 @@ class AsistenciaController {
                 'success' => false,
                 'message' => 'ℹ️ Ya tiene registro completo de hoy (entrada y salida).',
                 'tipo'    => 'info',
-                'aprendiz' => $aprendiz['nombre'] . ' ' . $aprendiz['apellido']
+                'aprendiz' => $nombreCompleto
             ]);
         }
     }
@@ -143,17 +199,28 @@ class AsistenciaController {
     /**
      * Calcula el estado de la entrada según el horario
      */
-    private function calcularEstadoEntrada(string $horaActual, array $horario): array {
-        $entrada   = strtotime($horario['hora_entrada']);
-        $actual    = strtotime($horaActual);
-        $tolerancia = (int) $horario['tolerancia_minutos'];
+    private function calcularEstadoEntrada(string $horaActual, array $horario, ?string $horaLlegadaInstructor = null): array {
+        $entradaProgramada = strtotime($horario['hora_entrada']);
+        $actual = strtotime($horaActual);
+        
+        $baseTolerancia = $entradaProgramada;
+        
+        // Si el instructor llegó, verificamos si llegó tarde
+        if ($horaLlegadaInstructor) {
+            $llegadaInst = strtotime($horaLlegadaInstructor);
+            if ($llegadaInst > $entradaProgramada) {
+                // Si el instructor llegó tarde, la base de tolerancia se mueve a la hora en que él llegó
+                $baseTolerancia = $llegadaInst;
+            }
+        }
 
-        $limiteTolerancia = $entrada + ($tolerancia * 60);
+        // El plazo es de 10 minutos desde la base
+        $limiteTolerancia = $baseTolerancia + (10 * 60);
 
         if ($actual <= $limiteTolerancia) {
             return ['estado' => 'A_Tiempo', 'minutos_retardo' => 0];
         } else {
-            $minutosRetardo = (int) ceil(($actual - $entrada) / 60);
+            $minutosRetardo = (int) ceil(($actual - $baseTolerancia) / 60);
             return ['estado' => 'Retardo', 'minutos_retardo' => $minutosRetardo];
         }
     }
@@ -199,5 +266,21 @@ class AsistenciaController {
             $pageTitle = 'Mi Historial de Asistencia';
             require_once ROOT_PATH . '/views/asistencia/historial.php';
         }
+    }
+
+    /**
+     * Exporta el reporte de asistencia a Excel delegando a ReporteController
+     */
+    public function exportarExcel(): void {
+        $reporteController = new ReporteController($this->db);
+        $reporteController->exportarExcel();
+    }
+
+    /**
+     * Exporta el reporte de asistencia a PDF delegando a ReporteController
+     */
+    public function exportarPdf(): void {
+        $reporteController = new ReporteController($this->db);
+        $reporteController->exportarPdf();
     }
 }

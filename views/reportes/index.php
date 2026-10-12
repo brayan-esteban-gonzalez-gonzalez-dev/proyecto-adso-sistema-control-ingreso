@@ -1,13 +1,23 @@
 <?php require_once ROOT_PATH . '/views/layouts/header.php'; ?>
 
-<!-- Filtros -->
+<!-- Filtros Dinámicos -->
 <form method="GET" action="<?= BASE_URL ?>">
     <input type="hidden" name="action" value="reportes">
+    <input type="hidden" name="generar" value="1">
     <div class="filter-bar">
         <div class="filter-group">
-            <label>Ficha</label>
+            <label><i class="fas fa-layer-group"></i> Modalidad</label>
+            <select name="tipo_reporte" class="form-control" id="tipoReporteSelect" onchange="toggleFechas(this.value)">
+                <option value="rango" <?= ($tipoReporte ?? 'rango') === 'rango' ? 'selected' : '' ?>>Rango Personalizado</option>
+                <option value="dia" <?= ($tipoReporte ?? '') === 'dia' ? 'selected' : '' ?>>Por Día (Específico / Hoy)</option>
+                <option value="semana" <?= ($tipoReporte ?? '') === 'semana' ? 'selected' : '' ?>>Semana Actual</option>
+                <option value="mes" <?= ($tipoReporte ?? '') === 'mes' ? 'selected' : '' ?>>Mes Actual</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label><i class="fas fa-graduation-cap"></i> Ficha</label>
             <select name="id_ficha" class="form-control">
-                <option value="">— Todas —</option>
+                <option value="">— Todas las Fichas —</option>
                 <?php foreach ($fichas as $f): ?>
                 <option value="<?= $f['id_ficha'] ?>" <?= ($idFicha ?? '') == $f['id_ficha'] ? 'selected' : '' ?>>
                     <?= htmlspecialchars($f['codigo_ficha'] . ' — ' . $f['nombre_programa']) ?>
@@ -15,26 +25,15 @@
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="filter-group">
-            <label>Fecha Inicio</label>
-            <input type="date" name="fecha_inicio" class="form-control" value="<?= htmlspecialchars($fechaInicio ?? '') ?>">
+        <div class="filter-group" id="grupoFechaInicio">
+            <label><i class="fas fa-calendar-alt"></i> Fecha Inicio</label>
+            <input type="date" name="fecha_inicio" class="form-control" value="<?= htmlspecialchars($fechaInicio ?? date('Y-m-01')) ?>">
         </div>
-        <div class="filter-group">
-            <label>Fecha Fin</label>
-            <input type="date" name="fecha_fin" class="form-control" value="<?= htmlspecialchars($fechaFin ?? '') ?>">
+        <div class="filter-group" id="grupoFechaFin">
+            <label><i class="fas fa-calendar-alt"></i> Fecha Fin</label>
+            <input type="date" name="fecha_fin" class="form-control" value="<?= htmlspecialchars($fechaFin ?? date('Y-m-d')) ?>">
         </div>
-        <div class="filter-group">
-            <label>Estado</label>
-            <select name="estado" class="form-control">
-                <option value="">— Todos —</option>
-                <option value="A_Tiempo" <?= ($estado ?? '') === 'A_Tiempo' ? 'selected' : '' ?>>A Tiempo</option>
-                <option value="Retardo" <?= ($estado ?? '') === 'Retardo' ? 'selected' : '' ?>>Retardo</option>
-                <option value="Inasistencia" <?= ($estado ?? '') === 'Inasistencia' ? 'selected' : '' ?>>Inasistencia</option>
-                <option value="Salida_Temprana" <?= ($estado ?? '') === 'Salida_Temprana' ? 'selected' : '' ?>>Salida Temprana</option>
-                <option value="Justificado" <?= ($estado ?? '') === 'Justificado' ? 'selected' : '' ?>>Justificado</option>
-            </select>
-        </div>
-        <div class="filter-group" style="flex: 0;">
+        <div class="filter-group" style="flex: 0; align-self: flex-end;">
             <label>&nbsp;</label>
             <button type="submit" class="btn btn-primary btn-sm">
                 <i class="fas fa-search"></i> Generar
@@ -45,34 +44,27 @@
 
 <?php if ($generado): ?>
 
-<!-- Botones de exportación -->
-<div class="toolbar">
+<!-- Barra de herramientas con botones de exportación -->
+<div class="toolbar" style="margin-top: 15px;">
     <div class="toolbar-left">
         <span class="text-secondary">
-            <strong><?= count($registros) ?></strong> registros encontrados
+            <strong><?= count($registros) ?></strong> aprendices evaluados en el período 
+            <span class="badge badge-blue"><?= htmlspecialchars($fechaInicio ?? '') ?> al <?= htmlspecialchars($fechaFin ?? '') ?></span>
         </span>
     </div>
     <div class="toolbar-right">
         <?php
-        $exportParams = http_build_query(array_filter([
-            'action'       => 'reportes/exportarPdf',
+        $exportQuery = http_build_query(array_filter([
             'id_ficha'     => $idFicha,
             'fecha_inicio' => $fechaInicio,
             'fecha_fin'    => $fechaFin,
-            'estado'       => $estado,
-        ]));
-        $exportParamsExcel = http_build_query(array_filter([
-            'action'       => 'reportes/exportarExcel',
-            'id_ficha'     => $idFicha,
-            'fecha_inicio' => $fechaInicio,
-            'fecha_fin'    => $fechaFin,
-            'estado'       => $estado,
+            'tipo_reporte' => $tipoReporte,
         ]));
         ?>
-        <a href="<?= BASE_URL ?>?<?= $exportParams ?>" class="btn btn-sm btn-danger">
+        <a href="<?= BASE_URL ?>?action=reportes/exportarPdf&<?= $exportQuery ?>" class="btn btn-sm btn-danger" target="_blank">
             <i class="fas fa-file-pdf"></i> Exportar PDF
         </a>
-        <a href="<?= BASE_URL ?>?<?= $exportParamsExcel ?>" class="btn btn-sm btn-primary" style="background: var(--gradient-green);">
+        <a href="<?= BASE_URL ?>?action=reportes/exportarExcel&<?= $exportQuery ?>" class="btn btn-sm btn-primary" style="background: var(--gradient-green);">
             <i class="fas fa-file-excel"></i> Exportar Excel
         </a>
     </div>
@@ -84,44 +76,70 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>#</th>
+                    <th style="width: 40px;">#</th>
                     <th>Documento</th>
-                    <th>Nombre</th>
+                    <th>Nombre Completo del Aprendiz</th>
                     <th>Ficha</th>
-                    <th>Fecha</th>
-                    <th>Entrada</th>
-                    <th>Salida</th>
-                    <th>Estado</th>
-                    <th>Retardo</th>
-                    <th>Sal. Ant.</th>
+                    <th>Programa</th>
+                    <th>Instructor Líder</th>
+                    <th style="text-align: right;">Min. Retardo</th>
+                    <th style="text-align: right;">Inasistencias</th>
+                    <th>Días de Inasistencia (Detalle)</th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($registros as $i => $reg): ?>
+                <?php 
+                $sumRetardo = 0;
+                $sumInasistencias = 0;
+                foreach ($registros as $i => $reg): 
+                    $sumRetardo += (int) $reg['total_minutos_retardo'];
+                    $sumInasistencias += (int) $reg['total_inasistencias'];
+                ?>
                 <tr>
                     <td><?= $i + 1 ?></td>
-                    <td><?= htmlspecialchars($reg['num_documento']) ?></td>
-                    <td><strong><?= htmlspecialchars($reg['nombre'] . ' ' . $reg['apellido']) ?></strong></td>
+                    <td><strong><?= htmlspecialchars((string) $reg['num_documento']) ?></strong></td>
+                    <td><?= htmlspecialchars($reg['nombre_completo']) ?></td>
                     <td><span class="badge badge-blue"><?= htmlspecialchars($reg['codigo_ficha']) ?></span></td>
-                    <td><?= $reg['fecha'] ?></td>
-                    <td><?= $reg['hora_entrada'] ?? '—' ?></td>
-                    <td><?= $reg['hora_salida'] ?? '—' ?></td>
-                    <td>
-                        <span class="badge badge-<?= strtolower($reg['estado']) ?>">
-                            <?= str_replace('_', ' ', $reg['estado']) ?>
-                        </span>
+                    <td><?= htmlspecialchars($reg['nombre_programa']) ?></td>
+                    <td><?= htmlspecialchars($reg['nombre_instructor']) ?></td>
+                    <td style="text-align: right;">
+                        <?php if ($reg['total_minutos_retardo'] > 0): ?>
+                            <span class="badge badge-retardo" style="background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; font-weight: bold;">
+                                <?= $reg['total_minutos_retardo'] ?> min
+                            </span>
+                        <?php else: ?>
+                            <span style="color: #10b981;">0 min</span>
+                        <?php endif; ?>
                     </td>
-                    <td><?= $reg['minutos_retardo'] > 0 ? $reg['minutos_retardo'] . ' min' : '—' ?></td>
-                    <td><?= $reg['minutos_salida_anticipada'] > 0 ? $reg['minutos_salida_anticipada'] . ' min' : '—' ?></td>
+                    <td style="text-align: right;">
+                        <?php if ($reg['total_inasistencias'] > 0): ?>
+                            <span class="badge badge-inasistencia" style="background-color: rgba(239, 68, 68, 0.2); color: #ef4444; font-weight: bold;">
+                                <?= $reg['total_inasistencias'] ?>
+                            </span>
+                        <?php else: ?>
+                            <span style="color: #10b981;">0</span>
+                        <?php endif; ?>
+                    </td>
+                    <td style="font-size: 0.85rem; color: #94a3b8;">
+                        <?= htmlspecialchars($reg['dias_inasistencia']) ?>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
+            <tfoot>
+                <tr style="background: rgba(255, 255, 255, 0.03); font-weight: bold; border-top: 2px solid var(--border-color);">
+                    <td colspan="6" style="text-align: right;">TOTALES CONSOLIDADOS:</td>
+                    <td style="text-align: right; color: #f59e0b;"><?= $sumRetardo ?> min</td>
+                    <td style="text-align: right; color: #ef4444;"><?= $sumInasistencias ?></td>
+                    <td>—</td>
+                </tr>
+            </tfoot>
         </table>
     </div>
     <?php else: ?>
     <div class="empty-state">
         <i class="fas fa-search"></i>
-        <p>No se encontraron registros con los filtros aplicados</p>
+        <p>No se encontraron registros de aprendices con los filtros aplicados</p>
     </div>
     <?php endif; ?>
 </div>
@@ -130,10 +148,33 @@
 <div class="card">
     <div class="empty-state">
         <i class="fas fa-file-alt"></i>
-        <p>Seleccione los filtros y presione "Generar" para crear un reporte</p>
-        <small>Puede filtrar por ficha, rango de fechas y estado de asistencia</small>
+        <p>Seleccione los parámetros deseados y presione "Generar" para consultar el reporte</p>
+        <small>Puede filtrar por modalidad (día, semana, mes o rango personalizado) y por ficha académica</small>
     </div>
 </div>
 <?php endif; ?>
+
+<script>
+function toggleFechas(tipo) {
+    const grupoInicio = document.getElementById('grupoFechaInicio');
+    const grupoFin = document.getElementById('grupoFechaFin');
+    if (!grupoInicio || !grupoFin) return;
+
+    if (tipo === 'dia') {
+        grupoFin.style.display = 'none';
+        grupoInicio.querySelector('label').innerHTML = '<i class="fas fa-calendar-day"></i> Fecha';
+    } else if (tipo === 'semana' || tipo === 'mes') {
+        grupoFin.style.display = 'none';
+        grupoInicio.querySelector('label').innerHTML = '<i class="fas fa-calendar"></i> Fecha Referencia';
+    } else {
+        grupoFin.style.display = 'block';
+        grupoInicio.querySelector('label').innerHTML = '<i class="fas fa-calendar-alt"></i> Fecha Inicio';
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    const sel = document.getElementById('tipoReporteSelect');
+    if (sel) toggleFechas(sel.value);
+});
+</script>
 
 <?php require_once ROOT_PATH . '/views/layouts/footer.php'; ?>

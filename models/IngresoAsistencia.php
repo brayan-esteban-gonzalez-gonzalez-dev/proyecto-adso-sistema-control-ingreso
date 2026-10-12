@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * IngresoAsistencia.php — Modelo de Ingresos/Asistencia
  * 
@@ -64,12 +66,12 @@ class IngresoAsistencia {
     /**
      * Obtiene el ingreso de hoy para un aprendiz
      */
-    public function getIngresoHoy(int $idAprendiz): ?array {
+    public function getIngresoHoy(int $idUsuario): ?array {
         $sql = "SELECT * FROM {$this->table}
-                WHERE id_aprendiz = :id_aprendiz AND fecha = CURDATE()
+                WHERE id_usuario = :id_usuario AND fecha = CURDATE()
                 ORDER BY id_ingreso DESC LIMIT 1";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([':id_aprendiz' => $idAprendiz]);
+        $stmt->execute([':id_usuario' => $idUsuario]);
         $result = $stmt->fetch();
         return $result ?: null;
     }
@@ -77,9 +79,9 @@ class IngresoAsistencia {
     /**
      * Obtiene el historial de un aprendiz con filtros opcionales
      */
-    public function getByAprendiz(int $idAprendiz, ?string $fechaInicio = null, ?string $fechaFin = null): array {
-        $sql = "SELECT * FROM {$this->table} WHERE id_aprendiz = :id_aprendiz";
-        $params = [':id_aprendiz' => $idAprendiz];
+    public function getByAprendiz(int $idUsuario, ?string $fechaInicio = null, ?string $fechaFin = null): array {
+        $sql = "SELECT * FROM {$this->table} WHERE id_usuario = :id_usuario";
+        $params = [':id_usuario' => $idUsuario];
 
         if ($fechaInicio) {
             $sql .= " AND fecha >= :fecha_inicio";
@@ -102,11 +104,11 @@ class IngresoAsistencia {
     public function getByFecha(string $fecha): array {
         $sql = "SELECT i.*, 
                        u.nombre, u.apellido, u.num_documento,
-                       a.codigo_rfid, f.codigo_ficha
+                       u.codigo_rfid, f.codigo_ficha
                 FROM {$this->table} i
-                INNER JOIN aprendices a ON i.id_aprendiz = a.id_aprendiz
-                INNER JOIN usuarios u ON a.id_usuario = u.id_usuario
-                INNER JOIN fichas f ON a.id_ficha = f.id_ficha
+                INNER JOIN usuarios u ON i.id_usuario = u.id_usuario
+                LEFT JOIN aprendices a ON u.id_usuario = a.id_usuario
+                LEFT JOIN fichas f ON a.id_ficha = f.id_ficha
                 WHERE i.fecha = :fecha
                 ORDER BY i.hora_entrada";
         $stmt = $this->conn->prepare($sql);
@@ -120,11 +122,11 @@ class IngresoAsistencia {
     public function getById(int $id): ?array {
         $sql = "SELECT i.*, 
                        u.nombre, u.apellido, u.num_documento,
-                       a.codigo_rfid, f.codigo_ficha, f.nombre_programa
+                       u.codigo_rfid, f.codigo_ficha, f.nombre_programa
                 FROM {$this->table} i
-                INNER JOIN aprendices a ON i.id_aprendiz = a.id_aprendiz
-                INNER JOIN usuarios u ON a.id_usuario = u.id_usuario
-                INNER JOIN fichas f ON a.id_ficha = f.id_ficha
+                INNER JOIN usuarios u ON i.id_usuario = u.id_usuario
+                LEFT JOIN aprendices a ON u.id_usuario = a.id_usuario
+                LEFT JOIN fichas f ON a.id_ficha = f.id_ficha
                 WHERE i.id_ingreso = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':id' => $id]);
@@ -138,12 +140,12 @@ class IngresoAsistencia {
     public function getReporte(?int $idFicha = null, ?string $fechaInicio = null, ?string $fechaFin = null, ?string $estado = null): array {
         $sql = "SELECT i.*, 
                        u.nombre, u.apellido, u.num_documento,
-                       a.codigo_rfid, a.id_ficha,
+                       u.codigo_rfid, a.id_ficha,
                        f.codigo_ficha, f.nombre_programa
                 FROM {$this->table} i
-                INNER JOIN aprendices a ON i.id_aprendiz = a.id_aprendiz
-                INNER JOIN usuarios u ON a.id_usuario = u.id_usuario
-                INNER JOIN fichas f ON a.id_ficha = f.id_ficha
+                INNER JOIN usuarios u ON i.id_usuario = u.id_usuario
+                LEFT JOIN aprendices a ON u.id_usuario = a.id_usuario
+                LEFT JOIN fichas f ON a.id_ficha = f.id_ficha
                 WHERE 1=1";
         $params = [];
 
@@ -173,7 +175,7 @@ class IngresoAsistencia {
     /**
      * Obtiene estadísticas de retardos por aprendiz
      */
-    public function getEstadisticasRetardo(int $idAprendiz, ?string $fechaInicio = null, ?string $fechaFin = null): array {
+    public function getEstadisticasRetardo(int $idUsuario, ?string $fechaInicio = null, ?string $fechaFin = null): array {
         $sql = "SELECT 
                     COUNT(CASE WHEN estado = 'Retardo' THEN 1 END) AS total_retardos,
                     COALESCE(SUM(minutos_retardo), 0) AS total_minutos_retardo,
@@ -183,8 +185,8 @@ class IngresoAsistencia {
                     COUNT(CASE WHEN estado = 'Justificado' THEN 1 END) AS total_justificados,
                     COUNT(*) AS total_registros
                 FROM {$this->table}
-                WHERE id_aprendiz = :id_aprendiz";
-        $params = [':id_aprendiz' => $idAprendiz];
+                WHERE id_usuario = :id_usuario";
+        $params = [':id_usuario' => $idUsuario];
 
         if ($fechaInicio) {
             $sql .= " AND fecha >= :fecha_inicio";
@@ -242,14 +244,14 @@ class IngresoAsistencia {
         $diaSemana = $dias[$dayName];
 
         // Buscar aprendices que tengan horario ese día y no tengan registro
-        $sql = "INSERT INTO {$this->table} (id_aprendiz, fecha, estado)
-                SELECT a.id_aprendiz, :fecha, 'Inasistencia'
+        $sql = "INSERT INTO {$this->table} (id_usuario, fecha, estado)
+                SELECT u.id_usuario, :fecha, 'Inasistencia'
                 FROM aprendices a
                 INNER JOIN usuarios u ON a.id_usuario = u.id_usuario
                 INNER JOIN horarios h ON a.id_ficha = h.id_ficha AND h.dia_semana = :dia
                 WHERE u.estado = 'Activo'
-                AND a.id_aprendiz NOT IN (
-                    SELECT id_aprendiz FROM {$this->table} WHERE fecha = :fecha2
+                AND u.id_usuario NOT IN (
+                    SELECT id_usuario FROM {$this->table} WHERE fecha = :fecha2
                 )";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':fecha' => $fecha, ':dia' => $diaSemana, ':fecha2' => $fecha]);
@@ -275,12 +277,92 @@ class IngresoAsistencia {
                 FROM {$this->table} i
                 INNER JOIN aprendices a ON i.id_aprendiz = a.id_aprendiz
                 INNER JOIN usuarios u ON a.id_usuario = u.id_usuario
-                INNER JOIN fichas f ON a.id_ficha = f.id_ficha
+                LEFT JOIN fichas f ON a.id_ficha = f.id_ficha
                 WHERE i.fecha = CURDATE()
                 ORDER BY i.hora_entrada DESC
                 LIMIT 20";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll();
+    }
+
+    /**
+     * Obtiene el reporte consolidado de asistencia por aprendiz en un período.
+     * 
+     * Implementa una consulta SQL avanzada optimizada sin problema N+1:
+     * - JOIN entre aprendices, usuarios, fichas, instructor líder e ingresos_asistencia.
+     * - SUM condicional para minutos acumulados de retardo.
+     * - COUNT condicional para totalizar inasistencias.
+     * - GROUP_CONCAT para detallar las fechas específicas de inasistencia.
+     * - GROUP BY estricto compatible con ONLY_FULL_GROUP_BY de MySQL/MariaDB.
+     *
+     * @param string $fechaInicio Fecha inicial del período (YYYY-MM-DD)
+     * @param string $fechaFin    Fecha final del período (YYYY-MM-DD)
+     * @param int|null $fichaId   ID opcional de la ficha para filtrar
+     * @return array<int, array<string, mixed>> Lista agregada por aprendiz
+     * @throws PDOException En caso de fallo en la consulta SQL
+     */
+    public function obtenerReporteAsistencia(string $fechaInicio, string $fechaFin, ?int $fichaId = null): array {
+        $sql = "SELECT 
+                    a.id_aprendiz,
+                    u.num_documento,
+                    CONCAT(u.nombre, ' ', u.apellido) AS nombre_completo,
+                    u.correo,
+                    f.id_ficha,
+                    f.codigo_ficha,
+                    f.nombre_programa,
+                    COALESCE(CONCAT(inst.nombre, ' ', inst.apellido), 'Sin instructor asignado') AS nombre_instructor,
+                    COALESCE(SUM(i.minutos_retardo), 0) AS total_minutos_retardo,
+                    COUNT(CASE WHEN i.estado = 'Inasistencia' THEN 1 END) AS total_inasistencias,
+                    COALESCE(
+                        GROUP_CONCAT(
+                            DISTINCT CASE 
+                                WHEN i.estado = 'Inasistencia' THEN DATE_FORMAT(i.fecha, '%Y-%m-%d') 
+                            END 
+                            ORDER BY i.fecha ASC 
+                            SEPARATOR ', '
+                        ), 
+                        'Ninguno'
+                    ) AS dias_inasistencia
+                FROM aprendices a
+                INNER JOIN usuarios u ON a.id_usuario = u.id_usuario
+                INNER JOIN fichas f ON a.id_ficha = f.id_ficha
+                LEFT JOIN usuarios inst ON f.id_instructor_lider = inst.id_usuario
+                LEFT JOIN {$this->table} i ON (
+                    i.id_aprendiz = a.id_aprendiz 
+                    AND i.fecha >= :fecha_inicio 
+                    AND i.fecha <= :fecha_fin
+                )
+                WHERE u.estado = 'Activo'";
+
+        $params = [
+            ':fecha_inicio' => $fechaInicio,
+            ':fecha_fin'    => $fechaFin,
+        ];
+
+        if ($fichaId !== null && $fichaId > 0) {
+            $sql .= " AND f.id_ficha = :ficha_id";
+            $params[':ficha_id'] = $fichaId;
+        }
+
+        $sql .= " GROUP BY 
+                    a.id_aprendiz,
+                    u.id_usuario,
+                    u.num_documento,
+                    u.nombre,
+                    u.apellido,
+                    u.correo,
+                    f.id_ficha,
+                    f.codigo_ficha,
+                    f.nombre_programa,
+                    inst.id_usuario,
+                    inst.nombre,
+                    inst.apellido
+                  ORDER BY f.codigo_ficha ASC, u.apellido ASC, u.nombre ASC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
