@@ -58,10 +58,6 @@ $flash = Auth::getFlash();
                     <i class="fas fa-calendar-alt"></i>
                     <span>Horarios</span>
                 </a>
-                <a href="<?= BASE_URL ?>?action=aprendices" class="nav-link <?= str_starts_with($currentAction, 'aprendices') ? 'active' : '' ?>">
-                    <i class="fas fa-user-graduate"></i>
-                    <span>Aprendices</span>
-                </a>
             </div>
 
             <div class="nav-section">

@@ -1,16 +1,17 @@
 <?php require_once ROOT_PATH . '/views/layouts/header.php'; ?>
 
-<!-- Stats Cards -->
 <div class="stats-grid">
-    <div class="stat-card green">
-        <div class="stat-icon green">
-            <i class="fas fa-user-graduate"></i>
+    <a href="<?= BASE_URL ?>?action=usuarios&rol=3" style="text-decoration:none; color:inherit;">
+        <div class="stat-card green">
+            <div class="stat-icon green">
+                <i class="fas fa-user-graduate"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-value"><?= $stats['total_aprendices'] ?></div>
+                <div class="stat-label">Aprendices Activos</div>
+            </div>
         </div>
-        <div class="stat-info">
-            <div class="stat-value"><?= $stats['total_aprendices'] ?></div>
-            <div class="stat-label">Aprendices Activos</div>
-        </div>
-    </div>
+    </a>
 
     <div class="stat-card blue">
         <div class="stat-icon blue">
@@ -53,7 +54,6 @@
     </div>
 </div>
 
-<!-- Grid de 2 columnas -->
 <div class="grid-2">
     <!-- Últimos Ingresos de Hoy -->
     <div class="card">
@@ -167,8 +167,8 @@
         <a href="<?= BASE_URL ?>?action=asistencia/rfid" class="btn btn-primary">
             <i class="fas fa-wifi"></i> Marcación RFID
         </a>
-        <a href="<?= BASE_URL ?>?action=aprendices/crear" class="btn btn-blue">
-            <i class="fas fa-user-plus"></i> Nuevo Aprendiz
+        <a href="<?= BASE_URL ?>?action=usuarios/crear" class="btn btn-blue">
+            <i class="fas fa-user-plus"></i> Nuevo Usuario
         </a>
         <a href="<?= BASE_URL ?>?action=reportes" class="btn btn-purple">
             <i class="fas fa-file-alt"></i> Generar Reporte

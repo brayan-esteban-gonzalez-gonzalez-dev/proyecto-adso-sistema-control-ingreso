@@ -1,11 +1,5 @@
-/* ============================================================
-   SCIA — Sistema de Control de Ingreso de Aprendices
-   Premium Dark Theme — style.css
-   ============================================================ */
-
-/* ─── CSS Variables (Design Tokens) ─── */
 :root {
-    /* Colors — Dark Mode */
+    
     --bg-primary:     #0f172a;
     --bg-secondary:   #1e293b;
     --bg-tertiary:    #334155;
@@ -25,14 +19,14 @@
     --accent-purple:  #8b5cf6;
     --accent-cyan:    #06b6d4;
 
-    /* Gradients */
+   
     --gradient-green:  linear-gradient(135deg, #10b981 0%, #059669 100%);
     --gradient-blue:   linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
     --gradient-purple: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
     --gradient-red:    linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
     --gradient-dark:   linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
 
-    /* Shadows */
+    
     --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md:  0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
     --shadow-lg:  0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
@@ -40,23 +34,23 @@
     --shadow-glow-green: 0 0 20px rgba(16, 185, 129, 0.3);
     --shadow-glow-blue:  0 0 20px rgba(59, 130, 246, 0.3);
 
-    /* Border */
+
     --border-color:   rgba(148, 163, 184, 0.1);
     --border-radius:  12px;
     --border-radius-sm: 8px;
     --border-radius-lg: 16px;
 
-    /* Sidebar */
+    
     --sidebar-width:      260px;
     --sidebar-collapsed:  72px;
 
-    /* Transitions */
+    
     --transition-fast: 0.15s ease;
     --transition-base: 0.3s ease;
     --transition-slow: 0.5s ease;
 }
 
-/* ─── Reset & Base ─── */
+
 *,
 *::before,
 *::after {
@@ -90,7 +84,7 @@ img {
     height: auto;
 }
 
-/* ─── Scrollbar Custom ─── */
+
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-primary); }
 ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 3px; }
