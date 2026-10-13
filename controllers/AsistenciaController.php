@@ -27,7 +27,16 @@ class AsistenciaController {
      * Pantalla de marcación RFID
      */
     public function rfid(): void {
-        Auth::requireAdmin();
+        Auth::requireLogin();
+        if (Auth::isAdmin()) {
+            Auth::setFlash('info', 'La marcación RFID está reservada para el rol de Instructor.');
+            header('Location: ' . BASE_URL . '?action=dashboard');
+            exit;
+        }
+        if (!Auth::isInstructor()) {
+            header('Location: ' . BASE_URL . '?action=dashboard');
+            exit;
+        }
         $ultimosIngresos = $this->ingresoModel->getIngresosHoyDetalle();
         $pageTitle = 'Marcación RFID';
         require_once ROOT_PATH . '/views/asistencia/rfid.php';

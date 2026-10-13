@@ -62,10 +62,12 @@ $flash = Auth::getFlash();
 
             <div class="nav-section">
                 <span class="nav-section-title">Asistencia</span>
+                <?php if (Auth::isInstructor()): ?>
                 <a href="<?= BASE_URL ?>?action=asistencia/rfid" class="nav-link <?= $currentAction === 'asistencia/rfid' ? 'active' : '' ?>">
                     <i class="fas fa-wifi"></i>
                     <span>Marcación RFID</span>
                 </a>
+                <?php endif; ?>
                 <a href="<?= BASE_URL ?>?action=asistencia/historial" class="nav-link <?= $currentAction === 'asistencia/historial' ? 'active' : '' ?>">
                     <i class="fas fa-history"></i>
                     <span>Historial</span>

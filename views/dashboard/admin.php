@@ -164,17 +164,24 @@
         </h2>
     </div>
     <div class="btn-group">
+        <?php if (Auth::isInstructor()): ?>
         <a href="<?= BASE_URL ?>?action=asistencia/rfid" class="btn btn-primary">
             <i class="fas fa-wifi"></i> Marcación RFID
         </a>
+        <?php endif; ?>
+        <?php if (Auth::isAdmin()): ?>
         <a href="<?= BASE_URL ?>?action=usuarios/crear" class="btn btn-blue">
             <i class="fas fa-user-plus"></i> Nuevo Usuario
         </a>
+        <a href="<?= BASE_URL ?>?action=fichas/crear" class="btn btn-secondary">
+            <i class="fas fa-plus"></i> Nueva Ficha
+        </a>
+        <?php endif; ?>
         <a href="<?= BASE_URL ?>?action=reportes" class="btn btn-purple">
             <i class="fas fa-file-alt"></i> Generar Reporte
         </a>
-        <a href="<?= BASE_URL ?>?action=fichas/crear" class="btn btn-secondary">
-            <i class="fas fa-plus"></i> Nueva Ficha
+        <a href="<?= BASE_URL ?>?action=asistencia/historial" class="btn btn-secondary">
+            <i class="fas fa-history"></i> Historial de Asistencia
         </a>
     </div>
 </div>
