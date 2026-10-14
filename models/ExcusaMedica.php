@@ -44,12 +44,12 @@ class ExcusaMedica {
      */
     public function getById(int $id): ?array {
         $sql = "SELECT e.*,
-                       u.nombre, u.apellido, u.identificacion,
-                       f.codigo         AS codigo_ficha,
-                       p.nombre         AS nombre_programa,
-                       ee.estado        AS estado_revision,
-                       ee.respuesta     AS comentario_revision,
-                       CONCAT(rev.nombre, ' ', rev.apellido) AS nombre_revisor
+                    u.nombre, u.apellido, u.identificacion,
+                    f.codigo         AS codigo_ficha,
+                    p.nombre         AS nombre_programa,
+                    ee.estado        AS estado_revision,
+                    ee.respuesta     AS comentario_revision,
+                    CONCAT(rev.nombre, ' ', rev.apellido) AS nombre_revisor
                 FROM {$this->table} e
                 INNER JOIN Usuario u   ON e.Usuario_id     = u.id
                 LEFT JOIN Ficha   f    ON u.Ficha_id        = f.id
@@ -68,9 +68,9 @@ class ExcusaMedica {
      */
     public function getByAprendiz(int $idUsuario): array {
         $sql = "SELECT e.*,
-                       ee.estado    AS estado_revision,
-                       ee.respuesta AS comentario_revision,
-                       CONCAT(rev.nombre, ' ', rev.apellido) AS nombre_revisor
+                    ee.estado    AS estado_revision,
+                    ee.respuesta AS comentario_revision,
+                    CONCAT(rev.nombre, ' ', rev.apellido) AS nombre_revisor
                 FROM {$this->table} e
                 LEFT JOIN {$this->tableEstado} ee ON ee.Excusa_id = e.id
                 LEFT JOIN Usuario rev ON ee.Instructor_id = rev.id
