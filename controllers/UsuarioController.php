@@ -23,7 +23,6 @@ class UsuarioController {
         $pageTitle = 'Gestión de Usuarios';
         require_once ROOT_PATH . '/views/usuarios/index.php';
     }
-
     /**
      * Muestra formulario de creación
      */
@@ -36,7 +35,6 @@ class UsuarioController {
         $pageTitle  = 'Nuevo Usuario';
         require_once ROOT_PATH . '/views/usuarios/form.php';
     }
-
     /**
      * Muestra formulario de edición
      */
@@ -57,27 +55,22 @@ class UsuarioController {
         $pageTitle  = 'Editar Usuario';
         require_once ROOT_PATH . '/views/usuarios/form.php';
     }
-
     /**
      * Guarda un usuario (crear o actualizar)
      */
     public function guardar(): void {
         Auth::requireAdmin();
-
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             header('Location: ' . BASE_URL . '?action=usuarios');
             exit;
         }
-
         // Validar CSRF
         if (!Auth::validateCSRF($_POST['csrf_token'] ?? '')) {
             Auth::setFlash('error', 'Token de seguridad inválido.');
             header('Location: ' . BASE_URL . '?action=usuarios');
             exit;
         }
-
         $id = (int) ($_POST['id_usuario'] ?? 0);
-
         // Recoger datos con los nuevos nombres de campo
         $data = [
             'Rol_id'         => (int) ($_POST['id_rol'] ?? 3),
@@ -88,7 +81,6 @@ class UsuarioController {
             'codigo_llavero' => trim($_POST['codigo_llavero'] ?? '') ?: null,
             'estado'         => $_POST['estado'] ?? 'Activo',
         ];
-
         // Validaciones
         Validator::reset();
         Validator::required($data['identificacion'], 'número de documento');
@@ -110,14 +102,12 @@ class UsuarioController {
                 $data['password'] = $password;
             }
         }
-
         if (!Validator::isValid()) {
             Auth::setFlash('error', implode('<br>', Validator::getErrors()));
             $redirect = $id > 0 ? "usuarios/editar&id={$id}" : 'usuarios/crear';
             header('Location: ' . BASE_URL . "?action={$redirect}");
             exit;
         }
-
         try {
             if ($id > 0) {
                 $this->model->update($id, $data);
