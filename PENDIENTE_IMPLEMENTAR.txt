@@ -419,7 +419,7 @@
                        Validación: hasta >= desde, rango máximo = 6 meses (184 días).
 
   4. Archivo Excel:   <input type="file" accept=".xlsx,.xls">
-                       Validación: tipo MIME, tamaño ≤ 5 MB.
+                       Validación: tipo MIME, tamaño ≤ 15 MB.
 
   5. Botón "Descargar Plantilla": enlace que descarga el archivo Excel de
                        ejemplo con encabezados correctos y 3 filas de muestra.

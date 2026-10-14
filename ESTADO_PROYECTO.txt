@@ -230,7 +230,6 @@
   ❌  La vista rfid.php (registro RFID) existe pero el controlador de registro
       automático no está implementado (HorarioController no existe)
   ❌  No hay lógica de generación automática de inasistencias
-
   ─── MÓDULO 7: GESTIÓN DE EXCUSAS ────────────────────────────────────────────
 
   ✅  Listar excusas (todas / pendientes / propias según rol)
@@ -300,7 +299,6 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   SECCIÓN 5 — AJUSTES PENDIENTES EN VISTAS (CAMPOS RENOMBRADOS)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
   Las vistas existentes fueron escritas para la DB antigua y aún usan los
   nombres de campos viejos. Se deben actualizar así:
 
