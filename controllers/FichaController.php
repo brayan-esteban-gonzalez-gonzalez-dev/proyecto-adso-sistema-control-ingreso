@@ -8,12 +8,10 @@
 class FichaController {
     private PDO $db;
     private Ficha $model;
-
     public function __construct(PDO $db) {
         $this->db    = $db;
         $this->model = new Ficha($db);
     }
-
     /**
      * Lista todas las fichas
      */
@@ -23,7 +21,6 @@ class FichaController {
         $pageTitle = 'Gestión de Fichas';
         require_once ROOT_PATH . '/views/fichas/index.php';
     }
-
     /**
      * Formulario de creación
      */
@@ -38,7 +35,6 @@ class FichaController {
         $pageTitle    = 'Nueva Ficha';
         require_once ROOT_PATH . '/views/fichas/form.php';
     }
-
     /**
      * Formulario de edición
      */
