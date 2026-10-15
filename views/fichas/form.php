@@ -3,7 +3,7 @@
 <?php
 $fichaId = $ficha['id'] ?? $ficha['id_ficha'] ?? 0;
 $codigo = $ficha['codigo'] ?? $ficha['codigo_ficha'] ?? '';
-$programaId = $ficha['Programa_id'] ?? 0;
+$nombrePrograma = $ficha['nombre_programa'] ?? '';
 $jornadaId = $ficha['jornada_id'] ?? 0;
 $instructorId = $ficha['instructor_id'] ?? $ficha['id_instructor_lider'] ?? 0;
 ?>
@@ -21,15 +21,19 @@ $instructorId = $ficha['instructor_id'] ?? $ficha['id_instructor_lider'] ?? 0;
         </div>
 
         <div class="form-group">
-            <label class="form-label" for="Programa_id">Programa de Formación *</label>
-            <select id="Programa_id" name="Programa_id" class="form-control" required>
-                <option value="">— Seleccionar Programa —</option>
+            <label class="form-label" for="nombre_programa">Programa de Formación *</label>
+            <input type="text" id="nombre_programa" name="nombre_programa" class="form-control"
+                   value="<?= htmlspecialchars($nombrePrograma) ?>" required
+                   placeholder="Ej: Análisis y Desarrollo de Software"
+                   list="programas_list" autocomplete="off">
+            <datalist id="programas_list">
                 <?php foreach ($programas as $prog): ?>
-                <option value="<?= $prog['id'] ?>" <?= ($programaId == $prog['id']) ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($prog['nombre']) ?>
-                </option>
+                <option value="<?= htmlspecialchars($prog['nombre']) ?>">
                 <?php endforeach; ?>
-            </select>
+            </datalist>
+            <small class="text-muted" style="font-size: 0.85em; display: block; margin-top: 4px;">
+                Ingresa el nombre del programa manualmente o selecciona uno de los existentes.
+            </small>
         </div>
 
         <div class="form-group">

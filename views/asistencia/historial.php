@@ -81,7 +81,7 @@
                 <tr>
                     <?php if (Auth::isAdminOrInstructor()): ?>
                     <td><strong><?= htmlspecialchars(($ing['nombre'] ?? '') . ' ' . ($ing['apellido'] ?? '')) ?></strong></td>
-                    <td><?= htmlspecialchars($ing['num_documento'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($ing['identificacion'] ?? '') ?></td>
                     <td><span class="badge badge-blue"><?= htmlspecialchars($ing['codigo_ficha'] ?? '') ?></span></td>
                     <?php endif; ?>
                     <td><?= $ing['fecha'] ?></td>
@@ -93,7 +93,7 @@
                         </span>
                     </td>
                     <td><?= $ing['minutos_retardo'] > 0 ? $ing['minutos_retardo'] . ' min' : '—' ?></td>
-                    <td><?= $ing['minutos_salida_anticipada'] > 0 ? $ing['minutos_salida_anticipada'] . ' min' : '—' ?></td>
+                    <td><?= ($ing['minutos_anticipacion'] ?? 0) > 0 ? $ing['minutos_anticipacion'] . ' min' : '—' ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>

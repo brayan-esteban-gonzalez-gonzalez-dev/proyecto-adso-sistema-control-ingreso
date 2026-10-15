@@ -164,4 +164,30 @@ class Ficha {
         $stmt->execute();
         return $stmt->fetchAll();
     }
+
+    /**
+     * Busca un programa por su nombre exacto (case-insensitive) o lo crea si no existe.
+     * Retorna el ID del programa.
+     */
+    public function findOrCreatePrograma(string $nombre): int {
+        $nombre = trim($nombre);
+        if (empty($nombre)) {
+            return 0;
+        }
+
+        $sql  = "SELECT id FROM Programa WHERE LOWER(TRIM(nombre)) = LOWER(:nombre) LIMIT 1";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':nombre' => strtolower($nombre)]);
+        $row  = $stmt->fetch();
+
+        if ($row) {
+            return (int) $row['id'];
+        }
+
+        $sqlInsert  = "INSERT INTO Programa (nombre) VALUES (:nombre)";
+        $stmtInsert = $this->conn->prepare($sqlInsert);
+        $stmtInsert->execute([':nombre' => $nombre]);
+        return (int) $this->conn->lastInsertId();
+    }
 }
+

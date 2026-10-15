@@ -79,10 +79,21 @@ class FichaController {
             exit;
         }
 
-        $id   = (int) ($_POST['id_ficha']   ?? 0);
+        $id             = (int) ($_POST['id_ficha'] ?? 0);
+        $nombrePrograma = trim($_POST['nombre_programa'] ?? $_POST['Programa_id'] ?? '');
+
+        $programaId = 0;
+        if (!empty($nombrePrograma)) {
+            if (is_numeric($nombrePrograma) && (int)$nombrePrograma > 0 && empty($_POST['nombre_programa'])) {
+                $programaId = (int)$nombrePrograma;
+            } else {
+                $programaId = $this->model->findOrCreatePrograma($nombrePrograma);
+            }
+        }
+
         $data = [
             'codigo'        => (int) ($_POST['codigo_ficha']        ?? 0),
-            'Programa_id'   => (int) ($_POST['Programa_id']         ?? 0),
+            'Programa_id'   => $programaId,
             'jornada_id'    => (int) ($_POST['jornada_id']          ?? 0) ?: null,
             'instructor_id' => (int) ($_POST['id_instructor_lider'] ?? 0) ?: null,
             'estado'        => $_POST['estado'] ?? 'Activo',
@@ -90,7 +101,7 @@ class FichaController {
 
         Validator::reset();
         Validator::required((string)$data['codigo'],      'código de ficha');
-        Validator::required((string)$data['Programa_id'], 'programa');
+        Validator::required((string)$data['Programa_id'], 'programa de formación');
 
         if (!Validator::isValid()) {
             Auth::setFlash('error', implode('<br>', Validator::getErrors()));

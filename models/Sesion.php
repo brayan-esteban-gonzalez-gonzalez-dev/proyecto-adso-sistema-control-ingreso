@@ -70,27 +70,18 @@ class Sesion {
     }
 
     /**
-     * Obtiene una sesión existente por ficha, fecha y hora de inicio
+     * Verifica si ya existe una sesión en la misma fecha y hora para la misma ficha
      */
-    public function getSesionExistente(int $fichaId, string $fecha, string $horaInicio): ?array {
-        $sql = "SELECT * FROM {$this->table}
-                WHERE Ficha_id = :ficha_id AND fecha = :fecha AND hora_inicio = :hora_inicio
-                LIMIT 1";
+    public function existeSesion(int $fichaId, string $fecha, string $horaInicio): bool {
+        $sql = "SELECT COUNT(*) as total FROM {$this->table}
+                WHERE Ficha_id = :ficha_id AND fecha = :fecha AND hora_inicio = :hora_inicio";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([
             ':ficha_id'    => $fichaId,
             ':fecha'       => $fecha,
             ':hora_inicio' => $horaInicio,
         ]);
-        $result = $stmt->fetch();
-        return $result ?: null;
-    }
-
-    /**
-     * Verifica si ya existe una sesión en la misma fecha y hora para la misma ficha
-     */
-    public function existeSesion(int $fichaId, string $fecha, string $horaInicio): bool {
-        return $this->getSesionExistente($fichaId, $fecha, $horaInicio) !== null;
+        return ((int) $stmt->fetch()['total']) > 0;
     }
 
     /**

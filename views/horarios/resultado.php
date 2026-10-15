@@ -37,7 +37,7 @@
 <?php endif; ?>
 
 <!-- Resumen Estadístico de la Importación -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px;">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px;">
     <div class="card" style="text-align: center; padding: 20px;">
         <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">Total Bloques</span>
         <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #fff;"><?= $resultado['total_procesadas'] ?></h2>
@@ -48,23 +48,13 @@
         <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: var(--accent-green);"><?= $resultado['creadas'] ?></h2>
     </div>
 
-    <div class="card" style="text-align: center; padding: 20px; border-top: 3px solid #38bdf8;">
-        <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #38bdf8;">Actualizadas</span>
-        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #38bdf8;"><?= $resultado['actualizadas'] ?? 0 ?></h2>
-    </div>
-
-    <div class="card" style="text-align: center; padding: 20px; border-top: 3px solid #a855f7;">
-        <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #a855f7;">Instructores Nuevos</span>
-        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #a855f7;"><?= $resultado['instructores_nuevos'] ?? 0 ?></h2>
-    </div>
-
     <div class="card" style="text-align: center; padding: 20px; border-top: 3px solid var(--accent-yellow, #f59e0b);">
-        <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #f59e0b;">Sin Cambios (Omitidas)</span>
+        <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #f59e0b;">Omitidas (Duplicados)</span>
         <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #f59e0b;"><?= $resultado['omitidas'] ?></h2>
     </div>
 
     <div class="card" style="text-align: center; padding: 20px; border-top: 3px solid var(--accent-red, #ef4444);">
-        <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #ef4444;">Errores</span>
+        <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #ef4444;">Errores / No Hallados</span>
         <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #ef4444;"><?= $resultado['errores'] ?></h2>
     </div>
 </div>
@@ -87,7 +77,7 @@
         <table class="data-table" id="tablaDetalles">
             <thead>
                 <tr>
-                    <th style="width: 120px;">Estado</th>
+                    <th style="width: 100px;">Estado</th>
                     <th>Descripción de la Operación</th>
                 </tr>
             </thead>
@@ -97,15 +87,13 @@
                     <td>
                         <?php if ($item['tipo'] === 'success'): ?>
                             <span class="badge badge-green"><i class="fas fa-check"></i> Creado</span>
-                        <?php elseif ($item['tipo'] === 'info'): ?>
-                            <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);"><i class="fas fa-sync-alt"></i> Actualizado</span>
                         <?php elseif ($item['tipo'] === 'warning'): ?>
-                            <span class="badge badge-yellow" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;"><i class="fas fa-equals"></i> Sin cambios</span>
+                            <span class="badge badge-yellow" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;"><i class="fas fa-exclamation-triangle"></i> Omitido</span>
                         <?php else: ?>
                             <span class="badge badge-danger"><i class="fas fa-times-circle"></i> Error</span>
                         <?php endif; ?>
                     </td>
-                    <td style="font-size: 0.92rem; color: <?= $item['tipo'] === 'error' ? '#fca5a5' : ($item['tipo'] === 'warning' ? '#fde68a' : ($item['tipo'] === 'info' ? '#7dd3fc' : '#cbd5e1')) ?>;">
+                    <td style="font-size: 0.92rem; color: <?= $item['tipo'] === 'error' ? '#fca5a5' : ($item['tipo'] === 'warning' ? '#fde68a' : '#cbd5e1') ?>;">
                         <?= htmlspecialchars($item['mensaje']) ?>
                     </td>
                 </tr>

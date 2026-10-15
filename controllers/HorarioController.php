@@ -50,8 +50,7 @@ class HorarioController
     /**
      * Muestra el formulario para importar horarios desde Excel
      */
-    public function importar(): void
-    {
+    public function importar(): void {
         Auth::requireAdmin();
 
         $pageTitle = 'Importar Horarios desde Excel';
@@ -64,8 +63,7 @@ class HorarioController
     /**
      * Procesa la subida y extracción del archivo Excel
      */
-    public function procesar(): void
-    {
+    public function procesar(): void {
         Auth::requireAdmin();
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -106,6 +104,7 @@ class HorarioController
 
             $pageTitle = 'Resultado de la Importación';
             require_once ROOT_PATH . '/views/horarios/resultado.php';
+
         } catch (Exception $e) {
             Auth::setFlash('error', 'Error al procesar el archivo Excel: ' . $e->getMessage());
             header('Location: ' . BASE_URL . '?action=horarios/importar');
@@ -116,8 +115,7 @@ class HorarioController
     /**
      * Elimina una sesión
      */
-    public function eliminar(): void
-    {
+    public function eliminar(): void {
         Auth::requireAdmin();
 
         $id = (int)($_GET['id'] ?? 0);
@@ -134,20 +132,17 @@ class HorarioController
     /**
      * Algoritmo inteligente para parsear la grilla visual de horarios en el Excel
      */
-    private function parsearExcelHorarios($sheet): array
-    {
+    private function parsearExcelHorarios($sheet): array {
         $highestRow = $sheet->getHighestRow();
         $highestCol = $sheet->getHighestColumn();
         $highestColIndex = Coordinate::columnIndexFromString($highestCol);
         $resultado = [
-            'ficha_detectada'     => null,
-            'total_procesadas'    => 0,
-            'creadas'             => 0,
-            'actualizadas'        => 0,
-            'omitidas'            => 0,
-            'errores'             => 0,
-            'instructores_nuevos' => 0,
-            'detalles'            => []
+            'ficha_detectada' => null,
+            'total_procesadas' => 0,
+            'creadas' => 0,
+            'omitidas' => 0,
+            'errores' => 0,
+            'detalles' => []
         ];
         // 1. Detectar el Código de Ficha en las primeras filas
         $fichaEncontrada = null;
@@ -177,18 +172,9 @@ class HorarioController
 
         // Meses en español a número
         $mesesMap = [
-            'ENERO' => '01',
-            'FEBRERO' => '02',
-            'MARZO' => '03',
-            'ABRIL' => '04',
-            'MAYO' => '05',
-            'JUNIO' => '06',
-            'JULIO' => '07',
-            'AGOSTO' => '08',
-            'SEPTIEMBRE' => '09',
-            'OCTUBRE' => '10',
-            'NOVIEMBRE' => '11',
-            'DICIEMBRE' => '12'
+            'ENERO' => '01', 'FEBRERO' => '02', 'MARZO' => '03', 'ABRIL' => '04',
+            'MAYO' => '05', 'JUNIO' => '06', 'JULIO' => '07', 'AGOSTO' => '08',
+            'SEPTIEMBRE' => '09', 'OCTUBRE' => '10', 'NOVIEMBRE' => '11', 'DICIEMBRE' => '12'
         ];
 
         // 2. Mapear celdas combinadas
@@ -238,15 +224,19 @@ class HorarioController
                 continue;
             }
 
+            // Fila de encabezado de días encontrada en fila $r
+            // Buscar fila de números de día (generalmente $r + 1 o en la misma vecindad)
             $dayNumberRow = $r + 1;
-
+            
+            // Buscar fila de meses (generalmente $r - 1 o $r - 2)
             $monthRow = max(1, $r - 1);
 
-           
+            // Mapear cada columna a su fecha YYYY-MM-DD
             $colDates = [];
             $currentMonth = date('m');
 
             for ($c = 1; $c <= $highestColIndex; $c++) {
+                // Verificar si hay nombre de mes en la fila de meses o superior
                 for ($mr = max(1, $r - 3); $mr <= $r; $mr++) {
                     $mVal = strtoupper(trim((string)$sheet->getCell([$c, $mr])->getValue()));
                     foreach ($mesesMap as $nombreMes => $numMes) {
@@ -264,9 +254,11 @@ class HorarioController
                 }
             }
 
+            // Filas de clases para esta semana: desde $dayNumberRow + 1 hasta la siguiente fila de días o final
             $startClassRow = $dayNumberRow + 1;
             $endClassRow = min($highestRow, $startClassRow + 25);
 
+            // Buscar si hay otra fila de días antes de 25 filas
             for ($checkR = $startClassRow; $checkR <= min($highestRow, $startClassRow + 25); $checkR++) {
                 for ($checkC = 1; $checkC <= $highestColIndex; $checkC++) {
                     $cVal = strtoupper(trim((string)$sheet->getCell([$checkC, $checkR])->getValue()));
@@ -277,6 +269,7 @@ class HorarioController
                 }
             }
 
+            // Iterar por las celdas de este bloque
             for ($cr = $startClassRow; $cr <= $endClassRow; $cr++) {
                 foreach ($colDates as $colIdx => $fecha) {
                     $cellKey = "{$colIdx}_{$cr}";
@@ -290,6 +283,8 @@ class HorarioController
                     if (empty($rawText)) {
                         continue;
                     }
+
+                    // Determinar límites del bloque (si es celda combinada o individual)
                     $blockStartRow = $cr;
                     $blockEndRow = $cr;
                     $blockStartCol = $colIdx;
@@ -301,6 +296,8 @@ class HorarioController
                         $blockEndRow = $mInfo['endRow'];
                         $blockStartCol = $mInfo['startCol'];
                         $blockEndCol = $mInfo['endCol'];
+
+                        // Marcar todas las celdas de este merge como procesadas
                         for ($mr = $blockStartRow; $mr <= $blockEndRow; $mr++) {
                             for ($mc = $blockStartCol; $mc <= $blockEndCol; $mc++) {
                                 $processedBlocks["{$mc}_{$mr}"] = true;
@@ -309,12 +306,16 @@ class HorarioController
                     } else {
                         $processedBlocks[$cellKey] = true;
                     }
+
+                    // Determinar hora de inicio y fin
+                    // Revisamos columna B (hora inicio) y columna C (hora fin) o calculamos por fila
                     $horaInicioVal = $sheet->getCell([2, $blockStartRow])->getValue();
                     $horaFinVal = $sheet->getCell([3, $blockEndRow])->getValue();
 
                     if (is_numeric($horaInicioVal)) {
                         $horaInicio = sprintf('%02d:00:00', (int)$horaInicioVal);
                     } else {
+                        // Fallback por bloque
                         $horaInicio = '07:00:00';
                     }
 
@@ -327,6 +328,7 @@ class HorarioController
                         $horaFin = '13:00:00';
                     }
 
+                    // Parsear texto del instructor y metadata
                     $lineas = array_values(array_filter(
                         array_map('trim', preg_split('/\r\n|\r|\n/', $rawText)),
                         fn($l) => !empty($l)
@@ -354,89 +356,27 @@ class HorarioController
                     // Buscar instructor en la BD
                     $instructor = $this->usuarioModel->getInstructorPorNombre($nombreInstructor);
 
-                    // Si no se encuentra, auto-registrar al instructor
                     if (!$instructor) {
-                        $partes = array_values(array_filter(explode(' ', trim($nombreInstructor))));
-                        $nombreParte = $partes[0] ?? $nombreInstructor;
-                        $apellidoParte = count($partes) > 1 ? implode(' ', array_slice($partes, 1)) : 'Docente';
-
-                        $nuevoId = $this->usuarioModel->createInstructorDesdeExcel($nombreParte, $apellidoParte);
-                        if (!$nuevoId) {
-                            $resultado['errores']++;
-                            $resultado['detalles'][] = [
-                                'tipo' => 'error',
-                                'mensaje' => "No se pudo registrar automáticamente al instructor \"$nombreInstructor\" (Fecha: $fecha, Horario: $horaInicio - $horaFin)."
-                            ];
-                            continue;
-                        }
-
-                        $instructor = $this->usuarioModel->getById($nuevoId);
-                        $resultado['instructores_nuevos']++;
+                        $resultado['errores']++;
                         $resultado['detalles'][] = [
-                            'tipo' => 'info',
-                            'mensaje' => "Instructor \"$nombreInstructor\" registrado automáticamente (Identificación temporal asignada)."
+                            'tipo' => 'error',
+                            'mensaje' => "Instructor \"$nombreInstructor\" no encontrado en la base de datos (Fecha: $fecha, Horario: $horaInicio - $horaFin)."
                         ];
-                    }
-
-                    // Verificar si ya existe la sesión
-                    $sesionExistente = $this->sesionModel->getSesionExistente($fichaId, $fecha, $horaInicio);
-
-                    if ($sesionExistente) {
-                        // Comparar campos del Excel vs BD
-                        $datosExcel = [
-                            'Instructor_id'     => (int)$instructor['id'],
-                            'hora_fin'          => $horaFin,
-                            'tipo_instructor'   => $tipoInstructor,
-                            'especialidad'      => $especialidad,
-                            'nivel'             => $nivel,
-                            'grupo_convergente' => $grupoConvergente,
-                        ];
-
-                        $camposDiferentes = [];
-                        foreach ($datosExcel as $campo => $valorExcel) {
-                            $valorBD = $sesionExistente[$campo] ?? null;
-                            if ($campo === 'Instructor_id') {
-                                if ((int)$valorBD !== (int)$valorExcel) {
-                                    $camposDiferentes[$campo] = $valorExcel;
-                                }
-                            } else {
-                                $strBD = $valorBD !== null ? trim((string)$valorBD) : '';
-                                $strExcel = $valorExcel !== null ? trim((string)$valorExcel) : '';
-                                if ($strBD !== $strExcel) {
-                                    $camposDiferentes[$campo] = $valorExcel;
-                                }
-                            }
-                        }
-
-                        if (empty($camposDiferentes)) {
-                            // Los datos coinciden exactamente -> no actualizar
-                            $resultado['omitidas']++;
-                            $resultado['detalles'][] = [
-                                'tipo' => 'warning',
-                                'mensaje' => "Sesión sin cambios (omitida): Ficha {$fichaEncontrada['codigo']} el $fecha ($horaInicio - $horaFin) con {$instructor['nombre']} {$instructor['apellido']}."
-                            ];
-                        } else {
-                            // Hay diferencias -> actualizar solo lo necesario
-                            $actualizado = $this->sesionModel->update((int)$sesionExistente['id'], $camposDiferentes);
-                            if ($actualizado) {
-                                $resultado['actualizadas']++;
-                                $camposCambiados = implode(', ', array_keys($camposDiferentes));
-                                $resultado['detalles'][] = [
-                                    'tipo' => 'info',
-                                    'mensaje' => "Sesión actualizada ($camposCambiados): Ficha {$fichaEncontrada['codigo']} el $fecha ($horaInicio - $horaFin) — {$instructor['nombre']} {$instructor['apellido']}."
-                                ];
-                            } else {
-                                $resultado['errores']++;
-                                $resultado['detalles'][] = [
-                                    'tipo' => 'error',
-                                    'mensaje' => "Error al actualizar sesión para el $fecha ($horaInicio - $horaFin)."
-                                ];
-                            }
-                        }
                         continue;
                     }
 
-                    // Insertar sesión nueva si no existía
+                    // Verificar si ya existe la sesión
+                    $existe = $this->sesionModel->existeSesion($fichaId, $fecha, $horaInicio);
+                    if ($existe) {
+                        $resultado['omitidas']++;
+                        $resultado['detalles'][] = [
+                            'tipo' => 'warning',
+                            'mensaje' => "Sesión omitida (ya existía): Ficha {$fichaEncontrada['codigo']} el $fecha ($horaInicio - $horaFin) con {$instructor['nombre']} {$instructor['apellido']}."
+                        ];
+                        continue;
+                    }
+
+                    // Insertar sesión
                     $insertado = $this->sesionModel->create([
                         'Ficha_id'          => $fichaId,
                         'Competencia_id'    => null,
