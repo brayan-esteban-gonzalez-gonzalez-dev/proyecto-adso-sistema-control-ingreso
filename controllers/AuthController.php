@@ -1,7 +1,6 @@
 <?php
 /**
  * AuthController.php — Controlador de Autenticación
- * 
  * Gestionar login, logout y validacion de credenciales.
  */
 class AuthController {

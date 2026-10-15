@@ -209,6 +209,36 @@ class Usuario {
     }
 
     /**
+     * Registra un instructor nuevo detectado en la importación de horarios
+     */
+    public function createInstructorDesdeExcel(string $nombre, string $apellido): ?int {
+        // Generar una identificación temporal única
+        $identificacionTemp = 'INST_' . strtoupper(substr(md5($nombre . ' ' . $apellido . microtime()), 0, 8));
+        
+        // Limpiar para email
+        $cleanEmailName = preg_replace('/[^a-zA-Z0-9]/', '', strtolower($nombre));
+        $cleanEmailApe  = preg_replace('/[^a-zA-Z0-9]/', '', strtolower($apellido));
+        if (empty($cleanEmailName)) { $cleanEmailName = 'instructor'; }
+        if (empty($cleanEmailApe)) { $cleanEmailApe = substr(md5(microtime()), 0, 5); }
+        $email = $cleanEmailName . '.' . $cleanEmailApe . '_' . substr(uniqid(), -4) . '@sena.edu.co';
+
+        $sql = "INSERT INTO {$this->table} (Rol_id, identificacion, nombre, apellido, email, password, estado)
+                VALUES (:Rol_id, :identificacion, :nombre, :apellido, :email, :password, :estado)";
+        $stmt = $this->conn->prepare($sql);
+        $ok = $stmt->execute([
+            ':Rol_id'         => 2, // Rol 2: Instructor
+            ':identificacion' => $identificacionTemp,
+            ':nombre'         => ucwords(mb_strtolower(trim($nombre))),
+            ':apellido'       => ucwords(mb_strtolower(trim($apellido))),
+            ':email'          => $email,
+            ':password'       => password_hash(bin2hex(random_bytes(8)), PASSWORD_BCRYPT),
+            ':estado'         => 'Activo',
+        ]);
+
+        return $ok ? (int)$this->conn->lastInsertId() : null;
+    }
+
+    /**
      * Retorna el ID del último registro insertado
      */
     public function lastInsertId(): string {

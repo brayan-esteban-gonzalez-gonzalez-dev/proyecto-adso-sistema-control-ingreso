@@ -16,7 +16,6 @@ class Validator {
     public static function reset(): void {
         self::$errors = [];
     }
-
     /**
      * Retorna los errores acumulados
      */

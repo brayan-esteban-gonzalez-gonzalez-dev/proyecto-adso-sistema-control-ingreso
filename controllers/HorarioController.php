@@ -1,19 +1,23 @@
 <?php
+
 /**
  * HorarioController.php — Controlador de Horarios y Sesiones
  *
  * Gestión de horarios e importación masiva desde archivos Excel (calendario visual).
  */
+
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
-class HorarioController {
+class HorarioController
+{
     private PDO $db;
     private Sesion $sesionModel;
     private Ficha $fichaModel;
     private Usuario $usuarioModel;
 
-    public function __construct(PDO $db) {
+    public function __construct(PDO $db)
+    {
         $this->db = $db;
         $this->sesionModel = new Sesion($db);
         $this->fichaModel = new Ficha($db);
@@ -23,7 +27,8 @@ class HorarioController {
     /**
      * Lista las sesiones de horario programadas
      */
-    public function index(): void {
+    public function index(): void
+    {
         Auth::requireLogin();
 
         $pageTitle = 'Gestión de Horarios';
