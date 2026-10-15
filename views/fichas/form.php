@@ -26,7 +26,7 @@ $instructorId = $ficha['instructor_id'] ?? $ficha['id_instructor_lider'] ?? 0;
                 <option value="">— Seleccionar Programa —</option>
                 <?php foreach ($programas as $prog): ?>
                 <option value="<?= $prog['id'] ?>" <?= ($programaId == $prog['id']) ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($prog['nombre']) ?>
+                    <?= !empty($prog['codigo']) ? htmlspecialchars($prog['codigo']) . ' — ' : '' ?><?= htmlspecialchars($prog['nombre']) ?>
                 </option>
                 <?php endforeach; ?>
             </select>

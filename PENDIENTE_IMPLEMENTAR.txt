@@ -138,26 +138,19 @@ control docente.
        Tipo de Instructor, Especialidad, Nivel, Grupo Convergente.
   - Archivos: controllers/HorarioController.php, views/horarios/form.php.
 
-
 FASE 3: GESTION DE ENTIDADES MAESTRAS [PRIORIDAD MEDIA]
 --------------------------------------------------------------------------------
 Objetivo: Descentralizar la administracion de entidades de soporte del sistema.
 
-[MEDIA-01] Modulo CRUD de Programas de Formacion
+[MEDIA-01] Modulo CRUD de Programas de Formacion  [IMPLEMENTADO]
   - Especificacion: Gestion autonoma de la tabla 'Programa' (codigo, nombre, descripcion).
-  - Archivos a construir:
-    - models/Programa.php
-    - controllers/ProgramaController.php
-    - views/programas/index.php, views/programas/form.php
-    - Registro en helpers/Router.php.
+  - Ruta: ?action=programas
+  - Archivos: models/Programa.php, controllers/ProgramaController.php, views/programas/.
 
-[MEDIA-02] Modulo CRUD de Competencias
+[MEDIA-02] Modulo CRUD de Competencias  [IMPLEMENTADO]
   - Especificacion: Gestion de competencias vinculadas a programas e instructores.
-  - Archivos a construir:
-    - models/Competencia.php
-    - controllers/CompetenciaController.php
-    - views/competencias/index.php, views/competencias/form.php
-    - Registro en helpers/Router.php.
+  - Ruta: ?action=competencias
+  - Archivos: models/Competencia.php, controllers/CompetenciaController.php, views/competencias/.
 
 [MEDIA-03] Modulo CRUD de Jornadas
   - Especificacion: Administracion de franjas horarias maestras (Manana, Tarde, Noche).
@@ -167,11 +160,11 @@ Objetivo: Descentralizar la administracion de entidades de soporte del sistema.
     - views/jornadas/index.php, views/jornadas/form.php
     - Registro en helpers/Router.php.
 
-[MEDIA-04] Portal y Filtro Personalizado de Horarios para Instructores
+[MEDIA-04] Portal y Filtro Personalizado de Horarios para Instructores  [IMPLEMENTADO]
   - Especificacion: Vista especializada donde el usuario con rol Instructor visualice
     su carga horaria semanal y mensual en formato calendario interactivo.
   - Archivos: controllers/HorarioController.php, views/horarios/mi_horario.php.
-
+  - Ruta: ?action=horarios/miHorario (solo rol Instructor).
 
 FASE 4: REPORTES FORMALES Y ANALITICA AVANZADA [PRIORIDAD BAJA]
 --------------------------------------------------------------------------------
@@ -197,8 +190,7 @@ Objetivo: Generar valor gerencial y facilitar la auditoria academica.
        - Grafico circular: Proporcion de excusas aprobadas, rechazadas y pendientes.
        - Grafico de lineas: Evolucion de puntualidad en los ultimos 30 dias.
   - Archivos: controllers/DashboardController.php, views/dashboard/index.php.
-
-
+  
 3. MATRIZ DE PLANIFICACION Y ENTREGABLES
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
@@ -221,7 +213,6 @@ BAJA-02      Analitica visual en Dashboard (Chart.js) Baja         5 horas
 --------------------------------------------------------------------------------
 TOTAL ESTIMADO DE IMPLEMENTACION:                                  60 horas
 --------------------------------------------------------------------------------
-
 
 4. DEPENDENCIAS CRITICAS DE DESPLIEGUE
 --------------------------------------------------------------------------------

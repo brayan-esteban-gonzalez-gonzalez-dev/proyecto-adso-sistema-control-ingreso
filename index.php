@@ -30,8 +30,12 @@ Auth::init();
 require_once ROOT_PATH . '/models/Rol.php';
 require_once ROOT_PATH . '/models/Usuario.php';
 require_once ROOT_PATH . '/models/Ficha.php';
+require_once ROOT_PATH . '/models/Programa.php';
+require_once ROOT_PATH . '/models/Competencia.php';
+require_once ROOT_PATH . '/models/Jornada.php';
 require_once ROOT_PATH . '/models/Aprendiz.php';
 require_once ROOT_PATH . '/models/ExcusaMedica.php';
+require_once ROOT_PATH . '/models/Reporte.php';
 require_once ROOT_PATH . '/models/Sesion.php';
 
 //Conexion a la base de datos 

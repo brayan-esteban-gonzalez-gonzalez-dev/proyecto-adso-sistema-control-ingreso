@@ -100,6 +100,12 @@
             <i class="fas fa-file-medical"></i>
             <span>Excusas Pendientes</span>
         </a>
+        <?php if (Auth::isInstructor()): ?>
+        <a href="<?= BASE_URL ?>?action=horarios/miHorario" class="quick-action-btn">
+            <i class="fas fa-calendar-week"></i>
+            <span>Mi Horario</span>
+        </a>
+        <?php endif; ?>
     </div>
 </div>
 <?php else: ?>

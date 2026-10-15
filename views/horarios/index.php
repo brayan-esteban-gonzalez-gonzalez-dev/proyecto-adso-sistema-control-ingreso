@@ -21,6 +21,11 @@
         </div>
     </div>
     <div class="toolbar-right">
+        <?php if (Auth::isInstructor()): ?>
+        <a href="<?= BASE_URL ?>?action=horarios/miHorario" class="btn btn-secondary">
+            <i class="fas fa-calendar-week"></i> Mi calendario
+        </a>
+        <?php endif; ?>
         <?php if (Auth::isAdminOrInstructor()): ?>
         <a href="<?= BASE_URL ?>?action=horarios/importar" class="btn btn-primary">
             <i class="fas fa-file-excel"></i> Importar Horarios desde Excel

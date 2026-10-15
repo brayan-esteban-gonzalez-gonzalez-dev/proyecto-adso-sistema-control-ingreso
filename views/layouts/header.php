@@ -54,10 +54,28 @@ $flash = Auth::getFlash();
                     <i class="fas fa-folder-open"></i>
                     <span>Fichas</span>
                 </a>
-                <a href="<?= BASE_URL ?>?action=horarios" class="nav-link <?= str_starts_with($currentAction, 'horarios') ? 'active' : '' ?>">
+                <a href="<?= BASE_URL ?>?action=programas" class="nav-link <?= str_starts_with($currentAction, 'programas') ? 'active' : '' ?>">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>Programas</span>
+                </a>
+                <a href="<?= BASE_URL ?>?action=competencias" class="nav-link <?= str_starts_with($currentAction, 'competencias') ? 'active' : '' ?>">
+                    <i class="fas fa-book-open"></i>
+                    <span>Competencias</span>
+                </a>
+                <a href="<?= BASE_URL ?>?action=jornadas" class="nav-link <?= str_starts_with($currentAction, 'jornadas') ? 'active' : '' ?>">
+                    <i class="fas fa-clock"></i>
+                    <span>Jornadas</span>
+                </a>
+                <a href="<?= BASE_URL ?>?action=horarios" class="nav-link <?= (str_starts_with($currentAction, 'horarios') && $currentAction !== 'horarios/miHorario') ? 'active' : '' ?>">
                     <i class="fas fa-calendar-alt"></i>
                     <span>Horarios</span>
                 </a>
+                <?php if (Auth::isInstructor()): ?>
+                <a href="<?= BASE_URL ?>?action=horarios/miHorario" class="nav-link <?= $currentAction === 'horarios/miHorario' ? 'active' : '' ?>">
+                    <i class="fas fa-calendar-week"></i>
+                    <span>Mi Horario</span>
+                </a>
+                <?php endif; ?>
                 <a href="<?= BASE_URL ?>?action=aprendices" class="nav-link <?= str_starts_with($currentAction, 'aprendices') ? 'active' : '' ?>">
                     <i class="fas fa-user-graduate"></i>
                     <span>Aprendices</span>
