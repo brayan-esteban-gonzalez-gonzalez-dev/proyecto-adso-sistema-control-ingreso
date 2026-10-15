@@ -53,26 +53,6 @@ class Usuario {
     }
 
     /**
-     * Obtiene los instructores (rol 2) registrados en el sistema.
-     * Utilizado para selectores de asignación como el Instructor Líder en fichas.
-     *
-     * @param bool $soloActivos Si es true, retorna únicamente instructores con estado 'Activo'.
-     * @return array
-     */
-    public function getInstructores(bool $soloActivos = false): array {
-        $sql = "SELECT id_usuario, nombre, apellido, num_documento, correo, estado
-                FROM {$this->table}
-                WHERE id_rol = :rol";
-        if ($soloActivos) {
-            $sql .= " AND estado = 'Activo'";
-        }
-        $sql .= " ORDER BY nombre ASC, apellido ASC";
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute([':rol' => self::ROL_INSTRUCTOR]);
-        return $stmt->fetchAll();
-    }
-
-    /**
      * Obtiene un usuario por su ID primario.
      */
     public function getById(int $id): ?array {
