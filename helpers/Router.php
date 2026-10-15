@@ -12,8 +12,12 @@ class Router {
         'auth'       => 'AuthController',
         'dashboard'  => 'DashboardController',
         'usuarios'   => 'UsuarioController',
-        'fichas'     => 'FichaController',
+        'fichas'       => 'FichaController',
+        'programas'    => 'ProgramaController',
+        'competencias' => 'CompetenciaController',
+        'jornadas'     => 'JornadaController',
         'horarios'   => 'HorarioController',
+        'importar'   => 'HorarioController',
         'aprendices' => 'AprendizController',
         'asistencia' => 'AsistenciaController',
         'excusas'    => 'ExcusaController',
@@ -68,14 +72,11 @@ class Router {
             $this->show404();
             return;
         }
-
         // Rutas públicas (no requieren autenticación)
         $publicRoutes = ['auth/login', 'auth/doLogin', 'auth/logout'];
-
         if (!in_array($action, $publicRoutes)) {
             Auth::requireLogin();
         }
-
         // Ejecutar el método del controlador
         $controller->$method();
     }

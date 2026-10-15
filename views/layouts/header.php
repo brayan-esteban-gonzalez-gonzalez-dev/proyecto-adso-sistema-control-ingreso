@@ -54,9 +54,31 @@ $flash = Auth::getFlash();
                     <i class="fas fa-folder-open"></i>
                     <span>Fichas</span>
                 </a>
-                <a href="<?= BASE_URL ?>?action=horarios" class="nav-link <?= str_starts_with($currentAction, 'horarios') ? 'active' : '' ?>">
+                <a href="<?= BASE_URL ?>?action=programas" class="nav-link <?= str_starts_with($currentAction, 'programas') ? 'active' : '' ?>">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>Programas</span>
+                </a>
+                <a href="<?= BASE_URL ?>?action=competencias" class="nav-link <?= str_starts_with($currentAction, 'competencias') ? 'active' : '' ?>">
+                    <i class="fas fa-book-open"></i>
+                    <span>Competencias</span>
+                </a>
+                <a href="<?= BASE_URL ?>?action=jornadas" class="nav-link <?= str_starts_with($currentAction, 'jornadas') ? 'active' : '' ?>">
+                    <i class="fas fa-clock"></i>
+                    <span>Jornadas</span>
+                </a>
+                <a href="<?= BASE_URL ?>?action=horarios" class="nav-link <?= (str_starts_with($currentAction, 'horarios') && $currentAction !== 'horarios/miHorario') ? 'active' : '' ?>">
                     <i class="fas fa-calendar-alt"></i>
                     <span>Horarios</span>
+                </a>
+                <?php if (Auth::isInstructor()): ?>
+                <a href="<?= BASE_URL ?>?action=horarios/miHorario" class="nav-link <?= $currentAction === 'horarios/miHorario' ? 'active' : '' ?>">
+                    <i class="fas fa-calendar-week"></i>
+                    <span>Mi Horario</span>
+                </a>
+                <?php endif; ?>
+                <a href="<?= BASE_URL ?>?action=aprendices" class="nav-link <?= str_starts_with($currentAction, 'aprendices') ? 'active' : '' ?>">
+                    <i class="fas fa-user-graduate"></i>
+                    <span>Aprendices</span>
                 </a>
             </div>
 
@@ -128,10 +150,13 @@ $flash = Auth::getFlash();
                 <h1 class="page-title"><?= htmlspecialchars($pageTitle ?? 'Dashboard') ?></h1>
             </div>
             <div class="header-right">
-                <span class="header-date">
-                    <i class="fas fa-calendar-day"></i>
-                    <?= strftime('%A, %d de %B de %Y') ?: date('l, d F Y') ?>
-                </span>
+               <span class="header-date">
+                <i class="fas fa-calendar-day"></i>
+                    <?php
+                        $dias = ['Sunday'=>'Domingo','Monday'=>'Lunes','Tuesday'=>'Martes','Wednesday'=>'Miércoles','Thursday'=>'Jueves','Friday'=>'Viernes','Saturday'=>'Sábado'];
+                        $meses = [1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre'];
+                        echo ($dias[date('l')] ?? date('l')) . ', ' . date('d') . ' de ' . ($meses[(int)date('n')] ?? date('F')) . ' de ' . date('Y');?>
+              </span>
             </div>
         </header>
 

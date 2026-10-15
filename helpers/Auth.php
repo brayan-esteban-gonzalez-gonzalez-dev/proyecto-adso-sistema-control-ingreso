@@ -1,32 +1,32 @@
 <?php
 /**
  * Auth.php — Helper de autenticación y sesiones
- * 
- * Gestiona el inicio/cierre de sesión, verificación de roles
+ * Gestionar el inicio/cierre de sesion, verificación de roles
  * y protección de rutas según permisos.
  */
 class Auth {
 
-    /**
-     * Inicia la sesión si no está activa
+    /*
+        Inicia la sesión si no está activa
      */
     public static function init(): void {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
     }
-
     /**
      * Establece los datos de sesión al iniciar sesión
      */
     public static function login(array $usuario): void {
         self::init();
-        $_SESSION['user_id']       = $usuario['id_usuario'];
-        $_SESSION['user_rol']      = $usuario['id_rol'];
+        // Compatibilidad con nueva DB: id (no id_usuario), Rol_id (no id_rol),
+        // email (no correo), identificacion (no num_documento)
+        $_SESSION['user_id']       = $usuario['id']             ?? $usuario['id_usuario']       ?? null;
+        $_SESSION['user_rol']      = $usuario['Rol_id']         ?? $usuario['id_rol']            ?? null;
         $_SESSION['user_nombre']   = $usuario['nombre'];
         $_SESSION['user_apellido'] = $usuario['apellido'];
-        $_SESSION['user_correo']   = $usuario['correo'];
-        $_SESSION['user_documento']= $usuario['num_documento'];
+        $_SESSION['user_correo']   = $usuario['email']          ?? $usuario['correo']            ?? '';
+        $_SESSION['user_documento']= $usuario['identificacion'] ?? $usuario['num_documento']     ?? '';
         session_regenerate_id(true);
     }
 

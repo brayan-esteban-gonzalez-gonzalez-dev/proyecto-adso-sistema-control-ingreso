@@ -51,6 +51,58 @@ class Sesion {
     }
 
     /**
+     * Sesiones de un instructor en un rango, con ficha, programa y jornada
+     */
+    public function getByInstructor(int $instructorId, string $desde, string $hasta, ?int $fichaId = null, ?string $estado = null): array {
+        $sql = "SELECT s.*,
+                       f.codigo AS codigo_ficha,
+                       p.nombre AS nombre_programa,
+                       j.nombre AS nombre_jornada,
+                       c.nombre AS nombre_competencia
+                FROM {$this->table} s
+                INNER JOIN Ficha f ON s.Ficha_id = f.id
+                LEFT JOIN Programa p ON f.Programa_id = p.id
+                LEFT JOIN jornada j ON f.jornada_id = j.id
+                LEFT JOIN competencia c ON s.Competencia_id = c.id
+                WHERE s.Instructor_id = :instructor_id
+                  AND s.fecha BETWEEN :desde AND :hasta";
+        $params = [
+            ':instructor_id' => $instructorId,
+            ':desde'         => $desde,
+            ':hasta'         => $hasta,
+        ];
+
+        if ($fichaId) {
+            $sql .= " AND s.Ficha_id = :ficha_id";
+            $params[':ficha_id'] = $fichaId;
+        }
+        if ($estado) {
+            $sql .= " AND s.estado = :estado";
+            $params[':estado'] = $estado;
+        }
+
+        $sql .= " ORDER BY s.fecha ASC, s.hora_inicio ASC";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Fichas en las que el instructor tiene sesiones asignadas
+     */
+    public function getFichasDeInstructor(int $instructorId): array {
+        $sql = "SELECT DISTINCT f.id, f.codigo, p.nombre AS nombre_programa
+                FROM {$this->table} s
+                INNER JOIN Ficha f ON s.Ficha_id = f.id
+                LEFT JOIN Programa p ON f.Programa_id = p.id
+                WHERE s.Instructor_id = :instructor_id
+                ORDER BY f.codigo";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':instructor_id' => $instructorId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
      * Obtiene una sesión por su ID
      */
     public function getById(int $id): ?array {
@@ -70,18 +122,27 @@ class Sesion {
     }
 
     /**
-     * Verifica si ya existe una sesión en la misma fecha y hora para la misma ficha
+     * Obtiene una sesión existente por ficha, fecha y hora de inicio
      */
-    public function existeSesion(int $fichaId, string $fecha, string $horaInicio): bool {
-        $sql = "SELECT COUNT(*) as total FROM {$this->table}
-                WHERE Ficha_id = :ficha_id AND fecha = :fecha AND hora_inicio = :hora_inicio";
+    public function getSesionExistente(int $fichaId, string $fecha, string $horaInicio): ?array {
+        $sql = "SELECT * FROM {$this->table}
+                WHERE Ficha_id = :ficha_id AND fecha = :fecha AND hora_inicio = :hora_inicio
+                LIMIT 1";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([
             ':ficha_id'    => $fichaId,
             ':fecha'       => $fecha,
             ':hora_inicio' => $horaInicio,
         ]);
-        return ((int) $stmt->fetch()['total']) > 0;
+        $result = $stmt->fetch();
+        return $result ?: null;
+    }
+
+    /**
+     * Verifica si ya existe una sesión en la misma fecha y hora para la misma ficha
+     */
+    public function existeSesion(int $fichaId, string $fecha, string $horaInicio): bool {
+        return $this->getSesionExistente($fichaId, $fecha, $horaInicio) !== null;
     }
 
     /**

@@ -1,19 +1,8 @@
 {
-    "name": "sena/sistema-control-ingreso-aprendices",
-    "description": "Sistema de Control de Ingreso de Aprendices mediante RFID",
-    "type": "project",
-    "license": "MIT",
-    "require": {
-        "php": ">=8.0",
-        "dompdf/dompdf": "^3.0",
-        "phpoffice/phpspreadsheet": "^1.29"
+    "config": {
+        "vendor-dir": "librerias"
     },
-    "autoload": {
-        "classmap": [
-            "config/",
-            "models/",
-            "controllers/",
-            "helpers/"
-        ]
+    "require": {
+        "phpoffice/phpspreadsheet": "^5.10"
     }
 }

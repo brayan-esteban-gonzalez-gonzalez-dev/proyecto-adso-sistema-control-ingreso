@@ -1,45 +1,62 @@
 <?php
+/**
+ * ExcusaMedica.php — Modelo de Excusas
+ *
+ * CRUD para las tablas `excusa` y `estado_excusa` de la nueva DB.
+ * Nueva DB:
+ *   excusa: id, fecha, motivo, evidencia, Usuario_id, Asistencia_id, Inasistencia_id
+ *   estado_excusa: id, fecha, respuesta, estado (Aprobada|Rechazada), Excusa_id, Instructor_id
+ */
 class ExcusaMedica {
     private PDO $conn;
-    private string $table = 'excusas_medicas';
+    private string $table      = 'excusa';
+    private string $tableEstado = 'estado_excusa';
 
     public function __construct(PDO $db) {
         $this->conn = $db;
     }
 
     /**
-     * Obtiene todas las excusas con datos del aprendiz
+     * Obtiene todas las excusas con datos del usuario y estado de revisión
      */
     public function getAll(): array {
-        $sql = "SELECT e.*, 
-                       u.nombre, u.apellido, u.num_documento,
-                       f.codigo_ficha,
-                       CONCAT(r.nombre, ' ', r.apellido) AS nombre_revisor
+        $sql = "SELECT e.*,
+                       u.nombre, u.apellido, u.identificacion,
+                       f.codigo         AS codigo_ficha,
+                       p.nombre         AS nombre_programa,
+                       ee.estado        AS estado_revision,
+                       ee.respuesta     AS comentario_revision,
+                       CONCAT(rev.nombre, ' ', rev.apellido) AS nombre_revisor
                 FROM {$this->table} e
-                INNER JOIN aprendices a ON e.id_aprendiz = a.id_aprendiz
-                INNER JOIN usuarios u ON a.id_usuario = u.id_usuario
-                INNER JOIN fichas f ON a.id_ficha = f.id_ficha
-                LEFT JOIN usuarios r ON e.id_instructor_revisor = r.id_usuario
-                ORDER BY e.creado_en DESC";
+                INNER JOIN Usuario u   ON e.Usuario_id     = u.id
+                LEFT JOIN Ficha   f    ON u.Ficha_id        = f.id
+                LEFT JOIN Programa p   ON f.Programa_id     = p.id
+                LEFT JOIN {$this->tableEstado} ee ON ee.Excusa_id = e.id
+                LEFT JOIN Usuario rev  ON ee.Instructor_id  = rev.id
+                ORDER BY e.fecha DESC";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll();
     }
 
     /**
-     * Obtiene una excusa por su ID
+     * Obtiene una excusa por su ID con datos completos
      */
     public function getById(int $id): ?array {
-        $sql = "SELECT e.*, 
-                       u.nombre, u.apellido, u.num_documento,
-                       f.codigo_ficha, f.nombre_programa,
-                       CONCAT(r.nombre, ' ', r.apellido) AS nombre_revisor
+        $sql = "SELECT e.*,
+                    u.nombre, u.apellido, u.identificacion,
+                    f.codigo         AS codigo_ficha,
+                    p.nombre         AS nombre_programa,
+                    ee.estado        AS estado_revision,
+                    ee.respuesta     AS comentario_revision,
+                    CONCAT(rev.nombre, ' ', rev.apellido) AS nombre_revisor
                 FROM {$this->table} e
-                INNER JOIN aprendices a ON e.id_aprendiz = a.id_aprendiz
-                INNER JOIN usuarios u ON a.id_usuario = u.id_usuario
-                INNER JOIN fichas f ON a.id_ficha = f.id_ficha
-                LEFT JOIN usuarios r ON e.id_instructor_revisor = r.id_usuario
-                WHERE e.id_excusa = :id";
+                INNER JOIN Usuario u   ON e.Usuario_id     = u.id
+                LEFT JOIN Ficha   f    ON u.Ficha_id        = f.id
+                LEFT JOIN Programa p   ON f.Programa_id     = p.id
+                LEFT JOIN {$this->tableEstado} ee ON ee.Excusa_id = e.id
+                LEFT JOIN Usuario rev  ON ee.Instructor_id  = rev.id
+                WHERE e.id = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':id' => $id]);
         $result = $stmt->fetch();
@@ -47,106 +64,117 @@ class ExcusaMedica {
     }
 
     /**
-     * Obtiene excusas de un aprendiz
+     * Obtiene excusas de un usuario (aprendiz) específico
      */
-    public function getByAprendiz(int $idAprendiz): array {
-        $sql = "SELECT e.*, 
-                       CONCAT(r.nombre, ' ', r.apellido) AS nombre_revisor
+    public function getByAprendiz(int $idUsuario): array {
+        $sql = "SELECT e.*,
+                    ee.estado    AS estado_revision,
+                    ee.respuesta AS comentario_revision,
+                    CONCAT(rev.nombre, ' ', rev.apellido) AS nombre_revisor
                 FROM {$this->table} e
-                LEFT JOIN usuarios r ON e.id_instructor_revisor = r.id_usuario
-                WHERE e.id_aprendiz = :id_aprendiz
-                ORDER BY e.creado_en DESC";
+                LEFT JOIN {$this->tableEstado} ee ON ee.Excusa_id = e.id
+                LEFT JOIN Usuario rev ON ee.Instructor_id = rev.id
+                WHERE e.Usuario_id = :id
+                ORDER BY e.fecha DESC";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([':id_aprendiz' => $idAprendiz]);
+        $stmt->execute([':id' => $idUsuario]);
         return $stmt->fetchAll();
     }
 
     /**
-     * Obtiene excusas pendientes de revisión
+     * Obtiene excusas pendientes de revisión (sin estado_excusa asociado)
      */
     public function getPendientes(): array {
-        $sql = "SELECT e.*, 
-                       u.nombre, u.apellido, u.num_documento,
-                       f.codigo_ficha
+        $sql = "SELECT e.*,
+                       u.nombre, u.apellido, u.identificacion,
+                       f.codigo AS codigo_ficha,
+                       p.nombre AS nombre_programa
                 FROM {$this->table} e
-                INNER JOIN aprendices a ON e.id_aprendiz = a.id_aprendiz
-                INNER JOIN usuarios u ON a.id_usuario = u.id_usuario
-                INNER JOIN fichas f ON a.id_ficha = f.id_ficha
-                WHERE e.estado = 'Pendiente'
-                ORDER BY e.creado_en ASC";
+                INNER JOIN Usuario u ON e.Usuario_id  = u.id
+                LEFT JOIN Ficha   f  ON u.Ficha_id     = f.id
+                LEFT JOIN Programa p ON f.Programa_id  = p.id
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM {$this->tableEstado} ee WHERE ee.Excusa_id = e.id
+                )
+                ORDER BY e.fecha ASC";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll();
     }
 
     /**
-     * Crea una nueva excusa médica
+     * Crea una nueva excusa
+     * $data debe tener: usuario_id, fecha, motivo, evidencia (ruta archivo),
+     *                   asistencia_id o inasistencia_id (uno de los dos, no ambos)
      */
     public function create(array $data): bool {
-        $sql = "INSERT INTO {$this->table} 
-                (id_aprendiz, id_ingreso, fecha_inicio, fecha_fin, motivo, archivo_adjunto)
-                VALUES (:id_aprendiz, :id_ingreso, :fecha_inicio, :fecha_fin, :motivo, :archivo_adjunto)";
+        $sql = "INSERT INTO {$this->table}
+                    (fecha, motivo, evidencia, Usuario_id, Asistencia_id, Inasistencia_id)
+                VALUES
+                    (:fecha, :motivo, :evidencia, :Usuario_id, :Asistencia_id, :Inasistencia_id)";
         $stmt = $this->conn->prepare($sql);
         return $stmt->execute([
-            ':id_aprendiz'     => $data['id_aprendiz'],
-            ':id_ingreso'      => $data['id_ingreso'] ?: null,
-            ':fecha_inicio'    => $data['fecha_inicio'],
-            ':fecha_fin'       => $data['fecha_fin'],
+            ':fecha'           => $data['fecha']           ?? date('Y-m-d'),
             ':motivo'          => $data['motivo'],
-            ':archivo_adjunto' => $data['archivo_adjunto'],
+            ':evidencia'       => $data['evidencia']       ?? $data['archivo_adjunto'] ?? null,
+            ':Usuario_id'      => $data['usuario_id']      ?? $data['id_aprendiz']     ?? null,
+            ':Asistencia_id'   => $data['Asistencia_id']   ?? $data['id_ingreso']      ?? null,
+            ':Inasistencia_id' => $data['Inasistencia_id'] ?? null,
         ]);
     }
 
     /**
-     * Aprueba una excusa médica
+     * Aprueba una excusa: inserta registro en estado_excusa con estado='Aprobada'
      */
     public function aprobar(int $idExcusa, int $idInstructor, string $comentario = ''): bool {
-        $sql = "UPDATE {$this->table}
-                SET estado = 'Aprobada',
-                    id_instructor_revisor = :id_instructor,
-                    comentario_revision = :comentario
-                WHERE id_excusa = :id";
-        $stmt = $this->conn->prepare($sql);
-        return $stmt->execute([
-            ':id'             => $idExcusa,
-            ':id_instructor'  => $idInstructor,
-            ':comentario'     => $comentario,
-        ]);
+        return $this->registrarEstado($idExcusa, $idInstructor, 'Aprobada', $comentario);
     }
 
     /**
-     * Rechaza una excusa médica
+     * Rechaza una excusa: inserta registro en estado_excusa con estado='Rechazada'
      */
     public function rechazar(int $idExcusa, int $idInstructor, string $comentario = ''): bool {
-        $sql = "UPDATE {$this->table}
-                SET estado = 'Rechazada',
-                    id_instructor_revisor = :id_instructor,
-                    comentario_revision = :comentario
-                WHERE id_excusa = :id";
+        return $this->registrarEstado($idExcusa, $idInstructor, 'Rechazada', $comentario);
+    }
+
+    /**
+     * Inserta o actualiza el registro de estado_excusa
+     */
+    private function registrarEstado(int $idExcusa, int $idInstructor, string $estado, string $respuesta): bool {
+        // Si ya existe, actualizar; si no, insertar
+        $check = $this->conn->prepare("SELECT id FROM {$this->tableEstado} WHERE Excusa_id = :id LIMIT 1");
+        $check->execute([':id' => $idExcusa]);
+        $existing = $check->fetch();
+
+        if ($existing) {
+            $sql = "UPDATE {$this->tableEstado}
+                    SET estado = :estado, respuesta = :respuesta, fecha = CURDATE(), Instructor_id = :instructor
+                    WHERE Excusa_id = :excusa_id";
+        } else {
+            $sql = "INSERT INTO {$this->tableEstado} (fecha, respuesta, estado, Excusa_id, Instructor_id)
+                    VALUES (CURDATE(), :respuesta, :estado, :excusa_id, :instructor)";
+        }
+
         $stmt = $this->conn->prepare($sql);
         return $stmt->execute([
-            ':id'             => $idExcusa,
-            ':id_instructor'  => $idInstructor,
-            ':comentario'     => $comentario,
+            ':estado'      => $estado,
+            ':respuesta'   => $respuesta,
+            ':excusa_id'   => $idExcusa,
+            ':instructor'  => $idInstructor,
         ]);
     }
 
     /**
-     * Cuenta excusas pendientes
+     * Cuenta excusas pendientes (sin estado_excusa)
      */
     public function countPendientes(): int {
-        $sql = "SELECT COUNT(*) as total FROM {$this->table} WHERE estado = 'Pendiente'";
+        $sql = "SELECT COUNT(*) as total
+                FROM {$this->table} e
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM {$this->tableEstado} ee WHERE ee.Excusa_id = e.id
+                )";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return (int) $stmt->fetch()['total'];
-    }
-
-    /**
-     * Elimina una excusa por su ID
-     */
-    public function delete(int $id): bool {
-        $sql = "DELETE FROM {$this->table} WHERE id_excusa = :id";
-        $stmt = $this->conn->prepare($sql);
-        return $stmt->execute([':id' => $id]);
     }
 }

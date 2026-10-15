@@ -5,13 +5,13 @@
  * Cierra la estructura HTML y carga los scripts JS.
  */
 ?>
-        </div><!-- /.content-wrapper o /.auth-layout -->
-
 <?php if (Auth::isLoggedIn()): ?>
+        </div><!-- /.content-wrapper -->
     </main><!-- /.main-content -->
 <?php else: ?>
     </div><!-- /.auth-layout -->
 <?php endif; ?>
+
 
     <script src="<?= BASE_URL ?>assets/js/app.js"></script>
 <?php if (isset($loadRfidJs) && $loadRfidJs): ?>

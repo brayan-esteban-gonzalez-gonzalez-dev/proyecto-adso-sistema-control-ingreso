@@ -32,7 +32,7 @@
                     <th>Aprendiz</th>
                     <th>Ficha</th>
                     <?php endif; ?>
-                    <th>Período</th>
+                    <th>Fecha</th>
                     <th>Motivo</th>
                     <th>Estado</th>
                     <th>Archivo</th>
@@ -43,34 +43,44 @@
             </thead>
             <tbody>
                 <?php foreach ($excusas as $exc): ?>
+                <?php 
+                    $id = $exc['id'] ?? $exc['id_excusa'] ?? 0;
+                    $doc = $exc['identificacion'] ?? $exc['num_documento'] ?? '';
+                    $fecha = $exc['fecha'] ?? $exc['fecha_inicio'] ?? '';
+                    $estado = $exc['estado_revision'] ?? $exc['estado'] ?? 'Pendiente';
+                    $evidencia = $exc['evidencia'] ?? $exc['archivo_adjunto'] ?? '';
+                ?>
                 <tr>
                     <?php if (Auth::isAdminOrInstructor()): ?>
                     <td>
                         <strong><?= htmlspecialchars(($exc['nombre'] ?? '') . ' ' . ($exc['apellido'] ?? '')) ?></strong>
-                        <br><small class="text-muted"><?= htmlspecialchars($exc['num_documento'] ?? '') ?></small>
+                        <br><small class="text-muted"><?= htmlspecialchars($doc) ?></small>
                     </td>
-                    <td><span class="badge badge-blue"><?= htmlspecialchars($exc['codigo_ficha'] ?? '') ?></span></td>
+                    <td><span class="badge badge-blue"><?= htmlspecialchars($exc['codigo_ficha'] ?? '-') ?></span></td>
                     <?php endif; ?>
                     <td>
-                        <?= $exc['fecha_inicio'] ?> 
-                        <br><small class="text-muted">a <?= $exc['fecha_fin'] ?></small>
+                        <?= htmlspecialchars($fecha) ?>
                     </td>
-                    <td><?= htmlspecialchars(mb_substr($exc['motivo'], 0, 50)) ?>...</td>
+                    <td><?= htmlspecialchars(mb_substr($exc['motivo'] ?? '', 0, 50)) ?>...</td>
                     <td>
-                        <span class="badge badge-<?= strtolower($exc['estado']) ?>">
-                            <?= $exc['estado'] ?>
+                        <span class="badge badge-<?= strtolower($estado) ?>">
+                            <?= htmlspecialchars($estado) ?>
                         </span>
                     </td>
                     <td>
-                        <a href="<?= BASE_URL . $exc['archivo_adjunto'] ?>" target="_blank" 
+                        <?php if (!empty($evidencia)): ?>
+                        <a href="<?= BASE_URL . htmlspecialchars($evidencia) ?>" target="_blank" 
                            class="btn btn-sm btn-secondary">
                             <i class="fas fa-paperclip"></i>
                         </a>
+                        <?php else: ?>
+                            <span class="text-muted">—</span>
+                        <?php endif; ?>
                     </td>
                     <?php if (Auth::isAdminOrInstructor()): ?>
                     <td>
-                        <?php if ($exc['estado'] === 'Pendiente'): ?>
-                        <a href="<?= BASE_URL ?>?action=excusas/revisar&id=<?= $exc['id_excusa'] ?>" 
+                        <?php if ($estado === 'Pendiente'): ?>
+                        <a href="<?= BASE_URL ?>?action=excusas/revisar&id=<?= $id ?>" 
                            class="btn btn-sm btn-blue">
                             <i class="fas fa-eye"></i> Revisar
                         </a>
@@ -100,3 +110,4 @@
 </div>
 
 <?php require_once ROOT_PATH . '/views/layouts/footer.php'; ?>
+

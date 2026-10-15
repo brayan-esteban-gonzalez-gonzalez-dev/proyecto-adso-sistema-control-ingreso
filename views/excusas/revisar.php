@@ -1,51 +1,63 @@
 <?php require_once ROOT_PATH . '/views/layouts/header.php'; ?>
 
+<?php
+$id = $excusa['id'] ?? $excusa['id_excusa'] ?? 0;
+$doc = $excusa['identificacion'] ?? $excusa['num_documento'] ?? '';
+$fecha = $excusa['fecha'] ?? $excusa['fecha_inicio'] ?? '';
+$estado = $excusa['estado_revision'] ?? $excusa['estado'] ?? 'Pendiente';
+$evidencia = $excusa['evidencia'] ?? $excusa['archivo_adjunto'] ?? '';
+?>
+
 <div class="card" style="max-width: 750px;">
     <!-- Detalle de la excusa -->
     <div class="excusa-detail">
         <div class="detail-item">
             <div class="detail-label">Aprendiz</div>
-            <div class="detail-value"><?= htmlspecialchars($excusa['nombre'] . ' ' . $excusa['apellido']) ?></div>
+            <div class="detail-value"><?= htmlspecialchars(($excusa['nombre'] ?? '') . ' ' . ($excusa['apellido'] ?? '')) ?></div>
         </div>
         <div class="detail-item">
             <div class="detail-label">Documento</div>
-            <div class="detail-value"><?= htmlspecialchars($excusa['num_documento']) ?></div>
+            <div class="detail-value"><?= htmlspecialchars($doc) ?></div>
         </div>
         <div class="detail-item">
             <div class="detail-label">Ficha</div>
-            <div class="detail-value"><?= htmlspecialchars($excusa['codigo_ficha']) ?> — <?= htmlspecialchars($excusa['nombre_programa']) ?></div>
+            <div class="detail-value"><?= htmlspecialchars($excusa['codigo_ficha'] ?? '-') ?> — <?= htmlspecialchars($excusa['nombre_programa'] ?? '') ?></div>
         </div>
         <div class="detail-item">
             <div class="detail-label">Estado Actual</div>
             <div class="detail-value">
-                <span class="badge badge-<?= strtolower($excusa['estado']) ?>"><?= $excusa['estado'] ?></span>
+                <span class="badge badge-<?= strtolower($estado) ?>"><?= htmlspecialchars($estado) ?></span>
             </div>
         </div>
         <div class="detail-item">
-            <div class="detail-label">Período</div>
-            <div class="detail-value"><?= $excusa['fecha_inicio'] ?> — <?= $excusa['fecha_fin'] ?></div>
+            <div class="detail-label">Fecha</div>
+            <div class="detail-value"><?= htmlspecialchars($fecha) ?></div>
         </div>
         <div class="detail-item">
             <div class="detail-label">Archivo Adjunto</div>
             <div class="detail-value">
-                <a href="<?= BASE_URL . $excusa['archivo_adjunto'] ?>" target="_blank" class="btn btn-sm btn-secondary">
+                <?php if (!empty($evidencia)): ?>
+                <a href="<?= BASE_URL . htmlspecialchars($evidencia) ?>" target="_blank" class="btn btn-sm btn-secondary">
                     <i class="fas fa-paperclip"></i> Ver archivo
                 </a>
+                <?php else: ?>
+                    <span class="text-muted">Sin archivo</span>
+                <?php endif; ?>
             </div>
         </div>
         <div class="detail-item full-width">
             <div class="detail-label">Motivo</div>
-            <div class="detail-value"><?= nl2br(htmlspecialchars($excusa['motivo'])) ?></div>
+            <div class="detail-value"><?= nl2br(htmlspecialchars($excusa['motivo'] ?? '')) ?></div>
         </div>
     </div>
 
-    <?php if ($excusa['estado'] === 'Pendiente'): ?>
+    <?php if ($estado === 'Pendiente'): ?>
     <hr style="border-color: var(--border-color); margin: 24px 0;">
 
     <!-- Formulario de revisión -->
     <form method="POST" action="<?= BASE_URL ?>?action=excusas/procesar">
         <input type="hidden" name="csrf_token" value="<?= $csrf_token ?>">
-        <input type="hidden" name="id_excusa" value="<?= $excusa['id_excusa'] ?>">
+        <input type="hidden" name="id_excusa" value="<?= $id ?>">
 
         <div class="form-group">
             <label class="form-label" for="comentario_revision">Comentario de Revisión</label>
@@ -74,7 +86,7 @@
         </div>
         <div class="detail-item full-width">
             <div class="detail-label">Comentario de Revisión</div>
-            <div class="detail-value"><?= $excusa['comentario_revision'] ? nl2br(htmlspecialchars($excusa['comentario_revision'])) : '<span class="text-muted">Sin comentario</span>' ?></div>
+            <div class="detail-value"><?= !empty($excusa['comentario_revision']) ? nl2br(htmlspecialchars($excusa['comentario_revision'])) : '<span class="text-muted">Sin comentario</span>' ?></div>
         </div>
     </div>
     <div class="form-actions">
@@ -86,3 +98,4 @@
 </div>
 
 <?php require_once ROOT_PATH . '/views/layouts/footer.php'; ?>
+

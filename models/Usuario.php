@@ -1,49 +1,28 @@
 <?php
-declare(strict_types=1);
-
 /**
  * Usuario.php — Modelo de Usuarios
  *
- * CRUD completo para la tabla `usuarios` + autenticación.
- * Implementa `registrarUsuario()` con Transacción PDO atómica
- * como "Single Source of Truth" para garantizar integridad referencial
- * entre `usuarios` y `aprendices`.
+ * CRUD completo para la tabla `Usuario` + autenticación.
+ * Nueva DB: tabla `Usuario`, PK `id`, campos: identificacion, email, Rol_id, Ficha_id, codigo_llavero.
  */
 class Usuario {
     private PDO $conn;
-    private string $table = 'usuarios';
-
-    /** Constantes de Roles en el Sistema */
-    public const ROL_ADMINISTRADOR = 1;
-    public const ROL_INSTRUCTOR    = 2;
-    public const ROL_APRENDIZ      = 3;
+    private string $table = 'Usuario';
 
     public function __construct(PDO $db) {
         $this->conn = $db;
     }
 
     /**
-     * Obtiene todos los usuarios (o filtrados por rol) junto con el nombre de su rol
-     * y los datos vinculados de aprendiz/ficha si corresponden.
+     * Obtiene todos los usuarios con su rol
      */
-    public function getAll(?int $rolId = null): array {
-        $sql = "SELECT u.*, r.nombre AS nombre_rol,
-                       a.id_aprendiz, a.codigo_rfid, a.id_ficha,
-                       f.codigo_ficha, f.nombre_programa
+    public function getAll(): array {
+        $sql = "SELECT u.*, r.nombre AS nombre_rol
                 FROM {$this->table} u
-                INNER JOIN roles r ON u.id_rol = r.id_rol
-                LEFT JOIN aprendices a ON u.id_usuario = a.id_usuario
-                LEFT JOIN fichas f ON a.id_ficha = f.id_ficha";
-
-        $params = [];
-        if ($rolId !== null && $rolId > 0) {
-            $sql .= " WHERE u.id_rol = :id_rol";
-            $params[':id_rol'] = $rolId;
-        }
-
-        $sql .= " ORDER BY u.creado_en DESC";
+                INNER JOIN Rol r ON u.Rol_id = r.id
+                ORDER BY u.apellido, u.nombre";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute($params);
+        $stmt->execute();
         return $stmt->fetchAll();
     }
 
@@ -99,8 +78,8 @@ class Usuario {
     public function getById(int $id): ?array {
         $sql = "SELECT u.*, r.nombre AS nombre_rol
                 FROM {$this->table} u
-                INNER JOIN roles r ON u.id_rol = r.id_rol
-                WHERE u.id_usuario = :id";
+                INNER JOIN Rol r ON u.Rol_id = r.id
+                WHERE u.id = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':id' => $id]);
         $result = $stmt->fetch();
@@ -108,243 +87,265 @@ class Usuario {
     }
 
     /**
-     * Obtiene un usuario por su número de documento.
+     * Obtiene un usuario por número de identificación
      */
-    public function getByDocumento(string $documento): ?array {
+    public function getByDocumento(string $identificacion): ?array {
         $sql = "SELECT u.*, r.nombre AS nombre_rol
                 FROM {$this->table} u
-                INNER JOIN roles r ON u.id_rol = r.id_rol
-                WHERE u.num_documento = :doc";
+                INNER JOIN Rol r ON u.Rol_id = r.id
+                WHERE u.identificacion = :identificacion";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([':doc' => $documento]);
+        $stmt->execute([':identificacion' => $identificacion]);
         $result = $stmt->fetch();
         return $result ?: null;
     }
 
     /**
-     * Obtiene un usuario por su correo electrónico.
+     * Obtiene un usuario por correo electrónico (email)
      */
-    public function getByCorreo(string $correo): ?array {
+    public function getByCorreo(string $email): ?array {
         $sql = "SELECT u.*, r.nombre AS nombre_rol
                 FROM {$this->table} u
-                INNER JOIN roles r ON u.id_rol = r.id_rol
-                WHERE u.correo = :correo";
+                INNER JOIN Rol r ON u.Rol_id = r.id
+                WHERE u.email = :email";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([':correo' => $correo]);
+        $stmt->execute([':email' => $email]);
         $result = $stmt->fetch();
         return $result ?: null;
     }
 
     /**
-     * Obtiene los datos del usuario mediante el código RFID escaneado.
-     * Realiza un INNER JOIN con la tabla `aprendices` donde reside `codigo_rfid`.
+     * Obtiene todos los instructores (roles 1 y 2) activos
      */
-    public function getByRfid(string $rfid): ?array {
-        $sql = "SELECT u.*, a.id_aprendiz, a.id_ficha, a.codigo_rfid, r.nombre AS nombre_rol
-                FROM {$this->table} u
-                INNER JOIN aprendices a ON u.id_usuario = a.id_usuario
-                INNER JOIN roles r ON u.id_rol = r.id_rol
-                WHERE a.codigo_rfid = :rfid";
+    public function getInstructores(): array {
+        $sql = "SELECT * FROM {$this->table} WHERE Rol_id IN (1,2) AND estado = 'Activo' ORDER BY nombre";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([':rfid' => $rfid]);
-        $result = $stmt->fetch();
-        return $result ?: null;
+        $stmt->execute();
+        return $stmt->fetchAll();
     }
 
     /**
-     * Autentica credenciales de acceso contra hash BCRYPT/Argon2.
+     * Busca un instructor por coincidencia de nombre y apellido
      */
-    public function authenticate(string $identificador, string $password): ?array {
-        $sql = "SELECT u.*, r.nombre AS nombre_rol
-                FROM {$this->table} u
-                INNER JOIN roles r ON u.id_rol = r.id_rol
-                WHERE (u.correo = :id_correo OR u.num_documento = :id_doc)
-                  AND u.estado = 'Activo'";
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute([
-            ':id_correo' => $identificador,
-            ':id_doc'    => $identificador,
-        ]);
-        $usuario = $stmt->fetch();
+    public function getInstructorPorNombre(string $nombreBusqueda): ?array {
+        $instructores = $this->getInstructores();
+        $normalizar = function($str) {
+            $str = mb_strtolower(trim($str), 'UTF-8');
+            $str = str_replace(
+                ['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ü', 'Ñ'],
+                ['a', 'e', 'i', 'o', 'u', 'u', 'n', 'a', 'e', 'i', 'o', 'u', 'u', 'n'],
+                $str
+            );
+            return preg_replace('/\s+/', ' ', $str);
+        };
 
-        if ($usuario && password_verify($password, $usuario['password'])) {
-            return $usuario;
+        $busqueda = $normalizar($nombreBusqueda);
+        if (empty($busqueda)) {
+            return null;
+        }
+
+        // 1. Coincidencia exacta completa
+        foreach ($instructores as $inst) {
+            $nomCompleto1 = $normalizar($inst['nombre'] . ' ' . $inst['apellido']);
+            $nomCompleto2 = $normalizar($inst['apellido'] . ' ' . $inst['nombre']);
+
+            if ($nomCompleto1 === $busqueda || $nomCompleto2 === $busqueda) {
+                return $inst;
+            }
+        }
+
+        // 2. Coincidencia por partes de palabras
+        $partes = array_filter(explode(' ', $busqueda), fn($p) => mb_strlen($p) >= 3);
+        if (count($partes) >= 2) {
+            foreach ($instructores as $inst) {
+                $nomCompleto = $normalizar($inst['nombre'] . ' ' . $inst['apellido']);
+                $todasEncontradas = true;
+                foreach ($partes as $parte) {
+                    if (!str_contains($nomCompleto, $parte)) {
+                        $todasEncontradas = false;
+                        break;
+                    }
+                }
+                if ($todasEncontradas) {
+                    return $inst;
+                }
+            }
         }
 
         return null;
     }
 
     /**
-     * ─── SINGLE SOURCE OF TRUTH (TRANSACCIÓN PDO ATÓMICA) ───────────────────
-     * Registra un usuario en la tabla `usuarios` y, en caso de ser Aprendiz,
-     * inserta simultáneamente en la tabla `aprendices`.
-     *
-     * Flujo transaccional:
-     *   A. Inicia transacción (`beginTransaction`).
-     *   B. INSERT en `usuarios` (nombre, documento, correo, password, id_rol, etc.).
-     *   C. Captura el ID insertado (`lastInsertId`).
-     *   D. Si rol es Aprendiz, segundo INSERT en `aprendices` (id_usuario, id_ficha, codigo_rfid).
-     *   E. Si todo sale bien, `commit()` y retorna true.
-     *   F. Si ocurre un `PDOException`, ejecuta `rollBack()`, registra en log y retorna false.
-     *
-     * @param array{
-     *     rol_id?: int,
-     *     id_rol?: int,
-     *     documento?: string,
-     *     num_documento?: string,
-     *     nombre: string,
-     *     apellido: string,
-     *     correo: string,
-     *     password: string,
-     *     estado?: string,
-     *     ficha_id?: int|null,
-     *     rfid_tag?: string|null
-     * } $datos
-     *
-     * @return bool True si la transacción fue exitosa, false en error.
+     * Obtiene todos los aprendices (rol 3) con datos de ficha
      */
-    public function registrarUsuario(array $datos): bool {
-        try {
-            $this->conn->beginTransaction();
-
-            // ── PASO A: INSERT en tabla `usuarios` ─────────────────────────────
-            $sqlUsuario = "INSERT INTO {$this->table}
-                            (id_rol, num_documento, nombre, apellido, correo, password, estado)
-                           VALUES
-                            (:id_rol, :num_documento, :nombre, :apellido, :correo, :password, :estado)";
-            $stmtUsuario = $this->conn->prepare($sqlUsuario);
-
-            // Asegurar que la contraseña esté hasheada
-            $pass = (string) ($datos['password'] ?? '');
-            $passwordHash = (str_starts_with($pass, '$2y$') || str_starts_with($pass, '$2a$') || str_starts_with($pass, '$argon2'))
-                ? $pass
-                : password_hash($pass, PASSWORD_DEFAULT);
-
-            $idRol = (int) ($datos['rol_id'] ?? $datos['id_rol'] ?? self::ROL_APRENDIZ);
-            $numDoc = (string) ($datos['documento'] ?? $datos['num_documento'] ?? '');
-
-            $stmtUsuario->execute([
-                ':id_rol'        => $idRol,
-                ':num_documento' => $numDoc,
-                ':nombre'        => (string) ($datos['nombre'] ?? ''),
-                ':apellido'      => (string) ($datos['apellido'] ?? ''),
-                ':correo'        => (string) ($datos['correo'] ?? ''),
-                ':password'      => $passwordHash,
-                ':estado'        => (string) ($datos['estado'] ?? 'Activo'),
-            ]);
-
-            // ── PASO B: Capturar ID generado ──────────────────────────────────
-            $usuarioId = (int) $this->conn->lastInsertId();
-
-            // ── PASO C: Si el rol es Aprendiz, segundo INSERT en `aprendices` ─
-            if ($idRol === self::ROL_APRENDIZ) {
-                $sqlAprendiz = "INSERT INTO aprendices (id_usuario, id_ficha, codigo_rfid)
-                                VALUES (:id_usuario, :id_ficha, :codigo_rfid)";
-                $stmtAprendiz = $this->conn->prepare($sqlAprendiz);
-                $stmtAprendiz->execute([
-                    ':id_usuario'  => $usuarioId,
-                    ':id_ficha'    => (int) ($datos['ficha_id'] ?? 0),
-                    ':codigo_rfid' => !empty($datos['rfid_tag']) ? (string) $datos['rfid_tag'] : null,
-                ]);
-            }
-
-            // ── PASO D: Confirmar transacción ─────────────────────────────────
-            $this->conn->commit();
-            return true;
-
-        } catch (\PDOException $e) {
-            // Revertir en caso de cualquier fallo
-            if ($this->conn->inTransaction()) {
-                $this->conn->rollBack();
-            }
-            error_log('[Usuario::registrarUsuario] PDOException: ' . $e->getMessage());
-            return false;
-        }
+    public function getAprendices(): array {
+        $sql = "SELECT u.*,
+                       f.codigo AS codigo_ficha,
+                       p.nombre AS nombre_programa,
+                       r.nombre AS nombre_rol
+                FROM {$this->table} u
+                INNER JOIN Rol r ON u.Rol_id = r.id
+                LEFT JOIN Ficha f ON u.Ficha_id = f.id
+                LEFT JOIN Programa p ON f.Programa_id = p.id
+                WHERE u.Rol_id = 3
+                ORDER BY u.apellido, u.nombre";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
     }
 
     /**
-     * Crea un usuario sin transacción (método de compatibilidad legado).
+     * Obtiene aprendices por ficha
+     */
+    public function getAprendicesByFicha(int $fichaId): array {
+        $sql = "SELECT u.*
+                FROM {$this->table} u
+                WHERE u.Rol_id = 3 AND u.Ficha_id = :ficha_id AND u.estado = 'Activo'
+                ORDER BY u.apellido, u.nombre";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':ficha_id' => $fichaId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Obtiene un usuario por código de llavero (RFID)
+     */
+    public function getByCodigoLlavero(string $codigo): ?array {
+        $sql = "SELECT u.*, r.nombre AS nombre_rol,
+                       f.codigo AS codigo_ficha
+                FROM {$this->table} u
+                INNER JOIN Rol r ON u.Rol_id = r.id
+                LEFT JOIN Ficha f ON u.Ficha_id = f.id
+                WHERE u.codigo_llavero = :codigo AND u.estado = 'Activo'";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':codigo' => $codigo]);
+        $result = $stmt->fetch();
+        return $result ?: null;
+    }
+
+    /**
+     * Autentica un usuario por identificación y contraseña
+     */
+    public function authenticate(string $identificacion, string $password): ?array {
+        $usuario = $this->getByDocumento($identificacion);
+        if ($usuario && $usuario['estado'] === 'Activo' && password_verify($password, $usuario['password'])) {
+            return $usuario;
+        }
+        return null;
+    }
+
+    /**
+     * Crea un nuevo usuario
      */
     public function create(array $data): bool {
-        $sql = "INSERT INTO {$this->table}
-                    (id_rol, num_documento, nombre, apellido, correo, password, estado)
-                VALUES
-                    (:id_rol, :num_documento, :nombre, :apellido, :correo, :password, :estado)";
+        $sql = "INSERT INTO {$this->table} (Rol_id, identificacion, nombre, apellido, email, password, Ficha_id, codigo_llavero, estado)
+                VALUES (:Rol_id, :identificacion, :nombre, :apellido, :email, :password, :Ficha_id, :codigo_llavero, :estado)";
         $stmt = $this->conn->prepare($sql);
         return $stmt->execute([
-            ':id_rol'        => $data['id_rol'],
-            ':num_documento' => $data['num_documento'],
-            ':nombre'        => $data['nombre'],
-            ':apellido'      => $data['apellido'],
-            ':correo'        => $data['correo'],
-            ':password'      => password_hash($data['password'], PASSWORD_DEFAULT),
-            ':estado'        => $data['estado'] ?? 'Activo',
+            ':Rol_id'         => $data['Rol_id'],
+            ':identificacion' => $data['identificacion'],
+            ':nombre'         => $data['nombre'],
+            ':apellido'       => $data['apellido'],
+            ':email'          => $data['email'],
+            ':password'       => password_hash($data['password'], PASSWORD_BCRYPT),
+            ':Ficha_id'       => $data['Ficha_id'] ?? null,
+            ':codigo_llavero' => $data['codigo_llavero'] ?? null,
+            ':estado'         => $data['estado'] ?? 'Activo',
         ]);
     }
 
     /**
-     * Retorna el último ID insertado.
+     * Registra un instructor nuevo detectado en la importación de horarios
+     */
+    public function createInstructorDesdeExcel(string $nombre, string $apellido): ?int {
+        // Generar una identificación temporal única
+        $identificacionTemp = 'INST_' . strtoupper(substr(md5($nombre . ' ' . $apellido . microtime()), 0, 8));
+        
+        // Limpiar para email
+        $cleanEmailName = preg_replace('/[^a-zA-Z0-9]/', '', strtolower($nombre));
+        $cleanEmailApe  = preg_replace('/[^a-zA-Z0-9]/', '', strtolower($apellido));
+        if (empty($cleanEmailName)) { $cleanEmailName = 'instructor'; }
+        if (empty($cleanEmailApe)) { $cleanEmailApe = substr(md5(microtime()), 0, 5); }
+        $email = $cleanEmailName . '.' . $cleanEmailApe . '_' . substr(uniqid(), -4) . '@sena.edu.co';
+
+        $sql = "INSERT INTO {$this->table} (Rol_id, identificacion, nombre, apellido, email, password, estado)
+                VALUES (:Rol_id, :identificacion, :nombre, :apellido, :email, :password, :estado)";
+        $stmt = $this->conn->prepare($sql);
+        $ok = $stmt->execute([
+            ':Rol_id'         => 2, // Rol 2: Instructor
+            ':identificacion' => $identificacionTemp,
+            ':nombre'         => ucwords(mb_strtolower(trim($nombre))),
+            ':apellido'       => ucwords(mb_strtolower(trim($apellido))),
+            ':email'          => $email,
+            ':password'       => password_hash(bin2hex(random_bytes(8)), PASSWORD_BCRYPT),
+            ':estado'         => 'Activo',
+        ]);
+
+        return $ok ? (int)$this->conn->lastInsertId() : null;
+    }
+
+    /**
+     * Retorna el ID del último registro insertado
      */
     public function lastInsertId(): string {
         return $this->conn->lastInsertId();
     }
 
     /**
-     * Actualiza un usuario existente.
+     * Actualiza un usuario existente
      */
     public function update(int $id, array $data): bool {
         $fields = [];
         $params = [':id' => $id];
 
-        foreach (['id_rol', 'num_documento', 'nombre', 'apellido', 'correo', 'estado'] as $field) {
-            if (isset($data[$field])) {
+        foreach (['Rol_id', 'identificacion', 'nombre', 'apellido', 'email', 'Ficha_id', 'codigo_llavero', 'estado'] as $field) {
+            if (array_key_exists($field, $data)) {
                 $fields[] = "{$field} = :{$field}";
                 $params[":{$field}"] = $data[$field];
             }
         }
 
+        // Si se proporcionó una nueva contraseña, actualizarla
         if (!empty($data['password'])) {
             $fields[] = "password = :password";
-            $params[':password'] = password_hash($data['password'], PASSWORD_DEFAULT);
+            $params[':password'] = password_hash($data['password'], PASSWORD_BCRYPT);
         }
 
         if (empty($fields)) {
             return false;
         }
 
-        $sql = "UPDATE {$this->table} SET " . implode(', ', $fields) . " WHERE id_usuario = :id";
+        $sql = "UPDATE {$this->table} SET " . implode(', ', $fields) . " WHERE id = :id";
         $stmt = $this->conn->prepare($sql);
         return $stmt->execute($params);
     }
 
     /**
-     * Elimina un usuario por su ID.
+     * Elimina un usuario por su ID
      */
     public function delete(int $id): bool {
-        $sql = "DELETE FROM {$this->table} WHERE id_usuario = :id";
+        $sql = "DELETE FROM {$this->table} WHERE id = :id";
         $stmt = $this->conn->prepare($sql);
         return $stmt->execute([':id' => $id]);
     }
 
     /**
-     * Conteo total de usuarios.
+     * Cuenta el total de usuarios
      */
     public function count(): int {
-        $sql = "SELECT COUNT(*) AS total FROM {$this->table}";
+        $sql = "SELECT COUNT(*) as total FROM {$this->table}";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return (int) $stmt->fetch()['total'];
     }
 
     /**
-     * Conteo de usuarios activos por rol.
+     * Cuenta usuarios por rol
      */
-    public function countByRol(int $idRol): int {
-        $sql = "SELECT COUNT(*) AS total
-                FROM {$this->table}
-                WHERE id_rol = :id_rol AND estado = 'Activo'";
+    public function countByRol(int $rolId): int {
+        $sql = "SELECT COUNT(*) as total FROM {$this->table} WHERE Rol_id = :rol_id AND estado = 'Activo'";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([':id_rol' => $idRol]);
+        $stmt->execute([':rol_id' => $rolId]);
         return (int) $stmt->fetch()['total'];
     }
 }

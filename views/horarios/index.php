@@ -2,88 +2,150 @@
 
 <div class="toolbar">
     <div class="toolbar-left">
-        <form method="GET" action="<?= BASE_URL ?>" class="d-flex align-center gap-1">
+        <form method="GET" action="<?= BASE_URL ?>" class="filter-form" style="display: flex; gap: 10px; align-items: center;">
             <input type="hidden" name="action" value="horarios">
-            <select name="id_ficha" class="form-control" style="width: auto; min-width: 250px;" onchange="this.form.submit()">
-                <option value="">— Seleccionar Ficha —</option>
-                <?php foreach ($fichas as $f): ?>
-                <option value="<?= $f['id_ficha'] ?>" <?= ($idFicha ?? 0) == $f['id_ficha'] ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($f['codigo_ficha'] . ' — ' . $f['nombre_programa']) ?>
-                </option>
-                <?php endforeach; ?>
-            </select>
+            <div class="form-group mb-0" style="margin-bottom: 0;">
+                <select name="ficha_id" class="form-control" onchange="this.form.submit()" style="min-width: 250px;">
+                    <option value="">-- Todas las Fichas --</option>
+                    <?php foreach ($fichas as $f): ?>
+                        <option value="<?= $f['id'] ?>" <?= ($fichaId == $f['id']) ? 'selected' : '' ?>>
+                            Ficha <?= htmlspecialchars($f['codigo']) ?> — <?= htmlspecialchars($f['nombre_programa']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
         </form>
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Buscar en horarios..." data-search-table="tablaHorarios">
+        </div>
     </div>
-    <?php if (!empty($idFicha ?? 0)): ?>
     <div class="toolbar-right">
-        <a href="<?= BASE_URL ?>?action=horarios/crear&id_ficha=<?= $idFicha ?>" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Nuevo Horario
+        <?php if (Auth::isInstructor()): ?>
+        <a href="<?= BASE_URL ?>?action=horarios/miHorario" class="btn btn-secondary">
+            <i class="fas fa-calendar-week"></i> Mi calendario
         </a>
+        <?php endif; ?>
+        <?php if (Auth::isAdminOrInstructor()): ?>
+        <a href="<?= BASE_URL ?>?action=horarios/importar" class="btn btn-primary">
+            <i class="fas fa-file-excel"></i> Importar Horarios desde Excel
+        </a>
+        <?php endif; ?>
     </div>
-    <?php endif; ?>
 </div>
 
-<?php if (!empty($ficha)): ?>
-<div class="card mb-3" style="padding: 16px 20px;">
-    <strong class="text-green"><i class="fas fa-folder-open"></i> <?= htmlspecialchars($ficha['codigo_ficha']) ?></strong>
-    — <?= htmlspecialchars($ficha['nombre_programa']) ?>
-    <?php if ($ficha['nombre_instructor']): ?>
-        <span class="text-secondary">| Instructor: <?= htmlspecialchars($ficha['nombre_instructor']) ?></span>
-    <?php endif; ?>
+<?php if ($fichaSeleccionada): ?>
+<div class="card mb-3" style="background: rgba(16, 185, 129, 0.05); border-left: 4px solid var(--accent-green); padding: 15px 20px; margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+            <h3 style="margin: 0; font-size: 1.1rem; color: #fff;">
+                Ficha <?= htmlspecialchars($fichaSeleccionada['codigo']) ?> — <?= htmlspecialchars($fichaSeleccionada['nombre_programa']) ?>
+            </h3>
+            <span class="text-muted" style="font-size: 0.9rem;">
+                Jornada: <strong><?= htmlspecialchars($fichaSeleccionada['nombre_jornada'] ?? 'N/A') ?></strong> | 
+                Líder: <strong><?= htmlspecialchars($fichaSeleccionada['nombre_instructor'] ?? 'No asignado') ?></strong>
+            </span>
+        </div>
+        <div>
+            <span class="badge badge-green" style="font-size: 0.9rem; padding: 6px 12px;">
+                <?= count($sesiones) ?> Sesiones programadas
+            </span>
+        </div>
+    </div>
 </div>
 <?php endif; ?>
 
 <div class="card">
-    <?php if (!empty($horarios)): ?>
+    <?php if (!empty($sesiones)): ?>
     <div class="table-wrapper">
-        <table class="data-table">
+        <table class="data-table" id="tablaHorarios">
             <thead>
                 <tr>
-                    <th>Día</th>
-                    <th>Hora Entrada</th>
-                    <th>Hora Salida</th>
-                    <th>Tolerancia</th>
+                    <th>Ficha</th>
+                    <th>Fecha</th>
+                    <th>Horario</th>
+                    <th>Instructor</th>
+                    <th>Tipo / Rol</th>
+                    <th>Especialidad</th>
+                    <th>Estado</th>
+                    <?php if (Auth::isAdminOrInstructor()): ?>
                     <th>Acciones</th>
+                    <?php endif; ?>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($horarios as $h): ?>
+                <?php foreach ($sesiones as $s): ?>
                 <tr>
-                    <td><strong><?= htmlspecialchars($h['dia_semana']) ?></strong></td>
-                    <td><?= $h['hora_entrada'] ?></td>
-                    <td><?= $h['hora_salida'] ?></td>
-                    <td><?= $h['tolerancia_minutos'] ?> min</td>
                     <td>
-                        <div class="btn-group">
-                            <a href="<?= BASE_URL ?>?action=horarios/editar&id=<?= $h['id_horario'] ?>" 
-                               class="btn btn-sm btn-secondary" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <a href="<?= BASE_URL ?>?action=horarios/eliminar&id=<?= $h['id_horario'] ?>&id_ficha=<?= $idFicha ?? $h['id_ficha'] ?>" 
-                               class="btn btn-sm btn-danger" 
-                               data-confirm="¿Eliminar el horario del día <?= $h['dia_semana'] ?>?"
-                               title="Eliminar">
-                                <i class="fas fa-trash"></i>
-                            </a>
-                        </div>
+                        <span class="badge badge-purple">
+                            Ficha <?= htmlspecialchars($s['codigo_ficha']) ?>
+                        </span>
                     </td>
+                    <td>
+                        <i class="far fa-calendar text-muted"></i>
+                        <strong><?= htmlspecialchars(date('d/m/Y', strtotime($s['fecha']))) ?></strong>
+                        <span class="text-muted" style="font-size: 0.8rem; display: block;">
+                            <?php
+                            $diasSemana = ['1' => 'Lunes', '2' => 'Martes', '3' => 'Miércoles', '4' => 'Jueves', '5' => 'Viernes', '6' => 'Sábado', '7' => 'Domingo'];
+                            echo $diasSemana[date('N', strtotime($s['fecha']))] ?? '';
+                            ?>
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge badge-blue">
+                            <i class="far fa-clock"></i>
+                            <?= htmlspecialchars(substr($s['hora_inicio'], 0, 5)) ?> - <?= htmlspecialchars(substr($s['hora_fin'], 0, 5)) ?>
+                        </span>
+                    </td>
+                    <td>
+                        <strong><?= htmlspecialchars($s['nombre_instructor']) ?></strong>
+                    </td>
+                    <td>
+                        <?= !empty($s['tipo_instructor']) ? htmlspecialchars($s['tipo_instructor']) : '<span class="text-muted">-</span>' ?>
+                    </td>
+                    <td>
+                        <?php if (!empty($s['especialidad'])): ?>
+                            <span class="badge badge-outline"><?= htmlspecialchars($s['especialidad']) ?></span>
+                        <?php else: ?>
+                            <span class="text-muted">-</span>
+                        <?php endif; ?>
+                        <?php if (!empty($s['grupo_convergente'])): ?>
+                            <span class="text-muted" style="font-size: 0.75rem; display: block;"><?= htmlspecialchars($s['grupo_convergente']) ?></span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($s['estado'] === 'Activo'): ?>
+                            <span class="badge badge-green">Activo</span>
+                        <?php elseif ($s['estado'] === 'Finalizada'): ?>
+                            <span class="badge badge-secondary">Finalizada</span>
+                        <?php else: ?>
+                            <span class="badge badge-danger"><?= htmlspecialchars($s['estado']) ?></span>
+                        <?php endif; ?>
+                    </td>
+                    <?php if (Auth::isAdminOrInstructor()): ?>
+                    <td>
+                        <a href="<?= BASE_URL ?>?action=horarios/eliminar&id=<?= $s['id'] ?><?= $fichaId ? '&ficha_id='.$fichaId : '' ?>" 
+                           class="btn btn-sm btn-danger" 
+                           data-confirm="¿Estás seguro de eliminar esta sesión de clase?"
+                           title="Eliminar sesión">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                    </td>
+                    <?php endif; ?>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
     </div>
-    <?php elseif (!empty($idFicha ?? 0)): ?>
-    <div class="empty-state">
-        <i class="fas fa-calendar-alt"></i>
-        <p>No hay horarios configurados para esta ficha</p>
-        <a href="<?= BASE_URL ?>?action=horarios/crear&id_ficha=<?= $idFicha ?>" class="btn btn-primary mt-2">
-            <i class="fas fa-plus"></i> Agregar horario
-        </a>
-    </div>
     <?php else: ?>
     <div class="empty-state">
-        <i class="fas fa-hand-pointer"></i>
-        <p>Selecciona una ficha para ver sus horarios</p>
+        <i class="fas fa-calendar-times"></i>
+        <p>No se encontraron sesiones de horario programadas</p>
+        <?php if (Auth::isAdminOrInstructor()): ?>
+        <a href="<?= BASE_URL ?>?action=horarios/importar" class="btn btn-primary mt-2">
+            <i class="fas fa-file-excel"></i> Cargar Horarios desde Excel
+        </a>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>

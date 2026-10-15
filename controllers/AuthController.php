@@ -1,8 +1,7 @@
 <?php
 /**
  * AuthController.php — Controlador de Autenticación
- * 
- * Gestiona login, logout y validación de credenciales.
+ * Gestionar login, logout y validacion de credenciales.
  */
 class AuthController {
     private PDO $db;

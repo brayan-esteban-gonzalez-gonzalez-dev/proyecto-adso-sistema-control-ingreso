@@ -34,9 +34,11 @@ CREATE TABLE IF NOT EXISTS `Rol` (
 DROP TABLE IF EXISTS `Programa`;
 CREATE TABLE IF NOT EXISTS `Programa` (
   `id` INT NOT NULL AUTO_INCREMENT,
+  `codigo` VARCHAR(20) NULL,
   `nombre` VARCHAR(100) NOT NULL,
   `descripcion` TEXT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_programa_codigo` (`codigo`)
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------

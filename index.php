@@ -26,7 +26,7 @@ require_once ROOT_PATH . '/helpers/Router.php';
 // Iniciar sesion
 Auth::init();
 
-// Cargar Modelos dinámicamente
+// Cargar modelos dinamicamente (incluye maestros y reportes)
 $modelsDir = ROOT_PATH . '/models/';
 if (is_dir($modelsDir)) {
     foreach (glob($modelsDir . '*.php') as $modelFile) {
