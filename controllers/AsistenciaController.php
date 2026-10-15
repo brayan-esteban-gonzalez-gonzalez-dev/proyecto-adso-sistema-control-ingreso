@@ -20,6 +20,27 @@ class AsistenciaController {
     }
 
     /**
+     * Pantalla de marcacion RFID. Solo instructor.
+     * El esquema actual no conserva el marcador AJAX de main.
+     */
+    public function rfid(): void {
+        Auth::requireLogin();
+        if (!Auth::isInstructor()) {
+            Auth::setFlash('info', 'La marcacion RFID esta reservada para el rol de Instructor.');
+            header('Location: ' . BASE_URL . '?action=dashboard');
+            exit;
+        }
+
+        $ultimosIngresos = array_map(static function (array $ing): array {
+            $ing['num_documento'] = $ing['identificacion'] ?? ($ing['num_documento'] ?? '');
+            return $ing;
+        }, $this->model->getHistorial(date('Y-m-d')));
+
+        $pageTitle = 'Marcacion RFID';
+        require_once ROOT_PATH . '/views/asistencia/rfid.php';
+    }
+
+    /**
      * Muestra el historial de asistencias
      */
     public function historial(): void {
