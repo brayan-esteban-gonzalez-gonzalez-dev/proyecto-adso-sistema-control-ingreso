@@ -1,19 +1,23 @@
 <?php
+
 /**
  * HorarioController.php — Controlador de Horarios y Sesiones
  *
  * Gestión de horarios e importación masiva desde archivos Excel (calendario visual).
  */
+
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
-class HorarioController {
+class HorarioController
+{
     private PDO $db;
     private Sesion $sesionModel;
     private Ficha $fichaModel;
     private Usuario $usuarioModel;
 
-    public function __construct(PDO $db) {
+    public function __construct(PDO $db)
+    {
         $this->db = $db;
         $this->sesionModel = new Sesion($db);
         $this->fichaModel = new Ficha($db);
@@ -23,7 +27,8 @@ class HorarioController {
     /**
      * Lista las sesiones de horario programadas
      */
-    public function index(): void {
+    public function index(): void
+    {
         Auth::requireLogin();
 
         $pageTitle = 'Gestión de Horarios';
@@ -45,7 +50,8 @@ class HorarioController {
     /**
      * Muestra el formulario para importar horarios desde Excel
      */
-    public function importar(): void {
+    public function importar(): void
+    {
         Auth::requireAdmin();
 
         $pageTitle = 'Importar Horarios desde Excel';
@@ -58,7 +64,8 @@ class HorarioController {
     /**
      * Procesa la subida y extracción del archivo Excel
      */
-    public function procesar(): void {
+    public function procesar(): void
+    {
         Auth::requireAdmin();
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -99,7 +106,6 @@ class HorarioController {
 
             $pageTitle = 'Resultado de la Importación';
             require_once ROOT_PATH . '/views/horarios/resultado.php';
-
         } catch (Exception $e) {
             Auth::setFlash('error', 'Error al procesar el archivo Excel: ' . $e->getMessage());
             header('Location: ' . BASE_URL . '?action=horarios/importar');
@@ -110,7 +116,8 @@ class HorarioController {
     /**
      * Elimina una sesión
      */
-    public function eliminar(): void {
+    public function eliminar(): void
+    {
         Auth::requireAdmin();
 
         $id = (int)($_GET['id'] ?? 0);
@@ -127,7 +134,8 @@ class HorarioController {
     /**
      * Algoritmo inteligente para parsear la grilla visual de horarios en el Excel
      */
-    private function parsearExcelHorarios($sheet): array {
+    private function parsearExcelHorarios($sheet): array
+    {
         $highestRow = $sheet->getHighestRow();
         $highestCol = $sheet->getHighestColumn();
         $highestColIndex = Coordinate::columnIndexFromString($highestCol);
@@ -167,9 +175,18 @@ class HorarioController {
 
         // Meses en español a número
         $mesesMap = [
-            'ENERO' => '01', 'FEBRERO' => '02', 'MARZO' => '03', 'ABRIL' => '04',
-            'MAYO' => '05', 'JUNIO' => '06', 'JULIO' => '07', 'AGOSTO' => '08',
-            'SEPTIEMBRE' => '09', 'OCTUBRE' => '10', 'NOVIEMBRE' => '11', 'DICIEMBRE' => '12'
+            'ENERO' => '01',
+            'FEBRERO' => '02',
+            'MARZO' => '03',
+            'ABRIL' => '04',
+            'MAYO' => '05',
+            'JUNIO' => '06',
+            'JULIO' => '07',
+            'AGOSTO' => '08',
+            'SEPTIEMBRE' => '09',
+            'OCTUBRE' => '10',
+            'NOVIEMBRE' => '11',
+            'DICIEMBRE' => '12'
         ];
 
         // 2. Mapear celdas combinadas
@@ -222,7 +239,7 @@ class HorarioController {
             // Fila de encabezado de días encontrada en fila $r
             // Buscar fila de números de día (generalmente $r + 1 o en la misma vecindad)
             $dayNumberRow = $r + 1;
-            
+
             // Buscar fila de meses (generalmente $r - 1 o $r - 2)
             $monthRow = max(1, $r - 1);
 
