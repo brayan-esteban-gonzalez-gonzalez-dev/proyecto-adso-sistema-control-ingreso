@@ -27,7 +27,53 @@ class Usuario {
     }
 
     /**
-     * Obtiene un usuario por su ID
+     * Retorna el conteo total de usuarios agrupados por cada rol para los filtros rápidos.
+     * @return array{total: int, administradores: int, instructores: int, aprendices: int}
+     */
+    public function getCountsByRole(): array {
+        $sql = "SELECT 
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN id_rol = :admin THEN 1 ELSE 0 END) AS administradores,
+                    SUM(CASE WHEN id_rol = :inst THEN 1 ELSE 0 END) AS instructores,
+                    SUM(CASE WHEN id_rol = :apren THEN 1 ELSE 0 END) AS aprendices
+                FROM {$this->table}";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':admin' => self::ROL_ADMINISTRADOR,
+            ':inst'  => self::ROL_INSTRUCTOR,
+            ':apren' => self::ROL_APRENDIZ,
+        ]);
+        $row = $stmt->fetch();
+        return [
+            'total'           => (int) ($row['total'] ?? 0),
+            'administradores' => (int) ($row['administradores'] ?? 0),
+            'instructores'    => (int) ($row['instructores'] ?? 0),
+            'aprendices'      => (int) ($row['aprendices'] ?? 0),
+        ];
+    }
+
+    /**
+     * Obtiene los instructores (rol 2) registrados en el sistema.
+     * Utilizado para selectores de asignación como el Instructor Líder en fichas.
+     *
+     * @param bool $soloActivos Si es true, retorna únicamente instructores con estado 'Activo'.
+     * @return array
+     */
+    public function getInstructores(bool $soloActivos = false): array {
+        $sql = "SELECT id_usuario, nombre, apellido, num_documento, correo, estado
+                FROM {$this->table}
+                WHERE id_rol = :rol";
+        if ($soloActivos) {
+            $sql .= " AND estado = 'Activo'";
+        }
+        $sql .= " ORDER BY nombre ASC, apellido ASC";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':rol' => self::ROL_INSTRUCTOR]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Obtiene un usuario por su ID primario.
      */
     public function getById(int $id): ?array {
         $sql = "SELECT u.*, r.nombre AS nombre_rol
