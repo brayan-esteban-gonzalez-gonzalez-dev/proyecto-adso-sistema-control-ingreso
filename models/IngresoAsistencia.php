@@ -72,33 +72,53 @@ class IngresoAsistencia
      */
     public function getEstadisticasAprendiz(int $idUsuario, string $fechaInicio, string $fechaFin): array
     {
-        $sql = "SELECT
+        // 1. Estadísticas de asistencia
+        $sqlAsistencia = "SELECT
                     SUM(CASE WHEN a.minutos_retardo = 0 AND a.estado = 'Activo' THEN 1 ELSE 0 END) AS total_a_tiempo,
                     SUM(CASE WHEN a.minutos_retardo > 0 THEN 1 ELSE 0 END)                          AS total_retardos,
-                    SUM(a.minutos_retardo)                                                           AS total_minutos_retardo,
-                    COUNT(i.id)                                                                      AS total_inasistencias
+                    SUM(a.minutos_retardo)                                                           AS total_minutos_retardo
                 FROM {$this->table} a
-                LEFT JOIN inasistencia i
-                    ON i.Usuario_id = a.Usuario_id
-                   AND i.fecha BETWEEN :inicio2 AND :fin2
                 WHERE a.Usuario_id = :id
                   AND a.fecha BETWEEN :inicio AND :fin";
 
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute([
+        $stmtA = $this->conn->prepare($sqlAsistencia);
+        $stmtA->execute([
             ':id'     => $idUsuario,
             ':inicio' => $fechaInicio,
             ':fin'    => $fechaFin,
-            ':inicio2' => $fechaInicio,
-            ':fin2'   => $fechaFin,
         ]);
+        $resA = $stmtA->fetch() ?: [];
 
-        $result = $stmt->fetch();
+        // 2. Estadísticas de inasistencias (excluyendo justificadas con excusa aprobada)
+        $sqlInasistencia = "SELECT
+                    COUNT(DISTINCT CASE 
+                        WHEN ee.estado = 'Aprobada' THEN NULL 
+                        ELSE i.id 
+                    END) AS total_inasistencias,
+                    COUNT(DISTINCT CASE 
+                        WHEN ee.estado = 'Aprobada' THEN i.id 
+                        ELSE NULL 
+                    END) AS inasistencias_justificadas
+                FROM inasistencia i
+                LEFT JOIN excusa e ON e.Inasistencia_id = i.id
+                LEFT JOIN estado_excusa ee ON ee.Excusa_id = e.id
+                WHERE i.Usuario_id = :id
+                  AND i.fecha BETWEEN :inicio AND :fin";
+
+        $stmtI = $this->conn->prepare($sqlInasistencia);
+        $stmtI->execute([
+            ':id'     => $idUsuario,
+            ':inicio' => $fechaInicio,
+            ':fin'    => $fechaFin,
+        ]);
+        $resI = $stmtI->fetch() ?: [];
+
         return [
-            'total_a_tiempo'        => (int)($result['total_a_tiempo']        ?? 0),
-            'total_retardos'        => (int)($result['total_retardos']         ?? 0),
-            'total_inasistencias'   => (int)($result['total_inasistencias']    ?? 0),
-            'total_minutos_retardo' => (int)($result['total_minutos_retardo']  ?? 0),
+            'total_a_tiempo'             => (int)($resA['total_a_tiempo']            ?? 0),
+            'total_retardos'             => (int)($resA['total_retardos']             ?? 0),
+            'total_inasistencias'        => (int)($resI['total_inasistencias']        ?? 0),
+            'inasistencias_justificadas' => (int)($resI['inasistencias_justificadas'] ?? 0),
+            'total_minutos_retardo'      => (int)($resA['total_minutos_retardo']      ?? 0),
         ];
     }
 
@@ -241,5 +261,99 @@ class IngresoAsistencia
         // la justificación se gestiona a través de la tabla excusa/estado_excusa.
         // Este método queda como stub para compatibilidad.
         return true;
+    }
+
+    /**
+     * Obtiene los registros de inasistencia del aprendiz que aún no posean
+     * una excusa asociada (sin excusa previa o cuya excusa no esté aprobada/en revisión).
+     *
+     * @param int $usuarioId ID del usuario con rol Aprendiz
+     * @return array Listado de inasistencias con datos de ficha, programa, sesión y competencia
+     */
+    public function obtenerInasistenciasSinExcusaPorAprendiz(int $usuarioId): array
+    {
+        $sql = "SELECT i.id,
+                       i.fecha,
+                       i.Sesion_id,
+                       i.Ficha_id,
+                       f.codigo         AS codigo_ficha,
+                       p.nombre         AS nombre_programa,
+                       s.hora_inicio    AS sesion_hora_inicio,
+                       s.hora_fin       AS sesion_hora_fin,
+                       COALESCE(c.nombre, 'Sesión formativa') AS nombre_competencia
+                FROM inasistencia i
+                INNER JOIN Ficha f ON i.Ficha_id = f.id
+                LEFT JOIN Programa p ON f.Programa_id = p.id
+                LEFT JOIN sesion s ON i.Sesion_id = s.id
+                LEFT JOIN competencia c ON s.Competencia_id = c.id
+                WHERE i.Usuario_id = :usuarioId
+                  AND NOT EXISTS (
+                      SELECT 1 FROM excusa e
+                      LEFT JOIN estado_excusa ee ON ee.Excusa_id = e.id
+                      WHERE e.Inasistencia_id = i.id
+                        AND (ee.estado IS NULL OR ee.estado = 'Aprobada')
+                  )
+                ORDER BY i.fecha DESC, s.hora_inicio DESC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':usuarioId' => $usuarioId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Verifica que una inasistencia pertenezca a un aprendiz específico.
+     *
+     * @param int $inasistenciaId ID de la inasistencia
+     * @param int $usuarioId ID del aprendiz logueado
+     * @return array|null Datos de la inasistencia o null si no pertenece al aprendiz
+     */
+    public function verificarInasistenciaAprendiz(int $inasistenciaId, int $usuarioId): ?array
+    {
+        $sql = "SELECT i.*,
+                       f.codigo         AS codigo_ficha,
+                       p.nombre         AS nombre_programa,
+                       s.hora_inicio    AS sesion_hora_inicio,
+                       s.hora_fin       AS sesion_hora_fin,
+                       COALESCE(c.nombre, 'Sesión formativa') AS nombre_competencia
+                FROM inasistencia i
+                INNER JOIN Ficha f ON i.Ficha_id = f.id
+                LEFT JOIN Programa p ON f.Programa_id = p.id
+                LEFT JOIN sesion s ON i.Sesion_id = s.id
+                LEFT JOIN competencia c ON s.Competencia_id = c.id
+                WHERE i.id = :id AND i.Usuario_id = :usuarioId";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':id'        => $inasistenciaId,
+            ':usuarioId' => $usuarioId,
+        ]);
+        $res = $stmt->fetch();
+        return $res ?: null;
+    }
+
+    /**
+     * Actualiza el estado de una inasistencia de forma resiliente
+     * (solo si la columna 'estado' existe en la tabla).
+     *
+     * @param int $inasistenciaId ID de la inasistencia
+     * @param string $estado 'Injustificada' | 'En revisión' | 'Justificada'
+     * @return bool True si se actualizó, false en caso contrario
+     */
+    public function actualizarEstadoInasistencia(int $inasistenciaId, string $estado): bool
+    {
+        try {
+            $check = $this->conn->query("SHOW COLUMNS FROM inasistencia LIKE 'estado'");
+            if ($check && $check->rowCount() > 0) {
+                $sql = "UPDATE inasistencia SET estado = :estado WHERE id = :id";
+                $stmt = $this->conn->prepare($sql);
+                return $stmt->execute([
+                    ':estado' => $estado,
+                    ':id'     => $inasistenciaId,
+                ]);
+            }
+        } catch (\PDOException $e) {
+            // Silencioso si la columna no existe aún
+        }
+        return false;
     }
 }

@@ -1,24 +1,30 @@
 <?php
+declare(strict_types=1);
+
 /**
  * ExcusaController.php — Controlador de Excusas
  *
- * Gestiona el envío, visualización y revisión de excusas.
- * Nueva DB: tablas `excusa` y `estado_excusa`.
- * Los aprendices son Usuarios con Rol_id=3; ya no existe tabla `aprendices`.
+ * Gestiona el envío, visualización y revisión de excusas médicas.
+ * Vincula de manera obligatoria cada excusa a una inasistencia previa real del aprendiz.
  */
-class ExcusaController {
+class ExcusaController
+{
     private PDO $db;
     private ExcusaMedica $model;
+    private IngresoAsistencia $asistenciaModel;
 
-    public function __construct(PDO $db) {
-        $this->db    = $db;
-        $this->model = new ExcusaMedica($db);
+    public function __construct(PDO $db)
+    {
+        $this->db              = $db;
+        $this->model           = new ExcusaMedica($db);
+        $this->asistenciaModel = new IngresoAsistencia($db);
     }
 
     /**
-     * Lista excusas (admin: todas/pendientes, aprendiz: propias)
+     * Lista excusas (admin/instructor: todas o pendientes; aprendiz: propias)
      */
-    public function index(): void {
+    public function index(): void
+    {
         Auth::requireLogin();
 
         if (Auth::isAdminOrInstructor()) {
@@ -28,37 +34,58 @@ class ExcusaController {
             } else {
                 $excusas = $this->model->getAll();
             }
-            $pageTitle = 'Gestión de Excusas';
+            $pageTitle = 'Gestión de Excusas Médicas';
         } else {
-            // El aprendiz consulta sus propias excusas usando su id de usuario directamente
             $excusas   = $this->model->getByAprendiz(Auth::getUserId());
-            $pageTitle = 'Mis Excusas';
+            $pageTitle = 'Mis Excusas Médicas';
         }
 
         require_once ROOT_PATH . '/views/excusas/index.php';
     }
 
     /**
-     * Formulario para crear una excusa (solo aprendiz)
+     * Muestra el formulario para crear una excusa (solo aprendiz).
+     * Consulta únicamente inasistencias reales del aprendiz sin excusa previa.
      */
-    public function crear(): void {
+    public function crear(): void
+    {
         Auth::requireLogin();
 
         if (!Auth::isAprendiz()) {
-            Auth::setFlash('error', 'Solo los aprendices pueden enviar excusas.');
+            Auth::setFlash('error', 'Solo los aprendices pueden registrar excusas médicas.');
             header('Location: ' . BASE_URL . '?action=excusas');
             exit;
         }
 
-        $csrf_token = Auth::generateCSRF();
-        $pageTitle  = 'Nueva Excusa';
+        $idUsuario     = Auth::getUserId();
+        $inasistencias = $this->asistenciaModel->obtenerInasistenciasSinExcusaPorAprendiz($idUsuario);
+        $csrf_token    = Auth::generateCSRF();
+        $pageTitle     = 'Nueva Excusa Médica';
+
         require_once ROOT_PATH . '/views/excusas/form.php';
     }
 
     /**
-     * Guarda una excusa
+     * Alias compatible de crear()
      */
-    public function guardar(): void {
+    public function create(): void
+    {
+        $this->crear();
+    }
+
+    /**
+     * Alias compatible de crear()
+     */
+    public function form(): void
+    {
+        $this->crear();
+    }
+
+    /**
+     * Guarda una nueva excusa médica vinculada a una inasistencia previa.
+     */
+    public function guardar(): void
+    {
         Auth::requireLogin();
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -66,27 +93,76 @@ class ExcusaController {
             exit;
         }
 
-        if (!Auth::validateCSRF($_POST['csrf_token'] ?? '')) {
-            Auth::setFlash('error', 'Token de seguridad inválido.');
+        if (!Auth::isAprendiz()) {
+            Auth::setFlash('error', 'Solo los aprendices pueden enviar excusas médicas.');
             header('Location: ' . BASE_URL . '?action=excusas');
             exit;
         }
 
-        // En la nueva DB el aprendiz ES el usuario logueado (no hay tabla aprendices)
+        if (!Auth::validateCSRF($_POST['csrf_token'] ?? '')) {
+            Auth::setFlash('error', 'Token de seguridad inválido. Por favor intente nuevamente.');
+            header('Location: ' . BASE_URL . '?action=excusas/crear');
+            exit;
+        }
+
         $idUsuario = Auth::getUserId();
 
-        // Validaciones
-        Validator::reset();
-        $motivo = trim($_POST['motivo'] ?? '');
-        Validator::required($motivo, 'motivo');
+        // 1. Validar el ID de inasistencia
+        $inasistenciaId = (int) ($_POST['ingreso_asistencia_id'] ?? $_POST['Inasistencia_id'] ?? 0);
+        if ($inasistenciaId <= 0) {
+            Auth::setFlash('error', 'Debe seleccionar una inasistencia válida a justificar.');
+            header('Location: ' . BASE_URL . '?action=excusas/crear');
+            exit;
+        }
 
-        // Validar archivo adjunto (evidencia)
+        // Verificar que la inasistencia pertenezca realmente al aprendiz en sesión
+        $inasistencia = $this->asistenciaModel->verificarInasistenciaAprendiz($inasistenciaId, $idUsuario);
+        if (!$inasistencia) {
+            Auth::setFlash('error', 'La inasistencia seleccionada no existe o no corresponde a su usuario.');
+            header('Location: ' . BASE_URL . '?action=excusas/crear');
+            exit;
+        }
+
+        // 2. Validar motivo / descripción
+        $motivo = trim($_POST['motivo'] ?? $_POST['descripcion'] ?? '');
+        Validator::reset();
+        Validator::required($motivo, 'motivo o descripción');
+        Validator::minLength($motivo, 10, 'motivo o descripción');
+
+        // 3. Validar archivo adjunto (Máx 2 MB, extensiones y MIME real con finfo_file)
         if (!isset($_FILES['archivo']) || $_FILES['archivo']['error'] !== UPLOAD_ERR_OK) {
             Validator::required('', 'archivo adjunto');
         } else {
-            $allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-            Validator::fileType($_FILES['archivo'], $allowedTypes, 'archivo adjunto');
-            Validator::fileSize($_FILES['archivo'], 5 * 1024 * 1024, 'archivo adjunto'); // 5MB
+            $archivo      = $_FILES['archivo'];
+            $maxBytes     = 2 * 1024 * 1024; // 2 MB
+            $extPermitidas = ['pdf', 'jpg', 'jpeg', 'png'];
+            $mimesPermitidos = [
+                'application/pdf',
+                'image/jpeg',
+                'image/png',
+            ];
+
+            // Validar tamaño
+            if ($archivo['size'] > $maxBytes) {
+                Validator::required('', 'El archivo excede el tamaño máximo permitido de 2 MB');
+            }
+
+            // Validar extensión
+            $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
+            if (!in_array($extension, $extPermitidas, true)) {
+                Validator::required('', 'Formato de archivo no permitido. Solo se aceptan PDF, JPG y PNG');
+            }
+
+            // Validar tipo MIME real mediante finfo_file
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mimeReal = $finfo ? finfo_file($finfo, $archivo['tmp_name']) : '';
+            if ($finfo) {
+                finfo_close($finfo);
+            }
+
+            if (!in_array($mimeReal, $mimesPermitidos, true)) {
+                Validator::required('', 'El contenido del archivo no coincide con un formato válido (PDF, JPG, PNG)');
+            }
         }
 
         if (!Validator::isValid()) {
@@ -95,40 +171,50 @@ class ExcusaController {
             exit;
         }
 
-        // Subir archivo de evidencia
+        // 4. Mover archivo de forma segura a carpeta protegida
         $uploadDir = UPLOAD_PATH . 'excusas/';
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0755, true);
         }
 
-        $extension    = pathinfo($_FILES['archivo']['name'], PATHINFO_EXTENSION);
-        $nombreArchivo = 'excusa_' . $idUsuario . '_' . time() . '.' . $extension;
-        $rutaArchivo  = $uploadDir . $nombreArchivo;
+        $extension = strtolower(pathinfo($_FILES['archivo']['name'], PATHINFO_EXTENSION));
+        if ($extension === 'jpeg') {
+            $extension = 'jpg';
+        }
+        $nombreArchivo = sprintf(
+            'excusa_%d_%d_%d_%s.%s',
+            $idUsuario,
+            $inasistenciaId,
+            time(),
+            bin2hex(random_bytes(4)),
+            $extension
+        );
+        $rutaFisica  = $uploadDir . $nombreArchivo;
+        $rutaRelativa = 'assets/uploads/excusas/' . $nombreArchivo;
 
-        if (!move_uploaded_file($_FILES['archivo']['tmp_name'], $rutaArchivo)) {
-            Auth::setFlash('error', 'Error al subir el archivo.');
+        if (!move_uploaded_file($_FILES['archivo']['tmp_name'], $rutaFisica)) {
+            Auth::setFlash('error', 'Ocurrió un error al guardar el archivo adjunto en el servidor.');
             header('Location: ' . BASE_URL . '?action=excusas/crear');
             exit;
         }
 
-        // Determinar si está asociada a una asistencia o inasistencia
-        $asistenciaId   = !empty($_POST['Asistencia_id'])   ? (int) $_POST['Asistencia_id']   : null;
-        $inasistenciaId = !empty($_POST['Inasistencia_id']) ? (int) $_POST['Inasistencia_id'] : null;
-
-        $data = [
-            'usuario_id'       => $idUsuario,
-            'fecha'            => date('Y-m-d'),
-            'motivo'           => $motivo,
-            'evidencia'        => 'assets/uploads/excusas/' . $nombreArchivo,
-            'Asistencia_id'    => $asistenciaId,
-            'Inasistencia_id'  => $inasistenciaId,
-        ];
-
+        // 5. Guardar la excusa vinculada a la inasistencia
         try {
-            $this->model->create($data);
-            Auth::setFlash('success', 'Excusa enviada correctamente. Pendiente de revisión.');
+            $ok = $this->model->crear([
+                'ingreso_asistencia_id' => $inasistenciaId,
+                'usuario_id'            => $idUsuario,
+                'descripcion'           => $motivo,
+                'ruta_archivo'          => $rutaRelativa,
+                'fecha'                 => $inasistencia['fecha'] ?? date('Y-m-d'),
+            ]);
+
+            if ($ok) {
+                Auth::setFlash('success', 'Excusa médica registrada exitosamente. Queda en estado "En revisión".');
+            } else {
+                Auth::setFlash('error', 'No se pudo guardar la excusa médica.');
+            }
         } catch (\PDOException $e) {
-            Auth::setFlash('error', 'Error al guardar la excusa: ' . $e->getMessage());
+            Auth::setFlash('error', 'Error al registrar la excusa: ' . $e->getMessage());
         }
 
         header('Location: ' . BASE_URL . '?action=excusas');
@@ -136,29 +222,52 @@ class ExcusaController {
     }
 
     /**
-     * Muestra una excusa para revisión (admin/instructor)
+     * Alias compatible de guardar()
      */
-    public function revisar(): void {
-        Auth::requireAdmin();
+    public function store(): void
+    {
+        $this->guardar();
+    }
+
+    /**
+     * Muestra el detalle de una excusa para revisión (Instructor o Administrador).
+     */
+    public function revisar(): void
+    {
+        Auth::requireLogin();
+
+        if (!Auth::isAdminOrInstructor()) {
+            Auth::setFlash('error', 'No tiene permisos para revisar excusas médicas.');
+            header('Location: ' . BASE_URL . '?action=excusas');
+            exit;
+        }
+
         $id     = (int) ($_GET['id'] ?? 0);
         $excusa = $this->model->getById($id);
 
         if (!$excusa) {
-            Auth::setFlash('error', 'Excusa no encontrada.');
+            Auth::setFlash('error', 'Excusa médica no encontrada.');
             header('Location: ' . BASE_URL . '?action=excusas');
             exit;
         }
 
         $csrf_token = Auth::generateCSRF();
-        $pageTitle  = 'Revisar Excusa';
+        $pageTitle  = 'Revisar Excusa Médica';
         require_once ROOT_PATH . '/views/excusas/revisar.php';
     }
 
     /**
-     * Procesa la aprobación o rechazo de una excusa
+     * Procesa la aprobación o rechazo de una excusa médica (Instructor o Administrador).
      */
-    public function procesar(): void {
-        Auth::requireAdmin();
+    public function procesar(): void
+    {
+        Auth::requireLogin();
+
+        if (!Auth::isAdminOrInstructor()) {
+            Auth::setFlash('error', 'No tiene permisos para procesar excusas médicas.');
+            header('Location: ' . BASE_URL . '?action=excusas');
+            exit;
+        }
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             header('Location: ' . BASE_URL . '?action=excusas');
@@ -171,26 +280,28 @@ class ExcusaController {
             exit;
         }
 
-        $idExcusa   = (int) ($_POST['id_excusa']            ?? 0);
-        $accion     = $_POST['accion']                       ?? '';
-        $comentario = trim($_POST['comentario_revision']     ?? '');
+        $idExcusa   = (int) ($_POST['id_excusa'] ?? 0);
+        $accion     = $_POST['accion'] ?? '';
+        $comentario = trim($_POST['comentario_revision'] ?? '');
 
         $excusa = $this->model->getById($idExcusa);
         if (!$excusa) {
-            Auth::setFlash('error', 'Excusa no encontrada.');
+            Auth::setFlash('error', 'Excusa médica no encontrada.');
             header('Location: ' . BASE_URL . '?action=excusas');
             exit;
         }
 
+        $instructorId = Auth::getUserId();
+
         try {
             if ($accion === 'aprobar') {
-                $this->model->aprobar($idExcusa, Auth::getUserId(), $comentario);
-                Auth::setFlash('success', 'Excusa aprobada correctamente.');
+                $this->model->aprobar($idExcusa, $instructorId, $comentario);
+                Auth::setFlash('success', 'Excusa médica aprobada correctamente. La inasistencia ha sido justificada.');
             } elseif ($accion === 'rechazar') {
-                $this->model->rechazar($idExcusa, Auth::getUserId(), $comentario);
-                Auth::setFlash('success', 'Excusa rechazada.');
+                $this->model->rechazar($idExcusa, $instructorId, $comentario);
+                Auth::setFlash('success', 'Excusa médica rechazada.');
             } else {
-                Auth::setFlash('error', 'Acción no válida.');
+                Auth::setFlash('error', 'Acción de revisión no válida.');
             }
         } catch (\PDOException $e) {
             Auth::setFlash('error', 'Error al procesar la excusa: ' . $e->getMessage());
