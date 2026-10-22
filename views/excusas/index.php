@@ -44,9 +44,10 @@
             <tbody>
                 <?php foreach ($excusas as $exc): ?>
                 <?php 
-                    $id = $exc['id'] ?? $exc['id_excusa'] ?? 0;
+                    $id = (int) ($exc['id'] ?? $exc['id_excusa'] ?? 0);
                     $doc = $exc['identificacion'] ?? $exc['num_documento'] ?? '';
-                    $fecha = $exc['fecha'] ?? $exc['fecha_inicio'] ?? '';
+                    $fechaRadicacion = $exc['fecha'] ?? '';
+                    $fechaInasistencia = !empty($exc['fecha_inasistencia']) ? $exc['fecha_inasistencia'] : $fechaRadicacion;
                     $estado = $exc['estado_revision'] ?? $exc['estado'] ?? 'Pendiente';
                     $evidencia = $exc['evidencia'] ?? $exc['archivo_adjunto'] ?? '';
                 ?>
@@ -54,12 +55,15 @@
                     <?php if (Auth::isAdminOrInstructor()): ?>
                     <td>
                         <strong><?= htmlspecialchars(($exc['nombre'] ?? '') . ' ' . ($exc['apellido'] ?? '')) ?></strong>
-                        <br><small class="text-muted"><?= htmlspecialchars($doc) ?></small>
+                        <br><small class="text-muted"><?= htmlspecialchars((string) $doc) ?></small>
                     </td>
                     <td><span class="badge badge-blue"><?= htmlspecialchars($exc['codigo_ficha'] ?? '-') ?></span></td>
                     <?php endif; ?>
                     <td>
-                        <?= htmlspecialchars($fecha) ?>
+                        <strong><?= !empty($fechaInasistencia) ? date('d/m/Y', strtotime($fechaInasistencia)) : '—' ?></strong>
+                        <?php if (!empty($exc['fecha_inasistencia']) && $exc['fecha_inasistencia'] !== $fechaRadicacion && !empty($fechaRadicacion)): ?>
+                            <br><small class="text-muted" title="Fecha en que se radicó la excusa">Radicada: <?= date('d/m/Y', strtotime($fechaRadicacion)) ?></small>
+                        <?php endif; ?>
                     </td>
                     <td><?= htmlspecialchars(mb_substr($exc['motivo'] ?? '', 0, 50)) ?>...</td>
                     <td>

@@ -15,7 +15,14 @@ class Reporte {
                        u.identificacion,
                        COUNT(DISTINCT s.id) AS sesiones,
                        COUNT(DISTINCT a.id) AS asistencias,
-                       COUNT(DISTINCT i.id) AS inasistencias,
+                       COUNT(DISTINCT CASE 
+                           WHEN ee.estado = 'Aprobada' THEN NULL 
+                           ELSE i.id 
+                       END) AS inasistencias,
+                       COUNT(DISTINCT CASE 
+                           WHEN ee.estado = 'Aprobada' THEN i.id 
+                           ELSE NULL 
+                       END) AS inasistencias_justificadas,
                        COUNT(DISTINCT CASE WHEN a.minutos_retardo > 0 THEN a.id END) AS retardos
                 FROM Usuario u
                 LEFT JOIN sesion s
@@ -28,6 +35,10 @@ class Reporte {
                 LEFT JOIN inasistencia i
                        ON i.Sesion_id = s.id
                       AND i.Usuario_id = u.id
+                LEFT JOIN excusa e
+                       ON e.Inasistencia_id = i.id
+                LEFT JOIN estado_excusa ee
+                       ON ee.Excusa_id = e.id
                 WHERE u.Rol_id = 3
                   AND u.Ficha_id = :ficha
                 GROUP BY u.id, u.apellido, u.nombre, u.identificacion
@@ -173,11 +184,25 @@ class Reporte {
     }
 
     private function contarPorMes(string $tabla, string $desde, string $hasta, ?int $usuarioId): array {
-        $filtro = $usuarioId ? ' AND Usuario_id = :uid' : '';
-        $sql = "SELECT DATE_FORMAT(fecha, '%Y-%m') AS mes, COUNT(*) AS total
-                FROM {$tabla}
-                WHERE fecha >= :desde AND fecha < :hasta{$filtro}
-                GROUP BY mes";
+        if ($tabla === 'inasistencia') {
+            $filtro = $usuarioId ? ' AND t.Usuario_id = :uid' : '';
+            $sql = "SELECT DATE_FORMAT(t.fecha, '%Y-%m') AS mes,
+                           COUNT(DISTINCT CASE 
+                               WHEN ee.estado = 'Aprobada' THEN NULL 
+                               ELSE t.id 
+                           END) AS total
+                    FROM inasistencia t
+                    LEFT JOIN excusa e ON e.Inasistencia_id = t.id
+                    LEFT JOIN estado_excusa ee ON ee.Excusa_id = e.id
+                    WHERE t.fecha >= :desde AND t.fecha < :hasta{$filtro}
+                    GROUP BY mes";
+        } else {
+            $filtro = $usuarioId ? ' AND Usuario_id = :uid' : '';
+            $sql = "SELECT DATE_FORMAT(fecha, '%Y-%m') AS mes, COUNT(*) AS total
+                    FROM {$tabla}
+                    WHERE fecha >= :desde AND fecha < :hasta{$filtro}
+                    GROUP BY mes";
+        }
         $stmt = $this->conn->prepare($sql);
         $params = [':desde' => $desde, ':hasta' => $hasta];
         if ($usuarioId) {
