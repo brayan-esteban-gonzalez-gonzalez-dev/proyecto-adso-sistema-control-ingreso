@@ -6,6 +6,10 @@
  * Nueva DB: tabla `Usuario`, PK `id`, campos: identificacion, email, Rol_id, Ficha_id, codigo_llavero.
  */
 class Usuario {
+    public const ROL_ADMINISTRADOR = 1;
+    public const ROL_INSTRUCTOR    = 2;
+    public const ROL_APRENDIZ      = 3;
+
     private PDO $conn;
     private string $table = 'Usuario';
 
@@ -14,14 +18,28 @@ class Usuario {
     }
 
     /**
-     * Obtiene todos los usuarios con su rol
+     * Obtiene todos los usuarios con su rol y datos de ficha si aplica,
+     * con opción de filtrado por rol.
      */
-    public function getAll(): array {
-        $sql = "SELECT u.*, r.nombre AS nombre_rol
+    public function getAll(?int $rolId = null): array {
+        $sql = "SELECT u.*, r.nombre AS nombre_rol,
+                       f.codigo AS codigo_ficha,
+                       p.nombre AS nombre_programa
                 FROM {$this->table} u
                 INNER JOIN Rol r ON u.Rol_id = r.id
-                ORDER BY u.apellido, u.nombre";
+                LEFT JOIN Ficha f ON u.Ficha_id = f.id
+                LEFT JOIN Programa p ON f.Programa_id = p.id";
+
+        if ($rolId !== null) {
+            $sql .= " WHERE u.Rol_id = :rol_id";
+        }
+
+        $sql .= " ORDER BY u.apellido, u.nombre";
+
         $stmt = $this->conn->prepare($sql);
+        if ($rolId !== null) {
+            $stmt->bindValue(':rol_id', $rolId, PDO::PARAM_INT);
+        }
         $stmt->execute();
         return $stmt->fetchAll();
     }
@@ -33,16 +51,12 @@ class Usuario {
     public function getCountsByRole(): array {
         $sql = "SELECT 
                     COUNT(*) AS total,
-                    SUM(CASE WHEN id_rol = :admin THEN 1 ELSE 0 END) AS administradores,
-                    SUM(CASE WHEN id_rol = :inst THEN 1 ELSE 0 END) AS instructores,
-                    SUM(CASE WHEN id_rol = :apren THEN 1 ELSE 0 END) AS aprendices
+                    SUM(CASE WHEN Rol_id = 1 THEN 1 ELSE 0 END) AS administradores,
+                    SUM(CASE WHEN Rol_id = 2 THEN 1 ELSE 0 END) AS instructores,
+                    SUM(CASE WHEN Rol_id = 3 THEN 1 ELSE 0 END) AS aprendices
                 FROM {$this->table}";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([
-            ':admin' => self::ROL_ADMINISTRADOR,
-            ':inst'  => self::ROL_INSTRUCTOR,
-            ':apren' => self::ROL_APRENDIZ,
-        ]);
+        $stmt->execute();
         $row = $stmt->fetch();
         return [
             'total'           => (int) ($row['total'] ?? 0),

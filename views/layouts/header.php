@@ -76,10 +76,6 @@ $flash = Auth::getFlash();
                     <span>Mi Horario</span>
                 </a>
                 <?php endif; ?>
-                <a href="<?= BASE_URL ?>?action=aprendices" class="nav-link <?= str_starts_with($currentAction, 'aprendices') ? 'active' : '' ?>">
-                    <i class="fas fa-user-graduate"></i>
-                    <span>Aprendices</span>
-                </a>
             </div>
 
             <div class="nav-section">

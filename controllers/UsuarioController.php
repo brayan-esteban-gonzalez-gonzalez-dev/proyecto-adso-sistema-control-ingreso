@@ -15,26 +15,41 @@ class UsuarioController {
     }
 
     /**
-     * Lista todos los usuarios
+     * Lista todos los usuarios con opción de filtrado por rol
      */
     public function index(): void {
         Auth::requireAdmin();
-        $usuarios  = $this->model->getAll();
-        $pageTitle = 'Gestión de Usuarios';
+
+        $rolFiltro = null;
+        if (isset($_GET['rol']) && $_GET['rol'] !== '') {
+            $rolId = (int) $_GET['rol'];
+            if ($rolId >= 1 && $rolId <= 3) {
+                $rolFiltro = $rolId;
+            }
+        }
+
+        $usuarios   = $this->model->getAll($rolFiltro);
+        $conteos    = $this->model->getCountsByRole();
+        $pageTitle  = 'Gestión de Usuarios';
         require_once ROOT_PATH . '/views/usuarios/index.php';
     }
+
     /**
      * Muestra formulario de creación
      */
     public function crear(): void {
         Auth::requireAdmin();
+        require_once ROOT_PATH . '/models/Ficha.php';
         $rolModel   = new Rol($this->db);
+        $fichaModel = new Ficha($this->db);
         $roles      = $rolModel->getAll();
+        $fichas     = $fichaModel->getAll();
         $usuario    = null;
         $csrf_token = Auth::generateCSRF();
         $pageTitle  = 'Nuevo Usuario';
         require_once ROOT_PATH . '/views/usuarios/form.php';
     }
+
     /**
      * Muestra formulario de edición
      */
@@ -49,12 +64,16 @@ class UsuarioController {
             exit;
         }
 
+        require_once ROOT_PATH . '/models/Ficha.php';
         $rolModel   = new Rol($this->db);
+        $fichaModel = new Ficha($this->db);
         $roles      = $rolModel->getAll();
+        $fichas     = $fichaModel->getAll();
         $csrf_token = Auth::generateCSRF();
         $pageTitle  = 'Editar Usuario';
         require_once ROOT_PATH . '/views/usuarios/form.php';
     }
+
     /**
      * Guarda un usuario (crear o actualizar)
      */
@@ -71,13 +90,19 @@ class UsuarioController {
             exit;
         }
         $id = (int) ($_POST['id_usuario'] ?? 0);
+        $rolId = (int) ($_POST['id_rol'] ?? $_POST['Rol_id'] ?? 3);
+        $fichaId = ($rolId === Usuario::ROL_APRENDIZ && !empty($_POST['Ficha_id']))
+            ? (int) $_POST['Ficha_id']
+            : null;
+
         // Recoger datos con los nuevos nombres de campo
         $data = [
-            'Rol_id'         => (int) ($_POST['id_rol'] ?? 3),
-            'identificacion' => trim($_POST['num_documento'] ?? ''),
+            'Rol_id'         => $rolId,
+            'identificacion' => trim($_POST['num_documento'] ?? $_POST['identificacion'] ?? ''),
             'nombre'         => trim($_POST['nombre']        ?? ''),
             'apellido'       => trim($_POST['apellido']      ?? ''),
-            'email'          => trim($_POST['correo']        ?? ''),
+            'email'          => trim($_POST['correo']        ?? $_POST['email'] ?? ''),
+            'Ficha_id'       => $fichaId,
             'codigo_llavero' => trim($_POST['codigo_llavero'] ?? '') ?: null,
             'estado'         => $_POST['estado'] ?? 'Activo',
         ];
@@ -88,6 +113,10 @@ class UsuarioController {
         Validator::required($data['apellido'],       'apellido');
         Validator::required($data['email'],          'correo');
         Validator::email($data['email']);
+
+        if ($rolId === Usuario::ROL_APRENDIZ && empty($fichaId)) {
+            Validator::required('', 'Ficha de Formación (obligatoria para el Aprendiz)');
+        }
 
         if ($id === 0) {
             // Nuevo usuario — contraseña obligatoria
