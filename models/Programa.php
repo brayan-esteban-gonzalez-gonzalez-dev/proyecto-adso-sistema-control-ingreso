@@ -31,7 +31,23 @@ class Programa {
         return $result ?: null;
     }
 
+    private function hasCodigo(): bool {
+        static $hasCodigo = null;
+        if ($hasCodigo === null) {
+            try {
+                $stmt = $this->conn->query("SHOW COLUMNS FROM {$this->table} LIKE 'codigo'");
+                $hasCodigo = ($stmt && $stmt->rowCount() > 0);
+            } catch (\Throwable $e) {
+                $hasCodigo = false;
+            }
+        }
+        return $hasCodigo;
+    }
+
     public function getByCodigo(string $codigo): ?array {
+        if (!$this->hasCodigo()) {
+            return null;
+        }
         $sql = "SELECT * FROM {$this->table} WHERE codigo = :codigo LIMIT 1";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':codigo' => $codigo]);
@@ -40,29 +56,52 @@ class Programa {
     }
 
     public function create(array $data): bool {
-        $sql = "INSERT INTO {$this->table} (codigo, nombre, descripcion)
-                VALUES (:codigo, :nombre, :descripcion)";
+        if ($this->hasCodigo()) {
+            $sql = "INSERT INTO {$this->table} (codigo, nombre, descripcion)
+                    VALUES (:codigo, :nombre, :descripcion)";
+            $params = [
+                ':codigo'      => $data['codigo'],
+                ':nombre'      => $data['nombre'],
+                ':descripcion' => $data['descripcion'] ?: null,
+            ];
+        } else {
+            $sql = "INSERT INTO {$this->table} (nombre, descripcion)
+                    VALUES (:nombre, :descripcion)";
+            $params = [
+                ':nombre'      => $data['nombre'],
+                ':descripcion' => $data['descripcion'] ?: null,
+            ];
+        }
         $stmt = $this->conn->prepare($sql);
-        return $stmt->execute([
-            ':codigo'      => $data['codigo'],
-            ':nombre'      => $data['nombre'],
-            ':descripcion' => $data['descripcion'] ?: null,
-        ]);
+        return $stmt->execute($params);
     }
 
     public function update(int $id, array $data): bool {
-        $sql = "UPDATE {$this->table}
-                SET codigo = :codigo,
-                    nombre = :nombre,
-                    descripcion = :descripcion
-                WHERE id = :id";
+        if ($this->hasCodigo()) {
+            $sql = "UPDATE {$this->table}
+                    SET codigo = :codigo,
+                        nombre = :nombre,
+                        descripcion = :descripcion
+                    WHERE id = :id";
+            $params = [
+                ':id'          => $id,
+                ':codigo'      => $data['codigo'],
+                ':nombre'      => $data['nombre'],
+                ':descripcion' => $data['descripcion'] ?: null,
+            ];
+        } else {
+            $sql = "UPDATE {$this->table}
+                    SET nombre = :nombre,
+                        descripcion = :descripcion
+                    WHERE id = :id";
+            $params = [
+                ':id'          => $id,
+                ':nombre'      => $data['nombre'],
+                ':descripcion' => $data['descripcion'] ?: null,
+            ];
+        }
         $stmt = $this->conn->prepare($sql);
-        return $stmt->execute([
-            ':id'          => $id,
-            ':codigo'      => $data['codigo'],
-            ':nombre'      => $data['nombre'],
-            ':descripcion' => $data['descripcion'] ?: null,
-        ]);
+        return $stmt->execute($params);
     }
 
     public function delete(int $id): bool {
@@ -88,7 +127,17 @@ class Programa {
      * Obtiene los programas activos.
      */
     public function obtenerActivos(): array {
-        $sql = "SELECT * FROM {$this->table} WHERE estado = 'Activo' ORDER BY nombre";
+        static $hasEstado = null;
+        if ($hasEstado === null) {
+            try {
+                $stmt = $this->conn->query("SHOW COLUMNS FROM {$this->table} LIKE 'estado'");
+                $hasEstado = ($stmt && $stmt->rowCount() > 0);
+            } catch (\Throwable $e) {
+                $hasEstado = false;
+            }
+        }
+        $where = $hasEstado ? "WHERE estado = 'Activo'" : "";
+        $sql = "SELECT * FROM {$this->table} {$where} ORDER BY nombre";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll();

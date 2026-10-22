@@ -13,10 +13,24 @@ class Competencia {
         $this->conn = $db;
     }
 
+    private function getCodigoColumnaSql(): string {
+        static $hasCodigo = null;
+        if ($hasCodigo === null) {
+            try {
+                $stmt = $this->conn->query("SHOW COLUMNS FROM Programa LIKE 'codigo'");
+                $hasCodigo = ($stmt && $stmt->rowCount() > 0);
+            } catch (\Throwable $e) {
+                $hasCodigo = false;
+            }
+        }
+        return $hasCodigo ? 'p.codigo AS codigo_programa' : "'' AS codigo_programa";
+    }
+
     public function getAll(?int $programaId = null): array {
+        $codigoSql = $this->getCodigoColumnaSql();
         $sql = "SELECT c.*,
                        p.nombre AS nombre_programa,
-                       p.codigo AS codigo_programa,
+                       {$codigoSql},
                        (SELECT COUNT(*) FROM sesion s WHERE s.Competencia_id = c.id) AS total_sesiones
                 FROM {$this->table} c
                 INNER JOIN Programa p ON c.Programa_id = p.id";
@@ -37,7 +51,8 @@ class Competencia {
     }
 
     public function getById(int $id): ?array {
-        $sql = "SELECT c.*, p.nombre AS nombre_programa, p.codigo AS codigo_programa
+        $codigoSql = $this->getCodigoColumnaSql();
+        $sql = "SELECT c.*, p.nombre AS nombre_programa, {$codigoSql}
                 FROM {$this->table} c
                 INNER JOIN Programa p ON c.Programa_id = p.id
                 WHERE c.id = :id";

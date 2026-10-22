@@ -45,9 +45,9 @@ $instructorId = $ficha['instructor_id'] ?? $ficha['id_instructor_lider'] ?? 0;
         </div>
 
         <div class="form-group">
-            <label class="form-label" for="id_instructor_lider">Instructor Líder</label>
-            <select id="id_instructor_lider" name="id_instructor_lider" class="form-control">
-                <option value="">— Sin asignar —</option>
+            <label class="form-label" for="id_instructor_lider">Instructor Líder *</label>
+            <select id="id_instructor_lider" name="id_instructor_lider" class="form-control" required>
+                <option value="">— Seleccionar Instructor Líder —</option>
                 <?php foreach ($instructores as $inst): ?>
                 <?php 
                     $instId = $inst['id'] ?? $inst['id_usuario'];

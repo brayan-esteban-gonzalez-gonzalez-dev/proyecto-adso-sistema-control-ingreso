@@ -85,8 +85,9 @@ class FichaController {
         ];
 
         Validator::reset();
-        Validator::required((string)$data['codigo'],      'código de ficha');
-        Validator::required((string)$data['Programa_id'], 'programa');
+        Validator::required((string)$data['codigo'],        'código de ficha');
+        Validator::required((string)$data['Programa_id'],   'programa');
+        Validator::required((string)($data['instructor_id'] ?? ''), 'instructor líder');
 
         if (!Validator::isValid()) {
             Auth::setFlash('error', implode('<br>', Validator::getErrors()));
