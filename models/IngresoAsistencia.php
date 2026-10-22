@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * IngresoAsistencia.php — Modelo de Asistencias
@@ -120,6 +121,70 @@ class IngresoAsistencia
     }
 
     /**
+     * Registra una asistencia con cálculo de retardo.
+     *
+     * Calcula los minutos de retardo comparando la hora actual con la hora base
+     * (hora_inicio de la sesión) + 10 minutos de tolerancia.
+     *
+     * @return array{ok: bool, estado: string, minutos_retardo: int, mensaje: string}
+     */
+    public function registrarEntradaConRetardo(
+        int    $usuarioId,
+        int    $sesionId,
+        int    $registradoPor,
+        string $horaInicioSesion,
+        ?string $codigoLlavero = null
+    ): array {
+        $ahora       = new \DateTime();
+        $horaBase    = new \DateTime($horaInicioSesion);
+        $tolerancia  = (clone $horaBase)->modify('+10 minutes');
+
+        $minutosRetardo = 0;
+        $estadoTexto    = 'Asistió';
+
+        if ($ahora > $tolerancia) {
+            $diff           = $tolerancia->diff($ahora);
+            $minutosRetardo = ($diff->h * 60) + $diff->i;
+            $estadoTexto    = 'Retardo';
+        }
+
+        $sql = "INSERT INTO {$this->table}
+                    (fecha, hora_entrada, Usuario_id, Sesion_id, registrado_por,
+                     codigo_llavero, estado, minutos_retardo)
+                VALUES
+                    (CURDATE(), CURTIME(), :usuario_id, :sesion_id, :registrado_por,
+                     :codigo_llavero, 'Activo', :minutos_retardo)";
+        $stmt = $this->conn->prepare($sql);
+        $ok   = $stmt->execute([
+            ':usuario_id'      => $usuarioId,
+            ':sesion_id'       => $sesionId,
+            ':registrado_por'  => $registradoPor,
+            ':codigo_llavero'  => $codigoLlavero,
+            ':minutos_retardo' => $minutosRetardo,
+        ]);
+
+        if (!$ok) {
+            return [
+                'ok'              => false,
+                'estado'          => 'Error',
+                'minutos_retardo' => 0,
+                'mensaje'         => 'No se pudo registrar la asistencia.',
+            ];
+        }
+
+        $msg = $minutosRetardo > 0
+            ? "Retardo de {$minutosRetardo} minuto(s)."
+            : 'Asistencia registrada a tiempo.';
+
+        return [
+            'ok'              => true,
+            'estado'          => $estadoTexto,
+            'minutos_retardo' => $minutosRetardo,
+            'mensaje'         => $msg,
+        ];
+    }
+
+    /**
      * Marca la salida de una asistencia
      */
     public function registrarSalida(int $asistenciaId): bool
@@ -129,6 +194,42 @@ class IngresoAsistencia
                 WHERE id = :id";
         $stmt = $this->conn->prepare($sql);
         return $stmt->execute([':id' => $asistenciaId]);
+    }
+
+    /**
+     * Verifica si un usuario ya tiene un registro de asistencia en una sesión específica.
+     */
+    public function existeRegistroEnSesion(int $usuarioId, int $sesionId): bool
+    {
+        $sql = "SELECT COUNT(*) AS total
+                FROM {$this->table}
+                WHERE Usuario_id = :usuario_id
+                  AND Sesion_id  = :sesion_id";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':usuario_id' => $usuarioId,
+            ':sesion_id'  => $sesionId,
+        ]);
+        return ((int) $stmt->fetch()['total']) > 0;
+    }
+
+    /**
+     * Obtiene las marcaciones de hoy para una sesión específica.
+     * Usado para la tabla en tiempo real de la vista RFID.
+     */
+    public function getMarcacionesPorSesion(int $sesionId): array
+    {
+        $sql = "SELECT a.*,
+                       u.nombre, u.apellido, u.identificacion,
+                       f.codigo AS codigo_ficha
+                FROM {$this->table} a
+                INNER JOIN Usuario u ON a.Usuario_id = u.id
+                LEFT  JOIN Ficha f   ON u.Ficha_id   = f.id
+                WHERE a.Sesion_id = :sesion_id
+                ORDER BY a.hora_entrada DESC";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':sesion_id' => $sesionId]);
+        return $stmt->fetchAll();
     }
 
     /**

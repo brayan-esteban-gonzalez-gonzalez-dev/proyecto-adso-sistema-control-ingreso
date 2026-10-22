@@ -15,7 +15,7 @@
 
     <script src="<?= BASE_URL ?>assets/js/app.js"></script>
 <?php if (isset($loadRfidJs) && $loadRfidJs): ?>
-    <script src="<?= BASE_URL ?>assets/js/rfid.js"></script>
+    <script src="<?= BASE_URL ?>assets/js/rfid.js?v=<?= file_exists(ROOT_PATH . '/assets/js/rfid.js') ? filemtime(ROOT_PATH . '/assets/js/rfid.js') : '1.0' ?>"></script>
 <?php endif; ?>
 </body>
 </html>

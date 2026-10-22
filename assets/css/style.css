@@ -1731,3 +1731,288 @@ hr {
         grid-column: 2;
     }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   TERMINAL RFID — CONTROL DE ASISTENCIA & TOGGLE INSTRUCTOR
+   ══════════════════════════════════════════════════════════════════════════════ */
+.rfid-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.rfid-clock {
+    text-align: center;
+    padding: 20px 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.rfid-clock-time {
+    font-size: 2.6rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: var(--accent-blue);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+
+.rfid-clock-date {
+    font-size: 0.92rem;
+    color: var(--text-secondary);
+    margin-top: 6px;
+}
+
+.rfid-fichas-panel .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+}
+
+.rfid-fichas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.rfid-ficha-card {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: var(--transition);
+}
+
+.rfid-ficha-card:hover {
+    border-color: var(--border-input);
+    transform: translateY(-2px);
+}
+
+.rfid-ficha-card.rfid-ficha-active {
+    border-color: var(--accent-green);
+    background: rgba(16, 185, 129, 0.05);
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.15);
+}
+
+.rfid-ficha-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.rfid-ficha-code {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.5px;
+}
+
+.rfid-ficha-program {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+}
+
+.rfid-ficha-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: auto;
+}
+
+.rfid-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+
+.rfid-status-active {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--accent-green);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.rfid-status-inactive {
+    background: rgba(100, 116, 139, 0.15);
+    color: var(--text-muted);
+    border: 1px solid rgba(100, 116, 139, 0.25);
+}
+
+.rfid-pulse-dot {
+    font-size: 0.55rem;
+    color: var(--accent-green);
+    animation: rfidPulse 1.5s infinite ease-in-out;
+}
+
+@keyframes rfidPulse {
+    0%   { opacity: 1; transform: scale(1); }
+    50%  { opacity: 0.25; transform: scale(0.8); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+.rfid-toggle-btn {
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.rfid-toggle-on {
+    background: var(--accent-green);
+    color: #ffffff;
+}
+
+.rfid-toggle-on:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 2px 12px rgba(16, 185, 129, 0.4);
+}
+
+.rfid-toggle-off {
+    background: var(--accent-red);
+    color: #ffffff;
+}
+
+.rfid-toggle-off:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 2px 12px rgba(239, 68, 68, 0.4);
+}
+
+.rfid-toggle-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.rfid-ficha-meta {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    padding-top: 6px;
+    border-top: 1px dashed var(--border-color);
+}
+
+.rfid-hidden-input {
+    position: fixed;
+    top: -100px;
+    left: -100px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* ─── Feedback Flotante ─── */
+.rfid-feedback {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 9999;
+    max-width: 440px;
+    min-width: 320px;
+}
+
+.rfid-feedback-inner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
+}
+
+.rfid-feedback-success {
+    background: rgba(16, 185, 129, 0.18);
+    border: 1px solid var(--accent-green);
+    color: var(--text-primary);
+}
+
+.rfid-feedback-success .rfid-feedback-icon {
+    color: var(--accent-green);
+    font-size: 1.8rem;
+}
+
+.rfid-feedback-error {
+    background: rgba(239, 68, 68, 0.18);
+    border: 1px solid var(--accent-red);
+    color: var(--text-primary);
+}
+
+.rfid-feedback-error .rfid-feedback-icon {
+    color: var(--accent-red);
+    font-size: 1.8rem;
+}
+
+.rfid-feedback-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.rfid-feedback-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.rfid-feedback-msg {
+    font-size: 0.83rem;
+    color: var(--text-secondary);
+}
+
+/* ─── Animaciones ─── */
+@keyframes slideDown {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes rowHighlight {
+    0% {
+        background-color: rgba(16, 185, 129, 0.3);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+.rfid-new-row {
+    animation: rowHighlight 3s ease-out;
+}
+
