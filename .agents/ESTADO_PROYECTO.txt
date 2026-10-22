@@ -156,24 +156,36 @@ MODULO / COMPONENTE                     ESTADO       OBSERVACIONES EJECUTIVAS
                                                      Rutas y menu lateral activos.
                                                      Migracion 004 para codigo.
 
-10. Terminal de Marcacion RFID          [PARCIAL]    Vista rfid.php y enlace de menu.
+~~10. Terminal de Marcacion RFID          [PARCIAL]    Vista rfid.php y enlace de menu.
                                                      AsistenciaController no tiene
                                                      rfid() ni registrarMarcacion().
                                                      No existe assets/js/rfid.js.
-                                                     El enlace responde 404.
+                                                     El enlace responde 404.~~
+10. Terminal de Marcacion RFID          [OPERATIVO]  Implementado (2026-10-22):
+                                                     Toggle de asistencia por ficha,
+                                                     captura automática lector USB,
+                                                     assets/js/rfid.js, feedback visual.
 
 11. Gestion y Revision de Excusas       [PARCIAL]    Listado, aprobacion y rechazo
                                                      operativos. form.php sigue pidiendo
                                                      fecha_inicio y fecha_fin, ajenos
                                                      a la tabla excusa.
 
-12. Motor de Reglas de Asistencia       [PENDIENTE]  Regla de retardo de 10 minutos
+~~12. Motor de Reglas de Asistencia       [PENDIENTE]  Regla de retardo de 10 minutos
                                                      desde inicio o registro del
-                                                     instructor. No implementada.
+                                                     instructor. No implementada.~~
+12. Motor de Reglas de Asistencia       [OPERATIVO]  Implementado (2026-10-22):
+                                                     Tolerancia de 10 minutos calculada
+                                                     desde la hora_inicio de la sesión
+                                                     activa en IngresoAsistencia.
 
-13. Generacion de Inasistencias         [PENDIENTE]  Cierre de sesion y marcacion
+~~13. Generacion de Inasistencias         [PENDIENTE]  Cierre de sesion y marcacion
                                                      automatica en tabla inasistencia
-                                                     para aprendices sin marca.
+                                                     para aprendices sin marca.~~
+13. Generacion de Inasistencias         [OPERATIVO]  Implementado (2026-10-22):
+                                                     Cierre de sesión formal (toggle OFF)
+                                                     con transacción atómica que inserta
+                                                     en la tabla inasistencia.
 
 14. Doble Aprobacion de Excusas         [PENDIENTE]  Consenso cuando dos o mas
                                                      instructores comparten ficha.
