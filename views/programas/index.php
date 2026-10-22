@@ -48,12 +48,18 @@
                                class="btn btn-sm btn-secondary" title="Editar">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            <a href="<?= BASE_URL ?>?action=programas/eliminar&id=<?= (int) $p['id'] ?>"
-                               class="btn btn-sm btn-danger"
-                               data-confirm="¿Eliminar el programa <?= htmlspecialchars($p['nombre']) ?>?"
-                               title="Eliminar">
-                                <i class="fas fa-trash"></i>
-                            </a>
+<?php if ((int)($p['total_fichas'] ?? 0) > 0): ?>
+    <button class="btn btn-sm btn-danger" disabled title="No se puede eliminar, tiene fichas vinculadas">
+        <i class="fas fa-trash"></i>
+    </button>
+<?php else: ?>
+    <a href="<?= BASE_URL ?>?action=programas/eliminar&id=<?= (int) $p['id'] ?>"
+       class="btn btn-sm btn-danger"
+       data-confirm="¿Eliminar el programa <?= htmlspecialchars($p['nombre']) ?>?"
+       title="Eliminar">
+        <i class="fas fa-trash"></i>
+    </a>
+<?php endif; ?>
                         </div>
                     </td>
                 </tr>

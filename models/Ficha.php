@@ -18,7 +18,7 @@ class Ficha {
      * Obtiene todas las fichas con programa, jornada e instructor
      */
     public function getAll(): array {
-        $sql = "SELECT f.*,
+        $sql = "SELECT f.*, p.codigo AS programa_codigo,
                        p.nombre AS nombre_programa,
                        p.descripcion AS descripcion_programa,
                        j.nombre AS nombre_jornada,
@@ -146,10 +146,10 @@ class Ficha {
     }
 
     /**
-     * Obtiene todos los programas disponibles
+     * Obtiene todos los programas activos disponibles
      */
     public function getProgramas(): array {
-        $sql = "SELECT * FROM Programa ORDER BY nombre";
+        $sql = "SELECT * FROM Programa WHERE estado = 'Activo' ORDER BY nombre";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll();

@@ -34,8 +34,10 @@ CREATE TABLE IF NOT EXISTS `Rol` (
 DROP TABLE IF EXISTS `Programa`;
 CREATE TABLE IF NOT EXISTS `Programa` (
   `id` INT NOT NULL AUTO_INCREMENT,
-  `codigo` VARCHAR(20) NULL,
+  `codigo` VARCHAR(20) NOT NULL,
   `nombre` VARCHAR(100) NOT NULL,
+  `nivel_formacion` VARCHAR(50) NOT NULL,
+  `estado` ENUM('Activo','Inactivo') NOT NULL DEFAULT 'Activo',
   `descripcion` TEXT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_programa_codigo` (`codigo`)

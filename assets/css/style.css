@@ -987,41 +987,42 @@ textarea.form-control {
     position: relative;
     overflow-x: hidden;
     overflow-y: auto;
-    background: #0b0d13;
+    background: transparent;
     margin: 0 auto;
     box-sizing: border-box;
+    z-index: 1;
 }
 
-/* Fondo con imagen y blur mínimo */
+/* Fondo con imagen y blur sutil */
 .auth-layout::before {
     content: '';
     position: fixed;
     inset: -20px;
     background: url('../img/login.jpg') center center / cover no-repeat;
-    filter: blur(4px);
-    transform: scale(1.05);
-    z-index: 0;
+    filter: blur(2px);
+    transform: scale(1.04);
+    z-index: 1;
 }
 
-/* Capa de contraste y matiz oscuro sobre la imagen de fondo */
+/* Capa de contraste equilibrada para no tapar la imagen */
 .auth-layout::after {
     content: '';
     position: fixed;
     inset: 0;
     background: radial-gradient(
         circle at 50% 45%,
-        rgba(15, 17, 23, 0.65) 0%,
-        rgba(15, 17, 23, 0.85) 100%
+        rgba(15, 17, 23, 0.35) 0%,
+        rgba(15, 17, 23, 0.55) 100%
     );
-    backdrop-filter: brightness(0.9);
-    -webkit-backdrop-filter: brightness(0.9);
-    z-index: 1;
+    backdrop-filter: brightness(0.95);
+    -webkit-backdrop-filter: brightness(0.95);
+    z-index: 2;
 }
 
 /* Card flotante centrada */
 .login-card {
     position: relative;
-    z-index: 2;
+    z-index: 10;
     width: 100%;
     max-width: 430px;
     margin: auto;

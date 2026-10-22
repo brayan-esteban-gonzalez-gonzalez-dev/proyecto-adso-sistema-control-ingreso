@@ -84,4 +84,14 @@ class Programa {
         $stmt->execute([':id' => $id]);
         return (int) $stmt->fetch()['total'];
     }
-}
+    /**
+     * Obtiene los programas activos.
+     */
+    public function obtenerActivos(): array {
+        $sql = "SELECT * FROM {$this->table} WHERE estado = 'Activo' ORDER BY nombre";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    }
