@@ -42,15 +42,14 @@ FASE 1: ESTABILIZACION OPERATIVA Y CIERRE DE BLOQUEOS [PRIORIDAD CRITICA]
 Objetivo: Eliminar enlaces con error 404 y subsanar inconsistencias entre
 interfaces y el modelo relacional actual.
 
-[CRITICA-01] Alineacion de Interfaz de Excusas (views/excusas/form.php)
+~~[CRITICA-01] Alineacion de Interfaz de Excusas (views/excusas/form.php)~~ [IMPLEMENTADO 2026-10-22]
   - Problema: El formulario solicita actualmente 'fecha_inicio' y 'fecha_fin',
     campos que no existen en la tabla 'excusa' de la base de datos oficial.
   - Accion requerida:
-    1. Reemplazar inputs de rango de fechas por un campo unico 'fecha'.
-    2. Incorporar selector dinamico de la sesion o inasistencia asociada
-       (Inasistencia_id o Asistencia_id) sobre la cual el aprendiz justifica.
-    3. Asegurar envio correcto hacia ExcusaController::guardar().
-  - Archivos: views/excusas/form.php, controllers/ExcusaController.php.
+    1. Reemplazar inputs de rango de fechas por selector obligatorio de inasistencia (Inasistencia_id).
+    2. Validar pertenencia de inasistencia al aprendiz autenticado y tipo MIME real de archivo adjunto (máx 2MB).
+    3. Asegurar envio correcto hacia ExcusaController::guardar() y panel de revision de instructor.
+  - Archivos: views/excusas/form.php, views/excusas/revisar.php, controllers/ExcusaController.php, models/ExcusaMedica.php, models/IngresoAsistencia.php.
 
 ~~[CRITICA-02] Implementacion del Flujo de Marcacion RFID (Backend)~~ [IMPLEMENTADO 2026-10-22]
   - Problema: El menu lateral conduce a ?action=asistencia/rfid, pero
