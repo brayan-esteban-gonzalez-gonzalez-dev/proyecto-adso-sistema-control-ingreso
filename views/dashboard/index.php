@@ -60,8 +60,8 @@
         <?php endif; ?>
     </div>
 
-    <!-- Tarjeta: Excusas Pendientes -->
-    <?php if (Auth::isAdminOrInstructor()): ?>
+    <!-- Tarjeta: Excusas Pendientes (solo Instructor) -->
+    <?php if (Auth::isInstructor()): ?>
     <div class="stat-card">
         <div class="stat-card-icon" style="background: linear-gradient(135deg, #ef4444, #f87171);">
             <i class="fas fa-file-medical"></i>
@@ -88,18 +88,22 @@
             <i class="fas fa-user-plus"></i>
             <span>Nuevo Usuario</span>
         </a>
+        <?php if (Auth::isAdmin()): ?>
         <a href="<?= BASE_URL ?>?action=fichas/crear" class="quick-action-btn">
             <i class="fas fa-folder-plus"></i>
             <span>Nueva Ficha</span>
         </a>
+        <?php endif; ?>
         <a href="<?= BASE_URL ?>?action=aprendices/crear" class="quick-action-btn">
             <i class="fas fa-user-graduate"></i>
             <span>Nuevo Aprendiz</span>
         </a>
+        <?php if (Auth::isInstructor()): ?>
         <a href="<?= BASE_URL ?>?action=excusas&filtro=pendientes" class="quick-action-btn">
             <i class="fas fa-file-medical"></i>
             <span>Excusas Pendientes</span>
         </a>
+        <?php endif; ?>
         <?php if (Auth::isInstructor()): ?>
         <a href="<?= BASE_URL ?>?action=horarios/miHorario" class="quick-action-btn">
             <i class="fas fa-calendar-week"></i>

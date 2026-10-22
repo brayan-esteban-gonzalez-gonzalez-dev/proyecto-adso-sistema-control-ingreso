@@ -13,19 +13,26 @@ class FichaController {
         $this->model = new Ficha($db);
     }
     /**
-     * Lista todas las fichas
+     * Lista las fichas (todas para Administrador, asignadas para Instructor)
      */
     public function index(): void {
         Auth::requireAdmin();
-        $fichas    = $this->model->getAll();
-        $pageTitle = 'Gestión de Fichas';
+
+        if (Auth::isInstructor()) {
+            $fichas    = $this->model->getByInstructorAsignado((int) Auth::getUserId());
+            $pageTitle = 'Mis Fichas Asignadas';
+        } else {
+            $fichas    = $this->model->getAll();
+            $pageTitle = 'Gestión de Fichas';
+        }
+
         require_once ROOT_PATH . '/views/fichas/index.php';
     }
     /**
      * Formulario de creación
      */
     public function crear(): void {
-        Auth::requireAdmin();
+        Auth::requireAdminOnly();
         $usuarioModel = new Usuario($this->db);
         $instructores = $usuarioModel->getInstructores();
         $programas    = $this->model->getProgramas();
@@ -39,7 +46,7 @@ class FichaController {
      * Formulario de edición
      */
     public function editar(): void {
-        Auth::requireAdmin();
+        Auth::requireAdminOnly();
         $id    = (int) ($_GET['id'] ?? 0);
         $ficha = $this->model->getById($id);
 
@@ -62,7 +69,7 @@ class FichaController {
      * Guarda una ficha
      */
     public function guardar(): void {
-        Auth::requireAdmin();
+        Auth::requireAdminOnly();
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             header('Location: ' . BASE_URL . '?action=fichas');
@@ -120,7 +127,7 @@ class FichaController {
      * Elimina una ficha
      */
     public function eliminar(): void {
-        Auth::requireAdmin();
+        Auth::requireAdminOnly();
         $id = (int) ($_GET['id'] ?? 0);
 
         try {
@@ -132,5 +139,35 @@ class FichaController {
 
         header('Location: ' . BASE_URL . '?action=fichas');
         exit;
+    }
+
+    /**
+     * Muestra el listado de aprendices e instructores vinculados a una ficha
+     */
+    public function integrantes(): void {
+        Auth::requireAdmin();
+        $id    = (int) ($_GET['id'] ?? 0);
+        $ficha = $this->model->getById($id);
+
+        if (!$ficha) {
+            Auth::setFlash('error', 'Ficha no encontrada.');
+            header('Location: ' . BASE_URL . '?action=fichas');
+            exit;
+        }
+
+        // Si es instructor, validar que la ficha le esté asignada
+        if (Auth::isInstructor()) {
+            $instructorId = (int) Auth::getUserId();
+            if (!$this->model->perteneceAInstructor($id, $instructorId)) {
+                Auth::setFlash('error', 'No tienes permisos para consultar los integrantes de esta ficha.');
+                header('Location: ' . BASE_URL . '?action=fichas');
+                exit;
+            }
+        }
+
+        $aprendices   = $this->model->getAprendices($id);
+        $instructores = $this->model->getInstructoresVinculados($id);
+        $pageTitle    = 'Integrantes de la Ficha ' . ($ficha['codigo'] ?? '');
+        require_once ROOT_PATH . '/views/fichas/integrantes.php';
     }
 }

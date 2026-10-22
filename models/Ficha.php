@@ -174,4 +174,100 @@ class Ficha {
         $stmt->execute();
         return $stmt->fetchAll();
     }
+
+    /**
+     * Obtiene las fichas asignadas a un instructor (líder o con sesiones asignadas)
+     */
+    public function getByInstructorAsignado(int $instructorId): array {
+        $sql = "SELECT f.*,
+                       p.nombre AS nombre_programa,
+                       p.descripcion AS descripcion_programa,
+                       j.nombre AS nombre_jornada,
+                       CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor,
+                       (SELECT COUNT(*) FROM Usuario a WHERE a.Ficha_id = f.id AND a.Rol_id = 3) AS total_aprendices
+                FROM {$this->table} f
+                INNER JOIN Programa p ON f.Programa_id = p.id
+                LEFT JOIN jornada j ON f.jornada_id = j.id
+                LEFT JOIN Usuario u ON f.instructor_id = u.id
+                WHERE f.instructor_id = :instructor_id
+                   OR EXISTS (SELECT 1 FROM sesion s WHERE s.Ficha_id = f.id AND s.Instructor_id = :instructor_id_sesion)
+                ORDER BY f.codigo";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':instructor_id'        => $instructorId,
+            ':instructor_id_sesion' => $instructorId,
+        ]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Verifica si una ficha está asignada a un instructor (como líder o con sesiones)
+     */
+    public function perteneceAInstructor(int $fichaId, int $instructorId): bool {
+        $sql = "SELECT 1 FROM {$this->table} f
+                WHERE f.id = :ficha_id 
+                  AND (f.instructor_id = :instructor_id 
+                       OR EXISTS (SELECT 1 FROM sesion s WHERE s.Ficha_id = f.id AND s.Instructor_id = :instructor_id_sesion))
+                LIMIT 1";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':ficha_id'             => $fichaId,
+            ':instructor_id'        => $instructorId,
+            ':instructor_id_sesion' => $instructorId,
+        ]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    /**
+     * Obtiene los aprendices vinculados a una ficha
+     */
+    public function getAprendices(int $fichaId): array {
+        $sql = "SELECT u.id, u.identificacion, u.nombre, u.apellido, u.email, u.codigo_llavero, u.estado
+                FROM Usuario u
+                WHERE u.Rol_id = 3 AND u.Ficha_id = :ficha_id
+                ORDER BY u.apellido ASC, u.nombre ASC";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':ficha_id' => $fichaId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Obtiene todos los instructores vinculados a la ficha (líder e instructores de sesiones)
+     */
+    public function getInstructoresVinculados(int $fichaId): array {
+        $sqlLider = "SELECT u.id, u.identificacion, u.nombre, u.apellido, u.email, u.estado,
+                            'Instructor Líder' AS rol_en_ficha
+                     FROM {$this->table} f
+                     INNER JOIN Usuario u ON f.instructor_id = u.id
+                     WHERE f.id = :ficha_id";
+        $stmtLider = $this->conn->prepare($sqlLider);
+        $stmtLider->execute([':ficha_id' => $fichaId]);
+        $lider = $stmtLider->fetch();
+
+        $sqlSesiones = "SELECT DISTINCT u.id, u.identificacion, u.nombre, u.apellido, u.email, u.estado,
+                               'Instructor de Sesión' AS rol_en_ficha
+                        FROM sesion s
+                        INNER JOIN Usuario u ON s.Instructor_id = u.id
+                        WHERE s.Ficha_id = :ficha_id";
+        $stmtSesiones = $this->conn->prepare($sqlSesiones);
+        $stmtSesiones->execute([':ficha_id' => $fichaId]);
+        $instructoresSesion = $stmtSesiones->fetchAll();
+
+        $instructores = [];
+        $idsRegistrados = [];
+
+        if ($lider) {
+            $instructores[] = $lider;
+            $idsRegistrados[] = (int) $lider['id'];
+        }
+
+        foreach ($instructoresSesion as $inst) {
+            if (!in_array((int) $inst['id'], $idsRegistrados, true)) {
+                $instructores[] = $inst;
+                $idsRegistrados[] = (int) $inst['id'];
+            }
+        }
+
+        return $instructores;
+    }
 }

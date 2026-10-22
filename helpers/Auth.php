@@ -133,6 +133,19 @@ class Auth {
     }
 
     /**
+     * Redirige si el usuario no es estrictamente Administrador (rol 1)
+     */
+    public static function requireAdminOnly(string $redirectTo = 'fichas'): void {
+        self::requireLogin();
+        if (!self::isAdmin()) {
+            self::setFlash('error', 'Acceso denegado: solo el Administrador tiene permisos para realizar esta acción.');
+            $destination = self::isAdminOrInstructor() ? $redirectTo : 'dashboard';
+            header('Location: ' . BASE_URL . '?action=' . $destination);
+            exit;
+        }
+    }
+
+    /**
      * Genera un token CSRF y lo almacena en sesión
      */
     public static function generateCSRF(): string {

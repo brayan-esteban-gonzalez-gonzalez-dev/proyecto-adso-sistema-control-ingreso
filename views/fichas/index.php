@@ -7,11 +7,13 @@
             <input type="text" placeholder="Buscar ficha..." data-search-table="tablaFichas">
         </div>
     </div>
+    <?php if (Auth::isAdmin()): ?>
     <div class="toolbar-right">
         <a href="<?= BASE_URL ?>?action=fichas/crear" class="btn btn-primary">
             <i class="fas fa-plus"></i> Nueva Ficha
         </a>
     </div>
+    <?php endif; ?>
 </div>
 
 <div class="card">
@@ -41,10 +43,19 @@
                     <td><span class="badge badge-purple"><?= htmlspecialchars($jornada) ?></span></td>
                     <td><?= !empty($f['nombre_instructor']) ? htmlspecialchars($f['nombre_instructor']) : '<span class="text-muted">Sin asignar</span>' ?></td>
                     <td>
-                        <span class="badge badge-blue"><?= $f['total_aprendices'] ?? 0 ?></span>
+                        <a href="<?= BASE_URL ?>?action=fichas/integrantes&id=<?= $id ?>" 
+                           class="badge badge-blue" 
+                           title="Ver aprendices vinculados" style="text-decoration: none;">
+                            <?= $f['total_aprendices'] ?? 0 ?>
+                        </a>
                     </td>
                     <td>
                         <div class="btn-group">
+                            <a href="<?= BASE_URL ?>?action=fichas/integrantes&id=<?= $id ?>" 
+                               class="btn btn-sm btn-info" title="Ver aprendices e instructores">
+                                <i class="fas fa-users"></i>
+                            </a>
+                            <?php if (Auth::isAdmin()): ?>
                             <a href="<?= BASE_URL ?>?action=fichas/editar&id=<?= $id ?>" 
                                class="btn btn-sm btn-secondary" title="Editar">
                                 <i class="fas fa-edit"></i>
@@ -55,6 +66,7 @@
                                title="Eliminar">
                                 <i class="fas fa-trash"></i>
                             </a>
+                            <?php endif; ?>
                         </div>
                     </td>
                 </tr>
@@ -65,10 +77,12 @@
     <?php else: ?>
     <div class="empty-state">
         <i class="fas fa-folder-open"></i>
-        <p>No hay fichas registradas</p>
+        <p><?= Auth::isInstructor() ? 'No tienes fichas asignadas actualmente' : 'No hay fichas registradas' ?></p>
+        <?php if (Auth::isAdmin()): ?>
         <a href="<?= BASE_URL ?>?action=fichas/crear" class="btn btn-primary mt-2">
             <i class="fas fa-plus"></i> Crear primera ficha
         </a>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>
