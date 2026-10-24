@@ -9,12 +9,17 @@
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
+require_once ROOT_PATH . '/helpers/HorarioParser.php';
+require_once ROOT_PATH . '/helpers/HorarioValidator.php';
+
 class HorarioController
 {
     private PDO $db;
     private Sesion $sesionModel;
     private Ficha $fichaModel;
     private Usuario $usuarioModel;
+    private HorarioParser $horarioParser;
+    private HorarioValidator $horarioValidator;
 
     public function __construct(PDO $db)
     {
@@ -22,6 +27,8 @@ class HorarioController
         $this->sesionModel = new Sesion($db);
         $this->fichaModel = new Ficha($db);
         $this->usuarioModel = new Usuario($db);
+        $this->horarioParser = new HorarioParser();
+        $this->horarioValidator = new HorarioValidator();
     }
 
     /**
@@ -294,15 +301,25 @@ class HorarioController
         }
 
         try {
-            $reader = IOFactory::createReaderForFile($fileTmp);
-            $reader->setReadDataOnly(false);
-            $spreadsheet = $reader->load($fileTmp);
-            $sheet = $spreadsheet->getActiveSheet();
+            $parseResult = $this->horarioParser->parsear($fileTmp, [
+                'tipo' => 'ficha',
+                'año'  => (int)date('Y'),
+            ]);
 
-            $resultado = $this->parsearExcelHorarios($sheet);
+            // Validación (Tarea A.2)
+            $validacion = $this->horarioValidator->validar($parseResult['bloques'] ?? []);
 
+            if (!$validacion['valido']) {
+                $pageTitle = 'Errores de Validación';
+                $errores = $validacion['errores'];
+                require_once ROOT_PATH . '/views/horarios/errores_validacion.php';
+                exit;
+            }
+
+            $resultado = $parseResult;
             $pageTitle = 'Resultado de la Importación';
             require_once ROOT_PATH . '/views/horarios/resultado.php';
+
         } catch (Exception $e) {
             Auth::setFlash('error', 'Error al procesar el archivo Excel: ' . $e->getMessage());
             header('Location: ' . BASE_URL . '?action=horarios/importar');
