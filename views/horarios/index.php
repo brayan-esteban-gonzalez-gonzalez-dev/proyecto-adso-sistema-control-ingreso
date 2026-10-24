@@ -25,10 +25,21 @@
         <a href="<?= BASE_URL ?>?action=horarios/miHorario" class="btn btn-secondary">
             <i class="fas fa-calendar-week"></i> Mi calendario
         </a>
+        <a href="<?= BASE_URL ?>?action=horarios/permutas" class="btn btn-secondary">
+            <i class="fas fa-arrows-rotate"></i> Permutas
+        </a>
+        <?php endif; ?>
+        <?php if (Auth::isAdmin()): ?>
+        <a href="<?= BASE_URL ?>?action=horarios/permutas" class="btn btn-secondary">
+            <i class="fas fa-arrows-rotate"></i> Auditoría Permutas
+        </a>
         <?php endif; ?>
         <?php if (Auth::isAdminOrInstructor()): ?>
+        <a href="<?= BASE_URL ?>?action=horarios/crear<?= $fichaId ? '&ficha_id='.$fichaId : '' ?>" class="btn btn-success">
+            <i class="fas fa-plus-circle"></i> Nueva Sesión
+        </a>
         <a href="<?= BASE_URL ?>?action=horarios/importar" class="btn btn-primary">
-            <i class="fas fa-file-excel"></i> Importar Horarios desde Excel
+            <i class="fas fa-file-excel"></i> Importar Excel
         </a>
         <?php endif; ?>
     </div>
@@ -118,18 +129,29 @@
                             <span class="badge badge-green">Activo</span>
                         <?php elseif ($s['estado'] === 'Finalizada'): ?>
                             <span class="badge badge-secondary">Finalizada</span>
+                        <?php elseif ($s['estado'] === 'Permutado'): ?>
+                            <span class="badge badge-purple" title="Sesión modificada por permuta">Permutado</span>
+                        <?php elseif ($s['estado'] === 'Cancelado'): ?>
+                            <span class="badge badge-danger">Cancelado</span>
                         <?php else: ?>
-                            <span class="badge badge-danger"><?= htmlspecialchars($s['estado']) ?></span>
+                            <span class="badge badge-outline"><?= htmlspecialchars($s['estado']) ?></span>
                         <?php endif; ?>
                     </td>
                     <?php if (Auth::isAdminOrInstructor()): ?>
                     <td>
-                        <a href="<?= BASE_URL ?>?action=horarios/eliminar&id=<?= $s['id'] ?><?= $fichaId ? '&ficha_id='.$fichaId : '' ?>" 
-                           class="btn btn-sm btn-danger" 
-                           data-confirm="¿Estás seguro de eliminar esta sesión de clase?"
-                           title="Eliminar sesión">
-                            <i class="fas fa-trash"></i>
-                        </a>
+                        <div style="display: flex; gap: 6px;">
+                            <a href="<?= BASE_URL ?>?action=horarios/editar&id=<?= $s['id'] ?>" 
+                               class="btn btn-sm btn-secondary" 
+                               title="Editar sesión">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="<?= BASE_URL ?>?action=horarios/eliminar&id=<?= $s['id'] ?><?= $fichaId ? '&ficha_id='.$fichaId : '' ?>" 
+                               class="btn btn-sm btn-danger" 
+                               data-confirm="¿Estás seguro de eliminar esta sesión de clase?"
+                               title="Eliminar sesión">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
                     </td>
                     <?php endif; ?>
                 </tr>
