@@ -31,9 +31,9 @@ class HorarioController
     {
         Auth::requireLogin();
 
-        $pageTitle = 'Gestión de Horarios';
+        $pageTitle = 'Gestion de Horarios';
         $fichaId = isset($_GET['ficha_id']) && !empty($_GET['ficha_id']) ? (int)$_GET['ficha_id'] : null;
-
+        
         $fichas = $this->fichaModel->getAll();
 
         if ($fichaId) {

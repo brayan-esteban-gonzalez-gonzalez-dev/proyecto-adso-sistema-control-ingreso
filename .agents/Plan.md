@@ -127,3 +127,89 @@ Cada uno trae mi propuesta para que solo la confirmes o la cambies.
 4. **Permisos de subida.** ¿El administrador también puede subir el horario de una ficha? ¿Un instructor que no es líder puede? Propongo que el administrador sí, que el instructor no líder no, y que el líder solo suba el de su ficha.
 5. **Permutas revertidas cuando sube el líder.** Confirma el administrador (RF-HOR-15). Propongo que el archivo quede pendiente hasta que confirme.
 6. **Jornadas que no miden 6 horas.** Propongo bloques de 3 horas desde el inicio de la jornada y que el último pueda ser más corto.
+
+### Desarrollo
+
+Estrategia de división de tareas en dos frentes de trabajo paralelos e independientes para dos desarrolladores. Para evitar bloqueos y conflictos de Git, se define un contrato previo de base de datos (migración `007`) y se modulariza el procesamiento de archivos separándolo de la gestión web.
+
+```
+       CONTRATO PREVIO COMPARTIDO (Migración 007: asignaciones, permutas y apertura real)
+                                   |
+         +-------------------------+-------------------------+
+         |                                                   |
+    DESARROLLADOR 1                                     DESARROLLADOR 2
+  [Track A: Motor de Ingesta,                         [Track B: CRUD Manual,
+   Validación y Sincronización Excel]                  Permutas, Vistas y Asistencia]
+         |                                                   |
+   - Parser de bloques de 3h (Ficha e Instructor)      - CRUD manual de sesiones (ALTA-04)
+   - Validador atómico multierror                      - Módulo de permutas y cesiones
+   - Algoritmo de sincronización diferencial           - Vistas de consulta por rol
+   - Reporte y auditoría de importación                - Apertura de asistencia sobre bloque
+```
+
+#### Contrato Compartido Previo: Esquema de Base de Datos
+*Punto de partida acordado antes de iniciar el código para que ninguno dependa del otro:*
+- **Migración `007-horarios-asignaciones-permutas.sql`**:
+  - Tabla `asignacion_instructor`: soporte para el horario semestral del instructor (`id`, `instructor_id`, `ficha_id`, `fecha`, `hora_inicio`, `hora_fin`, `estado`).
+  - Columnas en tabla `sesion`: `apertura_real` (TIME NULL), `cierre_real` (TIME NULL), ampliación de estados a `'Cancelado'` y `'Permutado'`.
+  - Tabla `permuta_sesion`: registro de solicitudes y resoluciones de intercambio/cesión entre instructores (`id`, `sesion_origen_id`, `sesion_destino_id`, `instructor_solicitante_id`, `instructor_receptor_id`, `estado`, `motivo`, `fecha_solicitud`, `fecha_resolucion`).
+
+---
+
+#### Desarrollador 1 — Track A: Motor de Ingesta, Validación y Sincronización Excel
+*Enfocado en el procesamiento masivo de datos, algoritmos de lectura matricial y reglas de consistencia.*
+
+- **Tarea A.1: Parser de Grilla y Bloques de 3 Horas** (RF-HOR-01 a 06, RF-HOR-36, RF-HOR-39)
+  - Detección de tipo de archivo (Ficha vs. Instructor de 6 meses) e identificación del código de ficha en encabezado.
+  - Agrupación de filas horarias en bloques de 3 horas acoplados a la jornada de la ficha.
+  - Procesamiento del año base (con transición automática diciembre a enero).
+  - *Archivos aislados*: `helpers/HorarioParser.php` o `models/HorarioExcel.php`.
+
+- **Tarea A.2: Motor de Validación Coherente Multierror** (RF-HOR-16 a 21, RF-HOR-38)
+  - Validación atómica: recolección de todas las inconsistencias antes de rechazar.
+  - Búsqueda normalizada de instructores en rol Instructor (sin crear temporales).
+  - Validación de cruces (instructor en dos fichas, ficha con dos bloques simultáneos, más de un instructor por bloque).
+  - Validación de jornada y formato de horas.
+  - Validación cruzada: verificar que el bloque de la ficha esté amparado en las asignaciones de 6 meses del instructor.
+
+- **Tarea A.3: Algoritmo de Sincronización y Protección de Sesiones** (RF-HOR-09 a 14, RF-HOR-40)
+  - Identificación de bloques por ficha, fecha y hora de inicio.
+  - Creación de nuevos bloques en estado `Activo`.
+  - Omisión estricta de bloques idénticos (cero escrituras redundantes).
+  - Actualización diferencial de instructores o descripciones modificadas.
+  - Cancelación lógica (estado `Cancelado`, sin borrado físico) de sesiones ausentes en el nuevo archivo.
+  - Blindaje de sesiones protegidas (aquellas con asistencias o inasistencias registradas).
+
+- **Tarea A.4: Registro, Reporte de Importación y Alerta de Permutas** (RF-HOR-07, 08, 15)
+  - Consolidación del log de importación (totales: creados, actualizados, omitidos, cancelados, protegidos).
+  - Detección de colisiones con permutas activas (RF-HOR-15) requiriendo confirmación de administrador.
+  - Interfaz de reporte post-subida.
+
+---
+
+#### Desarrollador 2 — Track B: CRUD Manual, Permutas, Vistas y Enlace con Asistencia
+*Enfocado en la interacción web, interfaz de usuario, operaciones manuales y conexión con el módulo de asistencia.*
+
+- **Tarea B.1: CRUD Manual de Sesiones Extraordinarias** (ALTA-04 / RF-HOR-22)
+  - Interfaz y endpoints para creación y edición individual de sesiones por Administrador e Instructor Líder.
+  - Validación de campos requeridos, jornada y prevención de solapamientos.
+  - Baja/cancelación de sesiones no iniciadas (impidiendo tocar sesiones con asistencia).
+  - *Archivos aislados*: `views/horarios/form.php`, métodos manuales en `controllers/HorarioController.php`.
+
+- **Tarea B.2: Módulo de Permutas y Cesiones entre Instructores** (RF-HOR-23 a 28, RF-HOR-43)
+  - Flujo de solicitud de intercambio de sesiones o cesión de bloque entre instructores.
+  - Bandeja interactiva para el instructor receptor (Aprobar / Rechazar).
+  - Transacción atómica de intercambio de instructores/bloques tras la aprobación mutua.
+  - Registro de auditoría (quién, cuándo, valores anteriores y motivo) y marcado de la sesión como permutada.
+
+- **Tarea B.3: Vistas de Consulta y Calendario por Rol** (RF-HOR-29 a 32)
+  - Vista Aprendiz: consulta de horario de ficha (semanal y mensual) en modo solo lectura.
+  - Vista Instructor: panel personal unificado (`miHorario`) con filtros por ficha asignada y estado.
+  - Vista Administrador: visualizador global con filtros de ficha e instructores.
+  - Renderizado visual distintivo para sesiones en estado `Cancelado` y `Permutado`.
+
+- **Tarea B.4: Integración Operativa con Asistencia y RFID** (RF-HOR-41, RF-HOR-42, RF-HOR-33 a 35)
+  - Apertura de toma de asistencia vinculada a la sesión programada existente (bloque activo).
+  - Registro de horas de apertura y cierre real en `sesion` sin alterar la hora programada del bloque.
+  - Cálculo de la hora base y regla de retardo de 10 minutos contra `MAX(hora_inicio_programada, apertura_real)`.
+  - Verificación de co-docencia en la jornada para regla de doble aprobación de excusas (RF-HOR-34).

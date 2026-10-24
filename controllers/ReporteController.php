@@ -15,8 +15,7 @@ class ReporteController {
         $this->db = $db;
         require_once ROOT_PATH . '/models/Reporte.php';
         $this->model = new Reporte($db);
-    }
-
+    }     
     /**
      * Muestra la interfaz de reportes institucionales
      */
