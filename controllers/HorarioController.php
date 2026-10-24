@@ -12,6 +12,7 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 require_once ROOT_PATH . '/helpers/HorarioParser.php';
 require_once ROOT_PATH . '/helpers/HorarioValidator.php';
 require_once ROOT_PATH . '/helpers/HorarioSincronizador.php';
+require_once ROOT_PATH . '/helpers/HorarioReporte.php';
 
 class HorarioController
 {
@@ -22,6 +23,7 @@ class HorarioController
     private HorarioParser $horarioParser;
     private HorarioValidator $horarioValidator;
     private HorarioSincronizador $horarioSincronizador;
+    private HorarioReporte $horarioReporte;
 
     public function __construct(PDO $db)
     {
@@ -32,6 +34,7 @@ class HorarioController
         $this->horarioParser = new HorarioParser();
         $this->horarioValidator = new HorarioValidator();
         $this->horarioSincronizador = new HorarioSincronizador($db);
+        $this->horarioReporte = new HorarioReporte();
     }
 
     /**
@@ -323,7 +326,13 @@ class HorarioController
             $fichaId = $this->fichaModel->getByCodigo($parseResult['meta']['codigo_ficha'] ?? 0)['id'] ?? 0;
             $reporteSincronizacion = $this->horarioSincronizador->sincronizar($parseResult['bloques'] ?? [], $fichaId);
 
-            $resultado = array_merge($parseResult, ['reporte' => $reporteSincronizacion]);
+            // Reporte consolidado (Tarea A.4)
+            $resultado = $this->horarioReporte->generarReporte(
+                $parseResult,
+                $validacion,
+                $reporteSincronizacion
+            );
+
             $pageTitle = 'Resultado de la Importación';
             require_once ROOT_PATH . '/views/horarios/resultado.php';
 
