@@ -300,13 +300,15 @@ class AsistenciaController {
             return;
         }
 
-        // 4. Registrar asistencia con cálculo de retardo
+        // 4. Registrar asistencia con cálculo de retardo (RF-HOR-42: hora base con apertura_real)
+        $aperturaReal = $sesionActiva['apertura_real'] ?? null;
         $resultado = $this->model->registrarEntradaConRetardo(
             $aprendizId,
             $sesionId,
             $instructorId,
             $horaInicio,
-            $rfidTag
+            $rfidTag,
+            $aperturaReal
         );
 
         $resultado['csrf_token'] = Auth::generateCSRF();

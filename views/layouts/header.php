@@ -98,6 +98,10 @@ $flash = Auth::getFlash();
             <?php else: ?>
             <div class="nav-section">
                 <span class="nav-section-title">Mi Información</span>
+                <a href="<?= BASE_URL ?>?action=horarios/miHorario" class="nav-link <?= str_starts_with($currentAction, 'horarios') ? 'active' : '' ?>">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Mi Horario</span>
+                </a>
                 <a href="<?= BASE_URL ?>?action=asistencia/historial" class="nav-link <?= $currentAction === 'asistencia/historial' ? 'active' : '' ?>">
                     <i class="fas fa-history"></i>
                     <span>Mi Historial</span>

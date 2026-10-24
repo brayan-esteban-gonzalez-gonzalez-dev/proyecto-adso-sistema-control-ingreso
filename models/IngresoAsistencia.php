@@ -153,10 +153,20 @@ class IngresoAsistencia
         int    $sesionId,
         int    $registradoPor,
         string $horaInicioSesion,
-        ?string $codigoLlavero = null
+        ?string $codigoLlavero = null,
+        ?string $aperturaReal = null
     ): array {
         $ahora       = new \DateTime();
         $horaBase    = new \DateTime($horaInicioSesion);
+        
+        // RF-HOR-42: El retardo de 10 minutos se cuenta desde la mayor entre la hora de inicio del bloque y la apertura real
+        if (!empty($aperturaReal)) {
+            $horaApertura = new \DateTime($aperturaReal);
+            if ($horaApertura > $horaBase) {
+                $horaBase = $horaApertura;
+            }
+        }
+
         $tolerancia  = (clone $horaBase)->modify('+10 minutes');
 
         $minutosRetardo = 0;

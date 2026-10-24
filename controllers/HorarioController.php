@@ -15,6 +15,7 @@ class HorarioController
     private Sesion $sesionModel;
     private Ficha $fichaModel;
     private Usuario $usuarioModel;
+    private PermutaSesion $permutaModel;
 
     public function __construct(PDO $db)
     {
@@ -22,6 +23,8 @@ class HorarioController
         $this->sesionModel = new Sesion($db);
         $this->fichaModel = new Ficha($db);
         $this->usuarioModel = new Usuario($db);
+        require_once ROOT_PATH . '/models/PermutaSesion.php';
+        $this->permutaModel = new PermutaSesion($db);
     }
 
     /**
@@ -30,6 +33,12 @@ class HorarioController
     public function index(): void
     {
         Auth::requireLogin();
+
+        // RF-HOR-29: Si es aprendiz, redirigir a miHorario (vista de su ficha)
+        if (Auth::isAprendiz()) {
+            header('Location: ' . BASE_URL . '?action=horarios/miHorario');
+            exit;
+        }
 
         $pageTitle = 'Gestion de Horarios';
         $fichaId = isset($_GET['ficha_id']) && !empty($_GET['ficha_id']) ? (int)$_GET['ficha_id'] : null;
@@ -48,28 +57,40 @@ class HorarioController
     }
 
     /**
-     * Portal del instructor: carga horaria semanal y mensual en calendario
+     * Portal del instructor / aprendiz: carga horaria semanal y mensual en calendario (RF-HOR-29, RF-HOR-30)
      */
     public function miHorario(): void
     {
         Auth::requireLogin();
-        if (!Auth::isInstructor()) {
-            Auth::setFlash('error', 'El portal de horarios está disponible solo para instructores.');
-            header('Location: ' . BASE_URL . '?action=' . (Auth::isAdmin() ? 'horarios' : 'dashboard'));
-            exit;
-        }
+        $esAprendiz = Auth::isAprendiz();
+        $esInstructor = Auth::isInstructor();
+        $esAdmin = Auth::isAdmin();
 
-        $instructorId = (int) Auth::getUserId();
+        $userId = (int) Auth::getUserId();
         $vistaGet = $_GET['vista'] ?? '';
         $vista = (is_string($vistaGet) && $vistaGet === 'mes') ? 'mes' : 'semana';
         $fechaGet = $_GET['fecha'] ?? null;
         $fechaRef = $this->fechaValida(is_string($fechaGet) ? $fechaGet : null);
-        $fichaGet = $_GET['ficha_id'] ?? '';
-        $fichaId = is_scalar($fichaGet) && $fichaGet !== '' ? (int) $fichaGet : null;
-        if ($fichaId !== null && $fichaId <= 0) {
-            $fichaId = null;
+        
+        $fichaId = null;
+        if ($esAprendiz) {
+            // El aprendiz ve exclusivamente su ficha asignada
+            $aprendizData = $this->usuarioModel->getById($userId);
+            $fichaId = (int) ($aprendizData['Ficha_id'] ?? 0);
+            if ($fichaId <= 0) {
+                Auth::setFlash('info', 'Aún no tienes una ficha de formación asignada.');
+                header('Location: ' . BASE_URL . '?action=dashboard');
+                exit;
+            }
+        } else {
+            $fichaGet = $_GET['ficha_id'] ?? '';
+            $fichaId = is_scalar($fichaGet) && $fichaGet !== '' ? (int) $fichaGet : null;
+            if ($fichaId !== null && $fichaId <= 0) {
+                $fichaId = null;
+            }
         }
-        $estadosValidos = ['Activo', 'Finalizada', 'Cancelado'];
+
+        $estadosValidos = ['Activo', 'Finalizada', 'Cancelado', 'Permutado'];
         $estadoGet = $_GET['estado'] ?? '';
         $estado = is_string($estadoGet) && in_array($estadoGet, $estadosValidos, true) ? $estadoGet : '';
 
@@ -88,7 +109,11 @@ class HorarioController
         $desde = min($gridStart->format('Y-m-d'), $iniSemStr);
         $hasta = max($gridEnd->format('Y-m-d'), $finSemStr);
 
-        $sesiones = $this->sesionModel->getByInstructor($instructorId, $desde, $hasta, $fichaId, $estado !== '' ? $estado : null);
+        if ($esAprendiz) {
+            $sesiones = $this->sesionModel->getByFichaRango($fichaId, $desde, $hasta);
+        } else {
+            $sesiones = $this->sesionModel->getByInstructor($userId, $desde, $hasta, $fichaId, $estado !== '' ? $estado : null);
+        }
         foreach ($sesiones as $i => $s) {
             $sesiones[$i] = $this->decorarSesion($s);
         }
@@ -218,8 +243,8 @@ class HorarioController
             }
         }
 
-        $fichasFiltro = $this->sesionModel->getFichasDeInstructor($instructorId);
-        $pageTitle = 'Mi Horario';
+        $fichasFiltro = $esAprendiz ? [] : $this->sesionModel->getFichasDeInstructor($userId);
+        $pageTitle = $esAprendiz ? 'Horario de mi Ficha' : 'Mi Horario';
         $nombreInstructor = Auth::getUserFullName();
         $tituloSemana = $this->tituloSemana($inicioSemana, $finSemana);
         $tituloMes = $this->nombreMes((int) $inicioMes->format('n')) . ' ' . $inicioMes->format('Y');
@@ -310,21 +335,345 @@ class HorarioController
         }
     }
 
+    // =====================================================================
+    //  CRUD MANUAL DE SESIONES (ALTA-04, RF-HOR-22, RF-HOR-27)
+    // =====================================================================
+
     /**
-     * Elimina una sesión
+     * Muestra formulario para crear una nueva sesión manual
+     */
+    public function crear(): void
+    {
+        Auth::requireAdminOrInstructor();
+
+        $pageTitle = 'Nueva Sesión de Horario';
+        $sesion = null;
+        $fichas = $this->fichaModel->getAll();
+        
+        require_once ROOT_PATH . '/models/Competencia.php';
+        $competenciaModel = new Competencia($this->db);
+        $competencias = $competenciaModel->getAll();
+
+        $instructores = $this->usuarioModel->getInstructores();
+        $csrfToken = Auth::generateCSRF();
+
+        require_once ROOT_PATH . '/views/horarios/form.php';
+    }
+
+    /**
+     * Muestra formulario para editar una sesión existente
+     */
+    public function editar(): void
+    {
+        Auth::requireAdminOrInstructor();
+
+        $id = (int)($_GET['id'] ?? 0);
+        $sesion = $this->sesionModel->getById($id);
+
+        if (!$sesion) {
+            Auth::setFlash('error', 'La sesión solicitada no existe.');
+            header('Location: ' . BASE_URL . '?action=horarios');
+            exit;
+        }
+
+        // RF-HOR-27: Una sesión con asistencia registrada no se puede mover ni reasignar
+        if ($this->sesionModel->tieneAsistencias($id)) {
+            Auth::setFlash('error', 'Esta sesión ya cuenta con asistencias registradas y no puede modificarse.');
+            header('Location: ' . BASE_URL . '?action=horarios');
+            exit;
+        }
+
+        // Si es instructor, solo puede editar si es su sesión o es líder de la ficha
+        if (Auth::isInstructor() && !Auth::isAdmin()) {
+            $userId = (int) Auth::getUserId();
+            $ficha = $this->fichaModel->getById((int)$sesion['Ficha_id']);
+            $esLider = ($ficha && (int)($ficha['instructor_id'] ?? 0) === $userId);
+            if ((int)$sesion['Instructor_id'] !== $userId && !$esLider) {
+                Auth::setFlash('error', 'No tienes permisos para modificar esta sesión.');
+                header('Location: ' . BASE_URL . '?action=horarios');
+                exit;
+            }
+        }
+
+        $pageTitle = 'Editar Sesión de Horario';
+        $fichas = $this->fichaModel->getAll();
+
+        require_once ROOT_PATH . '/models/Competencia.php';
+        $competenciaModel = new Competencia($this->db);
+        $competencias = $competenciaModel->getAll();
+
+        $instructores = $this->usuarioModel->getInstructores();
+        $csrfToken = Auth::generateCSRF();
+
+        require_once ROOT_PATH . '/views/horarios/form.php';
+    }
+
+    /**
+     * Guarda (crea o actualiza) una sesión manual
+     */
+    public function guardar(): void
+    {
+        Auth::requireAdminOrInstructor();
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: ' . BASE_URL . '?action=horarios');
+            exit;
+        }
+
+        $csrfToken = $_POST['csrf_token'] ?? '';
+        if (!Auth::validateCSRF($csrfToken)) {
+            Auth::setFlash('error', 'Token CSRF inválido o expirado.');
+            header('Location: ' . BASE_URL . '?action=horarios');
+            exit;
+        }
+
+        $id = (int)($_POST['id'] ?? 0);
+        $fichaId = (int)($_POST['Ficha_id'] ?? 0);
+        $competenciaId = !empty($_POST['Competencia_id']) ? (int)$_POST['Competencia_id'] : null;
+        $instructorId = (int)($_POST['Instructor_id'] ?? 0);
+        $fecha = trim($_POST['fecha'] ?? '');
+        $horaInicio = trim($_POST['hora_inicio'] ?? '');
+        $horaFin = trim($_POST['hora_fin'] ?? '');
+        $tipoInstructor = trim($_POST['tipo_instructor'] ?? '');
+        $especialidad = trim($_POST['especialidad'] ?? '');
+        $nivel = trim($_POST['nivel'] ?? '');
+        $grupoConvergente = trim($_POST['grupo_convergente'] ?? '');
+        $estado = trim($_POST['estado'] ?? 'Activo');
+
+        if (!in_array($estado, ['Activo', 'Cancelado', 'Permutado'], true)) {
+            $estado = 'Activo';
+        }
+
+        // Validaciones básicas
+        if ($fichaId <= 0 || $instructorId <= 0 || empty($fecha) || empty($horaInicio) || empty($horaFin)) {
+            Auth::setFlash('error', 'Por favor completa todos los campos requeridos.');
+            $redirect = $id > 0 ? '?action=horarios/editar&id=' . $id : '?action=horarios/crear';
+            header('Location: ' . BASE_URL . $redirect);
+            exit;
+        }
+
+        // RF-HOR-21: Validar que hora_fin > hora_inicio
+        if ($horaInicio >= $horaFin) {
+            Auth::setFlash('error', 'La hora de inicio debe ser menor que la hora de fin.');
+            $redirect = $id > 0 ? '?action=horarios/editar&id=' . $id : '?action=horarios/crear';
+            header('Location: ' . BASE_URL . $redirect);
+            exit;
+        }
+
+        // RF-HOR-19: Validar horas dentro de la jornada de la ficha
+        $ficha = $this->fichaModel->getById($fichaId);
+        if ($ficha && !empty($ficha['jornada_id'])) {
+            require_once ROOT_PATH . '/models/Jornada.php';
+            $jornadaModel = new Jornada($this->db);
+            $jornada = $jornadaModel->getById((int)$ficha['jornada_id']);
+            if ($jornada) {
+                if ($horaInicio < $jornada['hora_inicio'] || $horaFin > $jornada['hora_fin']) {
+                    Auth::setFlash('error', "El horario ({$horaInicio} - {$horaFin}) queda fuera de la jornada {$jornada['nombre']} de la ficha ({$jornada['hora_inicio']} - {$jornada['hora_fin']}).");
+                    $redirect = $id > 0 ? '?action=horarios/editar&id=' . $id : '?action=horarios/crear';
+                    header('Location: ' . BASE_URL . $redirect);
+                    exit;
+                }
+            }
+        }
+
+        // RF-HOR-22: Validar solapamientos
+        $solapamiento = $this->sesionModel->validarSolapamiento($fichaId, $instructorId, $fecha, $horaInicio, $horaFin, $id > 0 ? $id : null);
+        if (!$solapamiento['valido']) {
+            Auth::setFlash('error', $solapamiento['mensaje']);
+            $redirect = $id > 0 ? '?action=horarios/editar&id=' . $id : '?action=horarios/crear';
+            header('Location: ' . BASE_URL . $redirect);
+            exit;
+        }
+
+        $datos = [
+            'Ficha_id'          => $fichaId,
+            'Competencia_id'    => $competenciaId,
+            'Instructor_id'     => $instructorId,
+            'fecha'             => $fecha,
+            'hora_inicio'       => $horaInicio,
+            'hora_fin'          => $horaFin,
+            'estado'            => $estado,
+            'tipo_instructor'   => $tipoInstructor ?: null,
+            'especialidad'      => $especialidad ?: null,
+            'nivel'             => $nivel ?: null,
+            'grupo_convergente' => $grupoConvergente ?: null,
+        ];
+
+        if ($id > 0) {
+            // Verificar si tiene asistencias
+            if ($this->sesionModel->tieneAsistencias($id)) {
+                Auth::setFlash('error', 'No se puede modificar una sesión con asistencias ya registradas.');
+                header('Location: ' . BASE_URL . '?action=horarios');
+                exit;
+            }
+            $ok = $this->sesionModel->update($id, $datos);
+            $msg = $ok ? 'Sesión de horario actualizada correctamente.' : 'Error al actualizar la sesión.';
+        } else {
+            $ok = $this->sesionModel->create($datos);
+            $msg = $ok ? 'Sesión de horario creada exitosamente.' : 'Error al crear la sesión.';
+        }
+
+        Auth::setFlash($ok ? 'success' : 'error', $msg);
+        header('Location: ' . BASE_URL . '?action=horarios&ficha_id=' . $fichaId);
+        exit;
+    }
+
+    /**
+     * Elimina una sesión validando que no tenga asistencias (RF-HOR-27, ALTA-04)
      */
     public function eliminar(): void
     {
-        Auth::requireAdmin();
+        Auth::requireAdminOrInstructor();
 
         $id = (int)($_GET['id'] ?? 0);
-        if ($id > 0) {
-            $this->sesionModel->delete($id);
-            Auth::setFlash('success', 'Sesión de horario eliminada correctamente.');
+        if ($id <= 0) {
+            header('Location: ' . BASE_URL . '?action=horarios');
+            exit;
         }
+
+        $sesion = $this->sesionModel->getById($id);
+        if (!$sesion) {
+            Auth::setFlash('error', 'La sesión no existe.');
+            header('Location: ' . BASE_URL . '?action=horarios');
+            exit;
+        }
+
+        // RF-HOR-27: Una sesión con asistencia registrada no se puede mover ni eliminar
+        if ($this->sesionModel->tieneAsistencias($id)) {
+            Auth::setFlash('error', 'No se puede eliminar la sesión porque ya tiene registros de asistencia vinculados.');
+            $redirect = isset($_GET['ficha_id']) ? '&ficha_id=' . (int)$_GET['ficha_id'] : '';
+            header('Location: ' . BASE_URL . '?action=horarios' . $redirect);
+            exit;
+        }
+
+        $this->sesionModel->delete($id);
+        Auth::setFlash('success', 'Sesión de horario eliminada correctamente.');
 
         $redirect = isset($_GET['ficha_id']) ? '&ficha_id=' . (int)$_GET['ficha_id'] : '';
         header('Location: ' . BASE_URL . '?action=horarios' . $redirect);
+        exit;
+    }
+
+    // =====================================================================
+    //  MÓDULO DE PERMUTAS Y CESIONES (RF-HOR-23 a 28, RF-HOR-43)
+    // =====================================================================
+
+    /**
+     * Panel de control de permutas e intercambios
+     */
+    public function permutas(): void
+    {
+        Auth::requireAdminOrInstructor();
+
+        $pageTitle = 'Permutas de Horario';
+        $userId = (int) Auth::getUserId();
+        $esAdmin = Auth::isAdmin();
+
+        if ($esAdmin) {
+            $permutas = $this->permutaModel->getAll();
+            $recibidas = [];
+            $enviadas = [];
+        } else {
+            $recibidas = $this->permutaModel->getPendientesPorReceptor($userId);
+            $enviadas = $this->permutaModel->getEnviadasPorSolicitante($userId);
+            $permutas = [];
+        }
+
+        // Sesiones del instructor para proponer nueva permuta
+        $misSesiones = $this->sesionModel->getByInstructor($userId, date('Y-m-d'), date('Y-m-d', strtotime('+3 months')), null, 'Activo');
+        $csrfToken = Auth::generateCSRF();
+
+        require_once ROOT_PATH . '/views/horarios/permutas.php';
+    }
+
+    /**
+     * Procesa la creación de una solicitud de permuta
+     */
+    public function proponerPermuta(): void
+    {
+        Auth::requireAdminOrInstructor();
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: ' . BASE_URL . '?action=horarios/permutas');
+            exit;
+        }
+
+        $csrfToken = $_POST['csrf_token'] ?? '';
+        if (!Auth::validateCSRF($csrfToken)) {
+            Auth::setFlash('error', 'Token de seguridad inválido.');
+            header('Location: ' . BASE_URL . '?action=horarios/permutas');
+            exit;
+        }
+
+        $sesionOrigenId = (int)($_POST['sesion_origen_id'] ?? 0);
+        $sesionDestinoId = (int)($_POST['sesion_destino_id'] ?? 0);
+        $motivo = trim($_POST['motivo'] ?? '');
+        $userId = (int) Auth::getUserId();
+
+        $origen = $this->sesionModel->getById($sesionOrigenId);
+        $destino = $this->sesionModel->getById($sesionDestinoId);
+
+        if (!$origen || !$destino) {
+            Auth::setFlash('error', 'Una de las sesiones seleccionadas no existe.');
+            header('Location: ' . BASE_URL . '?action=horarios/permutas');
+            exit;
+        }
+
+        // Validar que el origen pertenezca al usuario (si no es admin)
+        if (!Auth::isAdmin() && (int)$origen['Instructor_id'] !== $userId) {
+            Auth::setFlash('error', 'Solo puedes proponer permutas sobre tus propias sesiones.');
+            header('Location: ' . BASE_URL . '?action=horarios/permutas');
+            exit;
+        }
+
+        // No permitir permutar sesiones que ya tengan asistencias
+        if ($this->sesionModel->tieneAsistencias($sesionOrigenId) || $this->sesionModel->tieneAsistencias($sesionDestinoId)) {
+            Auth::setFlash('error', 'No se pueden permutar sesiones con asistencias registradas.');
+            header('Location: ' . BASE_URL . '?action=horarios/permutas');
+            exit;
+        }
+
+        $solicitanteId = (int) $origen['Instructor_id'];
+        $receptorId = (int) $destino['Instructor_id'];
+
+        $res = $this->permutaModel->crearSolicitud($sesionOrigenId, $sesionDestinoId, $solicitanteId, $receptorId, $motivo);
+        Auth::setFlash($res['ok'] ? 'success' : 'error', $res['mensaje']);
+        header('Location: ' . BASE_URL . '?action=horarios/permutas');
+        exit;
+    }
+
+    /**
+     * Responde (Aprueba o Rechaza) una solicitud de permuta
+     */
+    public function responderPermuta(): void
+    {
+        Auth::requireAdminOrInstructor();
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: ' . BASE_URL . '?action=horarios/permutas');
+            exit;
+        }
+
+        $csrfToken = $_POST['csrf_token'] ?? '';
+        if (!Auth::validateCSRF($csrfToken)) {
+            Auth::setFlash('error', 'Token de seguridad inválido.');
+            header('Location: ' . BASE_URL . '?action=horarios/permutas');
+            exit;
+        }
+
+        $permutaId = (int)($_POST['permuta_id'] ?? 0);
+        $decision = trim($_POST['decision'] ?? '');
+        $userId = (int) Auth::getUserId();
+        $esAdmin = Auth::isAdmin();
+
+        if ($decision === 'aprobar') {
+            $res = $this->permutaModel->aprobarPermuta($permutaId, $userId, $esAdmin);
+        } else {
+            $res = $this->permutaModel->rechazarPermuta($permutaId, $userId, $esAdmin);
+        }
+
+        Auth::setFlash($res['ok'] ? 'success' : 'error', $res['mensaje']);
+        header('Location: ' . BASE_URL . '?action=horarios/permutas');
         exit;
     }
 
