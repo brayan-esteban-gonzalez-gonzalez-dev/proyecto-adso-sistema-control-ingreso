@@ -1,29 +1,47 @@
 ================================================================================
 INFORME DE ESTADO EJECUTIVO DEL PROYECTO
 SISTEMA DE CONTROL DE INGRESO DE APRENDICES (SENA)
-Fecha de corte: 15 de octubre de 2026
-Version del documento: 3.0
+Fecha de corte: 23 de octubre de 2026
+Version del documento: 4.0
+~~Fecha de corte: 15 de octubre de 2026~~
+~~Version del documento: 3.0~~
 ================================================================================
 
 1. RESUMEN EJECUTIVO
 --------------------------------------------------------------------------------
 El proyecto Sistema de Control de Ingreso de Aprendices registra un avance
-global consolidado del 78% frente a los requerimientos tecnicos y funcionales.
+global consolidado del 90% frente a los requerimientos tecnicos y funcionales.
+~~El proyecto Sistema de Control de Ingreso de Aprendices registra un avance
+global consolidado del 78% frente a los requerimientos tecnicos y funcionales.~~
 
-Durante el presente periodo se consolidaron los modulos maestros de Programas,
-Competencias y Jornadas (CRUD completo, rutas y menu), el portal de carga
-horaria del instructor (Mi Horario) y la migracion 004 de codigo de programa.
-Quedaron preparados, sin quedar operativos, el modelo de reportes institucionales,
-la libreria FPDF y los assets de graficas del dashboard.
+Durante el presente periodo (al 23 de octubre de 2026) se consolidaron:
+- Operacion de Terminal RFID en tiempo real con captura continua mediante lector USB,
+  reloj activo y feedback visual inmediato.
+- Apertura y cierre de sesion con toggle ON/OFF en AsistenciaController, con
+  motor de retardos automatizado (regla de los 10 minutos) e insercion automatica
+  y atomica de inasistencias en la tabla inasistencia al cerrar sesion.
+- Modulo de Excusas Medicas refactorizado: selector de inasistencias reales del
+  aprendiz autenticado, validacion estricta de formato y tamano de evidencias,
+  y revision interactiva del instructor.
+- Controlador de reportes (ReporteController) plenamente operativo con exportacion
+  en PDF (FPDF) y CSV (Excel), eliminando el error 404 en la ruta ?action=reportes.
+- Seguridad y perfiles: restriccion de creacion y edicion de Fichas al Administrador,
+  vista exclusiva de fichas asignadas para instructores y consulta de integrantes.
+- Saneamiento del enrutador y del menu lateral para roles Instructor y Aprendiz.
 
 El sistema cuenta con autenticacion por roles (Administrador, Instructor,
 Aprendiz), gestion de usuarios, fichas, aprendices, maestros academicos,
-importacion masiva de horarios Excel y consulta de historial de asistencia.
+importacion masiva de horarios Excel, terminal RFID, generacion de inasistencias,
+gestion de excusas medicas vinculadas, historial y exportacion de reportes.
 
-El 22% restante se concentra en la operacion RFID en tiempo real, el motor de
+El 10% restante se concentra exclusivamente en tres tareas bien definidas:
+1. Flujo de doble aprobacion de excusas en casos de co-docencia de ficha.
+2. Formulario CRUD manual para creacion y edicion individual de sesiones de horario.
+3. Integracion analitica visual en el Dashboard (Chart.js y endpoint dashboard/datosGraficos).
+~~El 22% restante se concentra en la operacion RFID en tiempo real, el motor de
 retardos (regla de 10 minutos), el cierre y generacion automatica de
 inasistencias, el flujo de doble aprobacion de excusas, la conexion del
-controlador de reportes (hoy 404) y la integracion de Chart.js en el dashboard.
+controlador de reportes (hoy 404) y la integracion de Chart.js en el dashboard.~~
 
 
 2. FICHA TECNICA Y ARQUITECTURA
@@ -63,49 +81,54 @@ Seguridad:              Hashing BCRYPT para credenciales, tokens CSRF por sesion
 |   |-- Sesion.php                     Programacion horaria y consulta por instructor
 |   |-- IngresoAsistencia.php          Marcaciones de asistencia y registros de entrada/salida
 |   |-- ExcusaMedica.php               Registro de excusas y ciclo de revision
-|   `-- Reporte.php                    Consultas de reportes e indicadores (sin controlador)
+|   `-- Reporte.php                    Consultas de reportes e indicadores
+|                                      ~~(sin controlador)~~ Conectado a ReporteController
 |-- controllers/
 |   |-- AuthController.php             Control de acceso, inicio y cierre de sesion
-|   |-- DashboardController.php        Panel de control (solo tarjetas; sin datosGraficos)
+|   |-- DashboardController.php        Panel de control (tarjetas operativas; pendiente datosGraficos)
 |   |-- UsuarioController.php          CRUD de administradores e instructores
 |   |-- ProgramaController.php         CRUD de programas
 |   |-- CompetenciaController.php      CRUD de competencias
 |   |-- JornadaController.php          CRUD de jornadas
-|   |-- FichaController.php            CRUD y configuracion de fichas academicas
+|   |-- FichaController.php            CRUD (Admin), vista asignada y detalle de integrantes
 |   |-- HorarioController.php          Importacion Excel y portal miHorario
-|   |-- AprendizController.php         CRUD de aprendices y vinculacion de llaveros RFID
-|   |-- AsistenciaController.php       Historial de marcaciones (sin metodo rfid)
-|   `-- ExcusaController.php           Recepcion, aprobacion y rechazo de excusas
-|   (ReporteController.php             NO EXISTE; Router apunta a esta clase)
+|   |-- AprendizController.php         Redireccion a gestion unificada de usuarios (rol 3)
+|   |-- AsistenciaController.php       Historial, toggle de sesion y terminal RFID (registrarMarcacion)
+|   |-- ExcusaController.php           Recepcion vinculada a inasistencia, aprobacion y rechazo
+|   `-- ReporteController.php          Generacion y exportacion PDF (FPDF) y CSV
+|   ~~(ReporteController.php             NO EXISTE; Router apunta a esta clase)~~
 |-- views/
-|   |-- layouts/                       Plantillas maestras (header.php, footer.php)
+|   |-- layouts/                       Plantillas maestras (header.php saneado, footer.php)
 |   |-- auth/                          Interfaz de autenticacion
-|   |-- dashboard/                     Tablero y partial _graficos.php (no incluido)
-|   |-- usuarios/                      Formularios y listados de usuarios
+|   |-- dashboard/                     Tablero y partial _graficos.php (pendiente incluir)
+|   |-- usuarios/                      Formularios (con seccion dinamica aprendiz) y listado con filtros
 |   |-- programas/                     CRUD de programas
 |   |-- competencias/                  CRUD de competencias
 |   |-- jornadas/                      CRUD de jornadas
-|   |-- fichas/                        Gestion de fichas academicas
+|   |-- fichas/                        Gestion de fichas academicas e integrantes (integrantes.php)
 |   |-- aprendices/                    Administracion y enrolamiento de aprendices
 |   |-- horarios/                      Listado, importacion y mi_horario.php
-|   |-- asistencia/                    Historial y vista terminal RFID (sin backend)
-|   |-- excusas/                       Bandeja de gestion y formulario desalineado
-|   `-- reportes/                      Formulario de exportacion (sin controlador)
+|   |-- asistencia/                    Historial y terminal RFID operativa (rfid.php)
+|   |-- excusas/                       Bandeja de gestion y formulario con inasistencias reales (form.php)
+|   `-- reportes/                      Formulario y generador de reportes (index.php operativo)
 |-- librerias/
 |   |-- phpoffice/phpspreadsheet/      Motor de lectura de archivos Excel
-|   |-- fpdf/                          Generacion PDF (no invocada)
+|   |-- fpdf/                          Generacion PDF (operativa en ReporteController)
 |   `-- psr/simple-cache/              Dependencia estandar PSR de cache
 |-- migrations/
 |   |-- db_ingreso_aprendices.sql      Esquema consolidado oficial
 |   |-- 003-horarios-columnas.sql      Extensiones de sesion
-|   `-- 004-programa-codigo.sql        Columna codigo e indice unico en Programa
+|   |-- 004-programa-codigo.sql        Columna codigo e indice unico en Programa
+|   |-- 005-sesion-asistencia-toggle.sql Toggle de sesion y hora_fin NULLABLE
+|   `-- 006-inasistencia-estado.sql    Propuesta de columna estado en inasistencia
 `-- assets/
     |-- css/style.css                  Hoja de estilos institucional
     |-- img/                           Recursos graficos
     `-- js/
         |-- app.js                     Busquedas, modales y confirmaciones
-        |-- dashboard.js               Chart.js (no cargado por el dashboard)
-        `-- mi-horario.js              Calendario del portal del instructor
+        |-- dashboard.js               Chart.js (pendiente de conectar al dashboard)
+        |-- mi-horario.js              Calendario del portal del instructor
+        `-- rfid.js                    Controlador de lector RFID USB, reloj y feedback en vivo
 
 
 4. MATRIZ DE ESTADO POR MODULO FUNCIONAL
@@ -166,10 +189,16 @@ MODULO / COMPONENTE                     ESTADO       OBSERVACIONES EJECUTIVAS
                                                      captura automática lector USB,
                                                      assets/js/rfid.js, feedback visual.
 
-11. Gestion y Revision de Excusas       [PARCIAL]    Listado, aprobacion y rechazo
+~~11. Gestion y Revision de Excusas       [PARCIAL]    Listado, aprobacion y rechazo
                                                      operativos. form.php sigue pidiendo
                                                      fecha_inicio y fecha_fin, ajenos
-                                                     a la tabla excusa.
+                                                     a la tabla excusa.~~
+11. Gestion y Revision de Excusas       [OPERATIVO]  Implementado (2026-10-22):
+                                                     Formulario alineado con selector dinamico
+                                                     de inasistencias reales del aprendiz,
+                                                     validacion estricta de tipo MIME y tamano (2MB),
+                                                     y panel interactivo del instructor con
+                                                     aprobacion y rechazo.
 
 ~~12. Motor de Reglas de Asistencia       [PENDIENTE]  Regla de retardo de 10 minutos
                                                      desde inicio o registro del
@@ -189,18 +218,41 @@ MODULO / COMPONENTE                     ESTADO       OBSERVACIONES EJECUTIVAS
 
 14. Doble Aprobacion de Excusas         [PENDIENTE]  Consenso cuando dos o mas
                                                      instructores comparten ficha.
+                                                     [QUÉ TOCA HACER]:
+                                                     - Detectar co-docencia en la sesion/ficha.
+                                                     - Registrar revision individual por instructor
+                                                       en tabla estado_excusa.
+                                                     - Exigir consenso unanime para pasar estado a
+                                                       'Aprobada'.
 
-15. Reportes y Exportacion              [PARCIAL]    Modelo Reporte.php, vista
+~~15. Reportes y Exportacion              [PARCIAL]    Modelo Reporte.php, vista
                                                      reportes/index.php y FPDF
                                                      presentes. Router mapea reportes
                                                      a ReporteController, archivo
                                                      inexistente: el menu da 404.
-                                                     No hay generacion PDF/Excel/CSV.
+                                                     No hay generacion PDF/Excel/CSV.~~
+15. Reportes y Exportacion              [OPERATIVO]  Implementado (2026-10-22):
+                                                     ReporteController creado y mapeado.
+                                                     Exportacion institucional en PDF (FPDF)
+                                                     y formato CSV para hojas de calculo.
+                                                     Ruta ?action=reportes activa sin 404.
 
 16. Tableros Analiticos (Dashboard)     [PARCIAL]    Tarjetas de totales operativas.
                                                      _graficos.php y dashboard.js
                                                      existen y no se incluyen.
                                                      Falta dashboard/datosGraficos.
+                                                     [QUÉ TOCA HACER]:
+                                                     - Implementar endpoint JSON
+                                                       DashboardController::datosGraficos().
+                                                     - Cargar libreria Chart.js.
+                                                     - Incluir partial _graficos.php en
+                                                       views/dashboard/index.php.
+
+17. Formulario Manual de Sesiones       [PENDIENTE]  Complemento a importacion Excel.
+                                                     [QUÉ TOCA HACER]:
+                                                     - Crear formulario views/horarios/form.php.
+                                                     - Implementar HorarioController::crear(),
+                                                       editar(), guardar() y eliminar().
 --------------------------------------------------------------------------------
 
 
@@ -209,67 +261,83 @@ MODULO / COMPONENTE                     ESTADO       OBSERVACIONES EJECUTIVAS
 Entidades y vistas normalizadas en ciclos previos y en este corte:
 
 - Tabla Usuario: identificacion, email, Rol_id y codigo_llavero en
-  views/usuarios/.
+  views/usuarios/ (con seccion dinamica de aprendiz y filtros por rol).
 - Tabla Ficha: codigo, Programa_id, jornada_id e instructor_id en views/fichas/.
-- Aprendiz (logica sobre Usuario): identificacion, email, Ficha_id y
-  codigo_llavero en views/aprendices/.
+  CRUD restringido a Administrador; instructores consultan unicamente fichas
+  asignadas y su seccion de integrantes (views/fichas/integrantes.php).
+- Aprendiz: gestion consolidada sobre Usuario (Rol 3); AprendizController redirige
+  limpiamente a usuarios con rol=3.
 - Tabla Sesion: especialidad, tipo_instructor, nivel y grupo_convergente
-  (migracion 003), usadas por el importador y por miHorario.
+  (migracion 003), y soporte toggle hora_fin NULLABLE (migracion 005).
 - Tabla Programa: columna codigo e indice unico uq_programa_codigo
-  (migracion 004). CRUD en views/programas/.
-- Competencias y Jornadas: interfaces propias, ya no solo selects de Ficha.
+  (migracion 004). CRUD en views/programas/ con resiliencia de columnas.
+- Competencias y Jornadas: interfaces CRUD propias y operativas.
+- Terminal RFID: captura con lector USB en emulacion de teclado, reloj activo y
+  registro asincrono con calculo de retardos.
+- Excusas Medicas: formulario vinculado exclusivamente a inasistencias reales
+  del aprendiz autenticado con validacion estricta de adjunto (PDF/JPG/PNG max 2MB).
+- Reportes: ReporteController creado con exportacion PDF (FPDF) y CSV.
+
+Puntos de ajuste resueltos:
+~~- views/excusas/form.php: solicita fecha_inicio y fecha_fin. Debe usar fecha
+  puntual y FK de Asistencia_id o Inasistencia_id.~~ [RESUELTO 2026-10-22]
+~~- ?action=asistencia/rfid: enlace en header.php sin metodo en
+  AsistenciaController. Responde 404.~~ [RESUELTO 2026-10-22]
+~~- ?action=reportes: enlace y mapa en Router.php apuntan a ReporteController,
+  archivo no creado. La vista views/reportes/index.php no se alcanza.~~ [RESUELTO 2026-10-22]
 
 Puntos de ajuste pendientes en interfaz y enrutamiento:
-
-- views/excusas/form.php: solicita fecha_inicio y fecha_fin. Debe usar fecha
-  puntual y FK de Asistencia_id o Inasistencia_id.
-- ?action=asistencia/rfid: enlace en header.php sin metodo en
-  AsistenciaController. Responde 404.
-- ?action=reportes: enlace y mapa en Router.php apuntan a ReporteController,
-  archivo no creado. La vista views/reportes/index.php no se alcanza.
 - views/dashboard/_graficos.php y assets/js/dashboard.js no estan incluidos
-  desde DashboardController ni desde views/dashboard/index.php.
+  desde DashboardController ni desde views/dashboard/index.php (falta endpoint datosGraficos).
+- Falta interfaz manual de gestion de sesiones individuales en HorarioController.
 
 
 6. ANALISIS DE RIESGOS Y DEUDA TECNICA
 --------------------------------------------------------------------------------
-NIVEL DE RIESGO: MEDIO
+NIVEL DE RIESGO: BAJO
+~~NIVEL DE RIESGO: MEDIO~~
 
-Factores identificados:
-1. Ruptura de navegacion: Marcacion RFID y Reportes siguen en el menu y
-   responden 404. Reportes esta mapeado, pero el controlador no existe.
-   Mitigacion: crear ReporteController y los metodos RFID, o ocultar enlaces.
-2. Formulario de excusas desalineado: un aprendiz radica fechas que no existen
-   en la tabla excusa y sin FK a la inasistencia.
-   Mitigacion: refactorizar views/excusas/form.php.
-3. Inasistencias no se generan al cerrar sesion: las metricas de ausentismo
-   quedan en cero si no hay cierre.
-   Mitigacion: accion de cierre en HorarioController/Sesion.
-4. Analitica huerfana: consultas en Reporte.php y canvases de Chart.js no
-   tienen endpoint. Riesgo de asumir el modulo como entregado.
-   Mitigacion: no marcar reportes ni graficas como operativos hasta conectar
-   controlador y vista.
+Factores mitigados y cerrados:
+~~1. Ruptura de navegacion: Marcacion RFID y Reportes siguen en el menu y
+   responden 404. Reportes esta mapeado, pero el controlador no existe.~~
+   -> MITIGADO: Implementados metodos rfid(), registrarMarcacion() y ReporteController.
+~~2. Formulario de excusas desalineado: un aprendiz radica fechas que no existen
+   en la tabla excusa y sin FK a la inasistencia.~~
+   -> MITIGADO: Formulario refactorizado con select dinamico de inasistencias reales.
+~~3. Inasistencias no se generan al cerrar sesion: las metricas de ausentismo
+   quedan en cero si no hay cierre.~~
+   -> MITIGADO: Transaccion de cierre formal por toggle OFF genera inasistencias.
+
+Factores identificados pendientes:
+1. Analitica visual pendiente: canvases de Chart.js y archivo assets/js/dashboard.js
+   no tienen endpoint JSON conectado (?action=dashboard/datosGraficos).
+2. Co-docencia en excusas: pendiente flujo colegiado cuando 2 o mas instructores
+   comparten ficha.
 
 
 7. METRICAS CONSOLIDADAS DE AVANCE
 --------------------------------------------------------------------------------
 Indicador General de Proyecto:
-  Avance total:              78%
-  Pendiente de ejecucion:    22%
+  Avance total:              90%
+  Pendiente de ejecucion:    10%
+~~Avance total:              78%~~
+~~Pendiente de ejecucion:    22%~~
 
 Desglose por Areas:
 - Modelo de Datos y Migraciones:     98% completado
-- Logica de Negocio y Controladores: 78% completado
-- Vistas e Interfaz Grafica:         82% completado
-- Integracion de Hardware (RFID):    20% completado
-- Analitica y Reportes:              40% completado
+- Logica de Negocio y Controladores: 92% completado
+- Vistas e Interfaz Grafica:         90% completado
+- Integracion de Hardware (RFID):   100% completado
+- Analitica y Reportes:              80% completado
 
-Cambio respecto a la version 2.0 (70%):
-- Maestros academicos pasaron de parcial a operativo.
-- Portal Mi Horario incorporado como operativo.
-- Reportes y graficas avanzaron en artefactos, no en operacion.
+Cambio respecto a la version 3.0 (78%):
+- Terminal RFID paso de parcial a 100% operativa.
+- Motor de retardos y generacion automatica de inasistencias plenamente operativos.
+- Reportes institucionales en PDF y CSV operativos.
+- Excusas medicas vinculadas a inasistencias reales operativas.
+- Gestion y seguridad de fichas / integrantes por rol implementadas.
 
-Estado general: EN CURSO DENTRO DE CRONOGRAMA.
+Estado general: FASE FINAL DE CONSOLIDACION (3 tareas pendientes documentadas).
 ================================================================================
 FIN DEL DOCUMENTO — ESTADO_PROYECTO.txt
 ================================================================================
