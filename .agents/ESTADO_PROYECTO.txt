@@ -248,11 +248,15 @@ MODULO / COMPONENTE                     ESTADO       OBSERVACIONES EJECUTIVAS
                                                      - Incluir partial _graficos.php en
                                                        views/dashboard/index.php.
 
-17. Formulario Manual de Sesiones       [PENDIENTE]  Complemento a importacion Excel.
+~~17. Formulario Manual de Sesiones       [PENDIENTE]  Complemento a importacion Excel.
                                                      [QUÉ TOCA HACER]:
                                                      - Crear formulario views/horarios/form.php.
                                                      - Implementar HorarioController::crear(),
-                                                       editar(), guardar() y eliminar().
+                                                       editar(), guardar() y eliminar().~~
+17. Formulario Manual de Sesiones       [OPERATIVO]  Implementado en rama horario por
+                                                     Dev 2: views/horarios/form.php y
+                                                     HorarioController::crear(), editar(),
+                                                     guardar() y eliminar().
 --------------------------------------------------------------------------------
 
 
@@ -289,7 +293,8 @@ Puntos de ajuste resueltos:
 Puntos de ajuste pendientes en interfaz y enrutamiento:
 - views/dashboard/_graficos.php y assets/js/dashboard.js no estan incluidos
   desde DashboardController ni desde views/dashboard/index.php (falta endpoint datosGraficos).
-- Falta interfaz manual de gestion de sesiones individuales en HorarioController.
+~~- Falta interfaz manual de gestion de sesiones individuales en HorarioController.~~
+  [RESUELTO en rama horario por Dev 2: views/horarios/form.php].
 
 
 6. ANALISIS DE RIESGOS Y DEUDA TECNICA
@@ -338,6 +343,27 @@ Cambio respecto a la version 3.0 (78%):
 - Gestion y seguridad de fichas / integrantes por rol implementadas.
 
 Estado general: FASE FINAL DE CONSOLIDACION (3 tareas pendientes documentadas).
+
+8. CORTE 26 DE OCTUBRE DE 2026 — TRACK A (RAMA horario)
+--------------------------------------------------------------------------------
+Desarrollador 1 dejo implementado, sin ejecutar migraciones contra la base:
+
+- helpers/HorarioParser.php: lectura de horario de ficha y de instructor.
+- helpers/HorarioValidator.php: RF-HOR-16, 17, 18, 20, 21 y 38.
+- helpers/HorarioSincronizador.php: crear, actualizar, omitir, cancelar y
+  proteger sesiones; sincronizar asignacion_instructor.
+- helpers/HorarioReporte.php y models/ImportacionHorario.php.
+- models/AsignacionInstructor.php.
+- views/horarios/errores_validacion.php y confirmar_permutas.php.
+- Migraciones escritas y no aplicadas: 007 y 008.
+
+Evaluacion de seguridad de ese codigo: .agents/reporssecuriti.md.
+Hallazgos altos: la subida de Excel solo mira la extension y procesar()
+muestra el mensaje crudo de la excepcion. Hay funciones duplicadas
+(parsearExcelHorarios sigue en el controlador y ya no se usa).
+
+Las migraciones 007 y 008 no se han ejecutado. Sin ellas, RF-HOR-38 y la
+auditoria de importaciones no pueden operar.
 ================================================================================
 FIN DEL DOCUMENTO — ESTADO_PROYECTO.txt
 ================================================================================

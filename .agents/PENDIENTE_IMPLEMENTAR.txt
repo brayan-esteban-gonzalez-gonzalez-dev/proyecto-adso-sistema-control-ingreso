@@ -241,7 +241,8 @@ CODIGO       DESCRIPCION                              ESTADO / PRIORIDAD  ESTIMA
 ~~ALTA-01      Motor de retardo (regla 10 minutos)      IMPLEMENTADO~~       0 horas (ant. 5h)
 ~~ALTA-02      Cierre de sesion y lote de inasistencias IMPLEMENTADO~~       0 horas (ant. 6h)
 ALTA-03      Doble aprobacion de excusas (consenso)   Alta (PENDIENTE)     5 horas
-ALTA-04      Formulario manual de sesiones            Alta (PENDIENTE)     4 horas
+~~ALTA-04      Formulario manual de sesiones            Alta (PENDIENTE)     4 horas~~
+~~ALTA-04      Formulario manual de sesiones            IMPLEMENTADO por Dev 2 en rama horario~~
 ~~MEDIA-01     Modulo CRUD Programas                    IMPLEMENTADO~~       0 horas (ant. 4h)
 ~~MEDIA-02     Modulo CRUD Competencias                 IMPLEMENTADO~~       0 horas (ant. 4h)
 ~~MEDIA-03     Modulo CRUD Jornadas                     IMPLEMENTADO~~       0 horas (ant. 3h)
@@ -249,8 +250,10 @@ ALTA-04      Formulario manual de sesiones            Alta (PENDIENTE)     4 hor
 ~~BAJA-01      Motor de Reportes PDF (FPDF)             IMPLEMENTADO~~       0 horas (ant. 8h)
 BAJA-02      Analitica visual en Dashboard (Chart.js) Baja (PENDIENTE)     5 horas
 --------------------------------------------------------------------------------
-TOTAL HORAS PENDIENTES DE IMPLEMENTACION:                          14 horas
-(Horas completadas acumuladas: 46 horas)
+~~TOTAL HORAS PENDIENTES DE IMPLEMENTACION:                          14 horas~~
+~~(Horas completadas acumuladas: 46 horas)~~
+TOTAL HORAS PENDIENTES DE IMPLEMENTACION:                          10 horas
+(ALTA-04 cerrado por Dev 2. Quedan ALTA-03 y BAJA-02, mas SEG-01 a SEG-07 sin estimar.)
 --------------------------------------------------------------------------------
 
 4. DEPENDENCIAS CRITICAS DE DESPLIEGUE
@@ -261,6 +264,26 @@ TOTAL HORAS PENDIENTES DE IMPLEMENTACION:                          14 horas
    (soporte de evidencias de excusas medicas).
 3. Base de datos db_ingreso_aprendices ejecutada con migraciones aplicadas
    (003 campos de sesion, 004 codigo programa, 005 toggle sesion y 006 inasistencia estado).
+4. [AGREGADO 2026-10-26] Falta aplicar, con permiso explicito, las migraciones
+   007-horarios-asignaciones-permutas.sql y 008-auditoria-importaciones.sql.
+   No estan ejecutadas.
+
+5. SEGURIDAD Y DUPLICADOS DEL TRACK A [AGREGADO 2026-10-26]
+--------------------------------------------------------------------------------
+Detalle en .agents/reporssecuriti.md. No se corrigio codigo en ese reporte.
+
+[SEG-01] Subida de Excel solo por extension, sin tope de tamano ni
+         is_uploaded_file(). Prioridad alta.
+[SEG-02] procesar() muestra $e->getMessage() al usuario. Prioridad alta.
+[SEG-03] confirmar_permutas en el POST salta la pantalla de confirmacion.
+         confirmarPermutas() no revalida la carga guardada en sesion.
+[SEG-04] Sincronizacion sin transaccion. Auditoria que traga excepciones.
+[SEG-05] El importador no usa Sesion::validarSolapamiento() ni
+         Sesion::tieneAsistencias(). Las reglas quedan duplicadas y distintas.
+[SEG-06] Borrar o aislar HorarioController::parsearExcelHorarios(). Sigue en
+         el controlador, ya no se llama, y aun crea instructores temporales.
+[SEG-07] Unificar la normalizacion de nombres: closure en
+         Usuario::getInstructorPorNombre() y HorarioController::normalizarNombre().
 
 ===============================================================================
 FIN DEL DOCUMENTO — PENDIENTE_IMPLEMENTAR.txt
