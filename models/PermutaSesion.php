@@ -225,6 +225,47 @@ class PermutaSesion
         $instSolicitante = (int) $permuta['instructor_solicitante_id'];
         $instReceptor    = (int) $permuta['instructor_receptor_id'];
 
+        // Cargar sesiones para revalidar cruces y vigencia (RF-HOR-25)
+        require_once ROOT_PATH . '/models/Sesion.php';
+        $sesionModel = new Sesion($this->conn);
+        $sesionOrigen = $sesionModel->getById($origenId);
+        $sesionDestino = $sesionModel->getById($destinoId);
+
+        if (!$sesionOrigen || !$sesionDestino) {
+            return ['ok' => false, 'mensaje' => 'Una de las sesiones involucradas ya no existe.'];
+        }
+
+        // RF-HOR-27: Una sesión con asistencia registrada no se puede mover ni reasignar
+        if ($sesionModel->tieneAsistencias($origenId) || $sesionModel->tieneAsistencias($destinoId)) {
+            return ['ok' => false, 'mensaje' => 'No se puede permutar porque una de las sesiones ya cuenta con asistencias registradas.'];
+        }
+
+        // RF-HOR-25: Revalidar que el instructor receptor no tenga conflicto en la franja de origen
+        $valReceptor = $sesionModel->validarSolapamiento(
+            (int)$sesionOrigen['Ficha_id'],
+            $instReceptor,
+            $sesionOrigen['fecha'],
+            $sesionOrigen['hora_inicio'],
+            $sesionOrigen['hora_fin'],
+            $destinoId
+        );
+        if (!$valReceptor['valido']) {
+            return ['ok' => false, 'mensaje' => "Conflicto para el receptor: {$valReceptor['mensaje']}"];
+        }
+
+        // RF-HOR-25: Revalidar que el instructor solicitante no tenga conflicto en la franja de destino
+        $valSolicitante = $sesionModel->validarSolapamiento(
+            (int)$sesionDestino['Ficha_id'],
+            $instSolicitante,
+            $sesionDestino['fecha'],
+            $sesionDestino['hora_inicio'],
+            $sesionDestino['hora_fin'],
+            $origenId
+        );
+        if (!$valSolicitante['valido']) {
+            return ['ok' => false, 'mensaje' => "Conflicto para el solicitante: {$valSolicitante['mensaje']}"];
+        }
+
         try {
             $this->conn->beginTransaction();
 
@@ -256,12 +297,43 @@ class PermutaSesion
             $stmtP = $this->conn->prepare($sqlPermuta);
             $stmtP->execute([':id' => $permutaId]);
 
+            // 3. Sincronizar asignaciones semestrales si la tabla existe (RF-HOR-43)
+            $this->sincronizarAsignacion($instReceptor, (int)$sesionOrigen['Ficha_id'], $sesionOrigen['fecha'], $sesionOrigen['hora_inicio'], $sesionOrigen['hora_fin']);
+            $this->sincronizarAsignacion($instSolicitante, (int)$sesionDestino['Ficha_id'], $sesionDestino['fecha'], $sesionDestino['hora_inicio'], $sesionDestino['hora_fin']);
+
             $this->conn->commit();
             return ['ok' => true, 'mensaje' => 'Permuta aprobada con éxito. Las sesiones han sido intercambiadas.'];
 
         } catch (\Throwable $e) {
             $this->conn->rollBack();
             return ['ok' => false, 'mensaje' => 'Error al aplicar la permuta: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Sincroniza la asignación de instructor semestral tras permuta (RF-HOR-43)
+     */
+    private function sincronizarAsignacion(int $instructorId, int $fichaId, string $fecha, string $horaInicio, string $horaFin): void
+    {
+        try {
+            $checkTable = $this->conn->query("SHOW TABLES LIKE 'asignacion_instructor'")->fetch();
+            if (!$checkTable) {
+                return;
+            }
+
+            $sql = "INSERT INTO asignacion_instructor (instructor_id, ficha_id, fecha, hora_inicio, hora_fin, estado)
+                    VALUES (:instructor, :ficha, :fecha, :inicio, :fin, 'Activo')
+                    ON DUPLICATE KEY UPDATE instructor_id = VALUES(instructor_id), estado = 'Activo'";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute([
+                ':instructor' => $instructorId,
+                ':ficha'      => $fichaId,
+                ':fecha'      => $fecha,
+                ':inicio'     => $horaInicio,
+                ':fin'        => $horaFin,
+            ]);
+        } catch (\Throwable $e) {
+            // Continúa sin romper la transacción de la permuta
         }
     }
 

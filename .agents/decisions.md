@@ -38,3 +38,9 @@ Formato sugerido por entrada:
   - Se crearon en `models/Ficha.php` los métodos `getByInstructorAsignado()`, `perteneceAInstructor()`, `getAprendices()` y `getInstructoresVinculados()`.
   - Se implementó la acción `FichaController::integrantes()` y la vista `views/fichas/integrantes.php` para visualizar el detalle de los aprendices matriculados y los instructores vinculados (Líder y de Sesión), con control de acceso que restringe la consulta al instructor asignado o al administrador.
   - Se integró el botón de acceso a integrantes (`fichas/integrantes`) en la tabla de `views/fichas/index.php`.
+- **2026-10-26 — Desarrollador 2 (Track B: Permutas, Horarios, Asistencia y Co-docencia):**
+  - Se subsanó la redeclaración duplicada de `Sesion::abrirSesion()`, garantizando apertura sobre sesiones programadas del día y asignando `apertura_real`.
+  - Se actualizó `Sesion::cerrarSesion()` para registrar `cierre_real = CURTIME()` preservando intacta la `hora_fin` programada del bloque (RF-HOR-42).
+  - Se reforzó `PermutaSesion::aprobarPermuta()` para validar disponibilidad horaria atómica de ambos instructores (RF-HOR-25) y sincronizar resilientemente la tabla `asignacion_instructor` (RF-HOR-43).
+  - Se implementó en `HorarioController::index()` y `views/horarios/index.php` el filtro por Instructor además del de Ficha para administradores (RF-HOR-31).
+  - Se implementó en `ExcusaMedica` y `ExcusaController` la regla de co-docencia en la jornada formativa (RF-HOR-34), requiriendo validación de dos instructores distintos (o administrador) antes de justificar formalmente una inasistencia.

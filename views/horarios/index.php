@@ -2,10 +2,10 @@
 
 <div class="toolbar">
     <div class="toolbar-left">
-        <form method="GET" action="<?= BASE_URL ?>" class="filter-form" style="display: flex; gap: 10px; align-items: center;">
+        <form method="GET" action="<?= BASE_URL ?>" class="filter-form" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <input type="hidden" name="action" value="horarios">
             <div class="form-group mb-0" style="margin-bottom: 0;">
-                <select name="ficha_id" class="form-control" onchange="this.form.submit()" style="min-width: 250px;">
+                <select name="ficha_id" class="form-control" onchange="this.form.submit()" style="min-width: 220px;">
                     <option value="">-- Todas las Fichas --</option>
                     <?php foreach ($fichas as $f): ?>
                         <option value="<?= $f['id'] ?>" <?= ($fichaId == $f['id']) ? 'selected' : '' ?>>
@@ -14,6 +14,18 @@
                     <?php endforeach; ?>
                 </select>
             </div>
+            <?php if (!empty($instructores)): ?>
+            <div class="form-group mb-0" style="margin-bottom: 0;">
+                <select name="instructor_id" class="form-control" onchange="this.form.submit()" style="min-width: 220px;">
+                    <option value="">-- Todos los Instructores --</option>
+                    <?php foreach ($instructores as $inst): ?>
+                        <option value="<?= $inst['id'] ?>" <?= ($instructorId == $inst['id']) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($inst['nombre'] . ' ' . $inst['apellido']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
         </form>
         <div class="search-box">
             <i class="fas fa-search"></i>
@@ -35,7 +47,7 @@
         </a>
         <?php endif; ?>
         <?php if (Auth::isAdminOrInstructor()): ?>
-        <a href="<?= BASE_URL ?>?action=horarios/crear<?= $fichaId ? '&ficha_id='.$fichaId : '' ?>" class="btn btn-success">
+        <a href="<?= BASE_URL ?>?action=horarios/crear<?= $fichaId ? '&ficha_id='.$fichaId : '' ?><?= $instructorId ? '&instructor_id='.$instructorId : '' ?>" class="btn btn-success">
             <i class="fas fa-plus-circle"></i> Nueva Sesión
         </a>
         <a href="<?= BASE_URL ?>?action=horarios/importar" class="btn btn-primary">
