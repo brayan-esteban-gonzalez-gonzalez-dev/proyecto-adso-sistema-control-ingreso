@@ -56,16 +56,14 @@ class HorarioController
 
         $pageTitle = 'Gestion de Horarios';
         $fichaId = isset($_GET['ficha_id']) && !empty($_GET['ficha_id']) ? (int)$_GET['ficha_id'] : null;
+        $instructorId = isset($_GET['instructor_id']) && !empty($_GET['instructor_id']) ? (int)$_GET['instructor_id'] : null;
         
         $fichas = $this->fichaModel->getAll();
+        $instructores = $this->usuarioModel->getInstructores();
 
-        if ($fichaId) {
-            $sesiones = $this->sesionModel->getByFicha($fichaId);
-            $fichaSeleccionada = $this->fichaModel->getById($fichaId);
-        } else {
-            $sesiones = $this->sesionModel->getAll();
-            $fichaSeleccionada = null;
-        }
+        $sesiones = $this->sesionModel->getFiltradas($fichaId, $instructorId);
+        $fichaSeleccionada = $fichaId ? $this->fichaModel->getById($fichaId) : null;
+        $instructorSeleccionado = $instructorId ? $this->usuarioModel->getById($instructorId) : null;
 
         require_once ROOT_PATH . '/views/horarios/index.php';
     }

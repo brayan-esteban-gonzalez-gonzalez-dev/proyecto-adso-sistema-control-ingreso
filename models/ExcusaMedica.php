@@ -205,18 +205,95 @@ class ExcusaMedica
     }
 
     /**
-     * Aprueba una excusa: registra 'Aprobada' en estado_excusa y actualiza la inasistencia.
+     * Verifica si una excusa requiere doble validación por co-docencia en la jornada (RF-HOR-34)
      */
-    public function aprobar(int $idExcusa, int $idInstructor, string $comentario = ''): bool
+    public function requiereDobleAprobacion(int $idExcusa): bool
     {
-        $ok = $this->registrarEstado($idExcusa, $idInstructor, 'Aprobada', $comentario);
-        if ($ok) {
-            $inasistenciaId = $this->obtenerInasistenciaIdDeExcusa($idExcusa);
-            if ($inasistenciaId !== null) {
-                $this->actualizarEstadoInasistencia($inasistenciaId, 'Justificada');
-            }
+        $sql = "SELECT s.Ficha_id, s.fecha
+                FROM {$this->table} e
+                INNER JOIN inasistencia i ON e.Inasistencia_id = i.id
+                INNER JOIN sesion s ON i.Sesion_id = s.id
+                WHERE e.id = :id
+                LIMIT 1";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':id' => $idExcusa]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            return false;
         }
-        return $ok;
+
+        $fichaId = (int) $row['Ficha_id'];
+        $fecha   = $row['fecha'];
+
+        $sqlCount = "SELECT COUNT(DISTINCT Instructor_id) AS total_instructores
+                     FROM sesion
+                     WHERE Ficha_id = :ficha_id
+                       AND fecha = :fecha
+                       AND estado != 'Cancelado'";
+        $stmtCount = $this->conn->prepare($sqlCount);
+        $stmtCount->execute([
+            ':ficha_id' => $fichaId,
+            ':fecha'    => $fecha,
+        ]);
+        $countRow = $stmtCount->fetch();
+        return ((int)($countRow['total_instructores'] ?? 0)) >= 2;
+    }
+
+    /**
+     * Aprueba una excusa: registra 'Aprobada' en estado_excusa y actualiza la inasistencia.
+     * Soporta regla de doble validación por co-docencia en la jornada (RF-HOR-34).
+     *
+     * @return array{ok: bool, completa: bool, mensaje: string}
+     */
+    public function aprobar(int $idExcusa, int $idInstructor, string $comentario = '', bool $esAdmin = false): array
+    {
+        $requiereDoble = $this->requiereDobleAprobacion($idExcusa);
+
+        if (!$requiereDoble || $esAdmin) {
+            $ok = $this->registrarEstado($idExcusa, $idInstructor, 'Aprobada', $comentario);
+            if ($ok) {
+                $inasistenciaId = $this->obtenerInasistenciaIdDeExcusa($idExcusa);
+                if ($inasistenciaId !== null) {
+                    $this->actualizarEstadoInasistencia($inasistenciaId, 'Justificada');
+                }
+            }
+            return [
+                'ok' => $ok,
+                'completa' => true,
+                'mensaje' => 'Excusa médica aprobada correctamente. La inasistencia ha sido justificada.'
+            ];
+        }
+
+        // Requiere doble validación (RF-HOR-34)
+        $check = $this->conn->prepare("SELECT id, Instructor_id, estado, respuesta FROM {$this->tableEstado} WHERE Excusa_id = :id LIMIT 1");
+        $check->execute([':id' => $idExcusa]);
+        $prev = $check->fetch();
+
+        if ($prev && (int)$prev['Instructor_id'] !== $idInstructor && $prev['estado'] === 'Pendiente') {
+            // Segunda firma recibida de co-docente
+            $comentarioFinal = trim($prev['respuesta'] . " | 2da aprobación: " . $comentario);
+            $ok = $this->registrarEstado($idExcusa, $idInstructor, 'Aprobada', $comentarioFinal);
+            if ($ok) {
+                $inasistenciaId = $this->obtenerInasistenciaIdDeExcusa($idExcusa);
+                if ($inasistenciaId !== null) {
+                    $this->actualizarEstadoInasistencia($inasistenciaId, 'Justificada');
+                }
+            }
+            return [
+                'ok' => $ok,
+                'completa' => true,
+                'mensaje' => 'Doble validación completada con éxito. La inasistencia ha sido justificada.'
+            ];
+        }
+
+        // Primera aprobación registrada
+        $comentarioParcial = "[1 de 2 firmas requeridas por co-docencia] " . $comentario;
+        $ok = $this->registrarEstado($idExcusa, $idInstructor, 'Pendiente', $comentarioParcial);
+        return [
+            'ok' => $ok,
+            'completa' => false,
+            'mensaje' => 'Primera aprobación registrada. Por regla de co-docencia (RF-HOR-34), se requiere la validación del segundo instructor de la jornada.'
+        ];
     }
 
     /**

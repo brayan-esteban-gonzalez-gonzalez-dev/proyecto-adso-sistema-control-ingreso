@@ -26,10 +26,12 @@ producto, atendiendo a las directrices academicas y normativas del SENA:
    -> [IMPLEMENTADO 2026-10-22]: Transaccion atomica al alternar toggle OFF de sesion
       que inserta aprendices sin marca en la tabla inasistencia.
 
-3. Flujo de doble validacion de excusas medicas:
+~~3. Flujo de doble validacion de excusas medicas:
    Mecanismo de aprobacion colegiada cuando dos o mas instructores comparten
    la formacion de una ficha en la misma jornada o franja horaria.
-   [PENDIENTE DE IMPLEMENTACION — Ver detalle en Fase 2].
+   [PENDIENTE DE IMPLEMENTACION — Ver detalle en Fase 2].~~
+   -> [IMPLEMENTADO 2026-10-26]: Regla RF-HOR-34 implementada en ExcusaMedica::requiereDobleAprobacion()
+      y ExcusaController::procesar(), exigiendo visto bueno de ambos instructores (o administrador).
 
 ~~4. Terminal operativa RFID:
    Puesta a punto del capturador de llaveros/tarjetas de proximidad mediante
@@ -132,7 +134,7 @@ control docente.
   - Archivos: models/Sesion.php, controllers/HorarioController.php,
               models/IngresoAsistencia.php.
 
-[ALTA-03] Flujo de Doble Aprobacion de Excusas (Co-docencia) [PENDIENTE]
+~~[ALTA-03] Flujo de Doble Aprobacion de Excusas (Co-docencia)~~ [IMPLEMENTADO 2026-10-26]
   - Especificacion funcional:
     1. Identificar si la sesion formativa o ficha cuenta con mas de un instructor asignado
        (cruce de Ficha.instructor_id e instructores vinculados en Sesion).
@@ -143,31 +145,17 @@ control docente.
        - Solo si el 100% de los instructores asignados votan 'Aprobada': la excusa pasa a estado general 'Aprobada'
          y la inasistencia vinculada se marca como 'Justificada'.
        - Mientras falten instructores por emitir voto: el estado general permanece en 'En revisión'.
-  - [QUÉ TOCA HACER]:
-    1. Proponer archivo de migracion (ej. 007-revisiones-excusa.sql) con la tabla de detalle por instructor.
-    2. Modificar models/ExcusaMedica.php con metodos para registrar revision individual y evaluar consenso colegiado.
-    3. Modificar ExcusaController::revisar(), aprobar() y rechazar() para registrar el dictamen individual
-       segun el instructor en sesion ($_SESSION['user_id']).
-    4. Actualizar views/excusas/revisar.php para renderizar la lista de instructores asignados y el voto/estado de cada uno.
-  - Archivos a intervenir: models/ExcusaMedica.php, controllers/ExcusaController.php, views/excusas/revisar.php, migrations/007-revisiones-excusa.sql.
+  - [IMPLEMENTADO 2026-10-26]: Integrado en ExcusaMedica::requiereDobleAprobacion(), ExcusaMedica::aprobar()
+    y views/excusas/revisar.php cumpliendo con RF-HOR-34.
 
-[ALTA-04] Formulario de Creacion y Modificacion Manual de Sesiones [PENDIENTE]
+~~[ALTA-04] Formulario de Creacion y Modificacion Manual de Sesiones~~ [IMPLEMENTADO 2026-10-26]
   - Especificacion funcional:
     1. Proveer interfaz CRUD manual para sesiones de horario que complemente
        la importacion semestral Excel.
     2. Permitir a administradores e instructores lideres crear sesiones extraordinarias,
        editar horarios existentes o darlas de baja.
-  - [QUÉ TOCA HACER]:
-    1. Implementar metodos en controllers/HorarioController.php:
-       - crear(): prepara listados de Fichas, Competencias e Instructores y renderiza el formulario.
-       - editar(): valida ID, obtiene datos con Sesion::getById() y renderiza formulario precargado.
-       - guardar(): valida token CSRF, campos requeridos (ficha, competencia, instructor, fecha, hora inicio, hora fin),
-         valida que hora_fin > hora_inicio y que no exista solapamiento en el mismo ambiente/ficha,
-         e invoca Sesion::create() o Sesion::update().
-       - eliminar(): valida que la sesion no tenga asistencias vinculadas antes de eliminar.
-    2. Crear vista views/horarios/form.php con maquetacion institucional (sin Bootstrap, usando CSS del sistema).
-    3. Agregar boton de "Nueva Sesion Manual" en views/horarios/index.php.
-  - Archivos a intervenir: controllers/HorarioController.php, views/horarios/form.php, views/horarios/index.php, models/Sesion.php.
+  - [IMPLEMENTADO 2026-10-26]: CRUD completo en controllers/HorarioController.php (crear, editar, guardar, eliminar),
+    vista views/horarios/form.php y enlace en views/horarios/index.php. Proteccion de sesiones con asistencia (RF-HOR-27).
 
 FASE 3: GESTION DE ENTIDADES MAESTRAS [PRIORIDAD MEDIA]
 --------------------------------------------------------------------------------

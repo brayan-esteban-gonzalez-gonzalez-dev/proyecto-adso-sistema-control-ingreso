@@ -19,6 +19,35 @@ class Sesion {
     /**
      * Obtiene todas las sesiones con información de ficha e instructor
      */
+    /**
+     * Obtiene sesiones filtradas por ficha y/o instructor (RF-HOR-31)
+     */
+    public function getFiltradas(?int $fichaId = null, ?int $instructorId = null): array
+    {
+        $sql = "SELECT s.*, 
+                       f.codigo AS codigo_ficha,
+                       CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor,
+                       c.nombre AS nombre_competencia
+                FROM {$this->table} s
+                INNER JOIN Ficha f ON s.Ficha_id = f.id
+                INNER JOIN Usuario u ON s.Instructor_id = u.id
+                LEFT JOIN competencia c ON s.Competencia_id = c.id
+                WHERE 1=1";
+        $params = [];
+        if ($fichaId !== null && $fichaId > 0) {
+            $sql .= " AND s.Ficha_id = :ficha_id";
+            $params[':ficha_id'] = $fichaId;
+        }
+        if ($instructorId !== null && $instructorId > 0) {
+            $sql .= " AND s.Instructor_id = :instructor_id";
+            $params[':instructor_id'] = $instructorId;
+        }
+        $sql .= " ORDER BY s.fecha DESC, s.hora_inicio ASC";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
     public function getAll(): array {
         $sql = "SELECT s.*, 
                        f.codigo AS codigo_ficha,
@@ -266,44 +295,6 @@ class Sesion {
     }
 
     /**
-     * Abre una nueva sesión de asistencia para una ficha (toggle ON).
-     *
-     * Inserta un registro con estado 'Activo', hora_fin = NULL, fecha y hora actuales.
-     *
-     * @return int|false  ID de la sesión creada, o false si falla.
-     */
-    public function abrirSesion(int $fichaId, int $instructorId): int|false
-    {
-        // Verificar que no haya ya una sesión activa para esta ficha hoy
-        $existente = $this->obtenerSesionActivaPorFicha($fichaId);
-        if ($existente !== null) {
-            return false;
-        }
-
-        $sql = "INSERT INTO {$this->table}
-                    (Ficha_id, Instructor_id, fecha, hora_inicio, hora_fin, estado)
-                VALUES
-                    (:ficha_id, :instructor_id, CURDATE(), CURTIME(), NULL, 'Activo')";
-        $stmt = $this->conn->prepare($sql);
-        $ok = $stmt->execute([
-            ':ficha_id'      => $fichaId,
-            ':instructor_id' => $instructorId,
-        ]);
-
-        return $ok ? (int) $this->conn->lastInsertId() : false;
-    }
-
-    /**
-     * Cierra una sesión de asistencia (toggle OFF).
-     *
-     * Usa una transacción para:
-     *  1. Actualizar estado a 'Finalizada' y registrar hora_fin.
-     *  2. Insertar inasistencias para los aprendices activos de la ficha
-     *     que NO tengan registro en la tabla `asistencia` para esa sesión.
-     *
-     * @return array{ok: bool, inasistencias: int, mensaje: string}
-     */
-    /**
      * Verifica si una sesión tiene asistencias registradas
      */
     public function tieneAsistencias(int $sesionId): bool
@@ -535,14 +526,17 @@ class Sesion {
         try {
             $this->conn->beginTransaction();
 
-            // 1. Cerrar la sesión
+            // 1. Cerrar la sesión preservando hora_fin programada (RF-HOR-42)
             if ($tieneCierreReal) {
                 $sqlUpdate = "UPDATE {$this->table}
-                              SET estado = 'Finalizada', hora_fin = CURTIME(), cierre_real = CURTIME()
+                              SET estado = 'Finalizada',
+                                  hora_fin = COALESCE(hora_fin, CURTIME()),
+                                  cierre_real = CURTIME()
                               WHERE id = :id";
             } else {
                 $sqlUpdate = "UPDATE {$this->table}
-                              SET estado = 'Finalizada', hora_fin = CURTIME()
+                              SET estado = 'Finalizada',
+                                  hora_fin = COALESCE(hora_fin, CURTIME())
                               WHERE id = :id";
             }
             $stmtUpdate = $this->conn->prepare($sqlUpdate);
