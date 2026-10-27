@@ -296,16 +296,11 @@ class ExcusaController
 
         try {
             if ($accion === 'aprobar') {
-                $esAdmin = Auth::isAdmin();
-                $res = $this->model->aprobar($idExcusa, (int)$instructorId, $comentario, $esAdmin);
-                if ($res['completa']) {
-                    Auth::setFlash('success', $res['mensaje']);
-                } else {
-                    Auth::setFlash('info', $res['mensaje']);
-                }
+                $res = $this->model->registrarRevision($idExcusa, $instructorId, 'Aprobada', $comentario);
+                Auth::setFlash($res['ok'] ? 'success' : 'error', $res['mensaje']);
             } elseif ($accion === 'rechazar') {
-                $this->model->rechazar($idExcusa, (int)$instructorId, $comentario);
-                Auth::setFlash('success', 'Excusa médica rechazada.');
+                $res = $this->model->registrarRevision($idExcusa, $instructorId, 'Rechazada', $comentario);
+                Auth::setFlash($res['ok'] ? 'success' : 'error', $res['mensaje']);
             } else {
                 Auth::setFlash('error', 'Acción de revisión no válida.');
             }
