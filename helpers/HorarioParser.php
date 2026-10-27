@@ -89,14 +89,77 @@ class HorarioParser
 
     /**
      * Parsea horario de instructor (6 meses, múltiples fichas).
+     *
+     * La grilla es la misma del horario de ficha, pero cada celda trae el
+     * código de la ficha que se le asigna al instructor y el encabezado
+     * identifica al instructor.
      */
     private function parsearHorarioInstructor($sheet, int $anioBase): array
     {
         $resultado = $this->estructuraBase('instructor');
-        // TODO: Implementar lógica específica del horario de instructor (6 meses)
-        // Por ahora devolvemos estructura vacía lista para Tarea A.2
-        $resultado['meta']['tipo'] = 'instructor';
+        $highestRow = $sheet->getHighestRow();
+        $highestCol = $sheet->getHighestColumn();
+        $highestColIndex = Coordinate::columnIndexFromString($highestCol);
+
+        $resultado['meta']['instructor_nombre'] = $this->detectarNombreInstructor($sheet, $highestRow, $highestColIndex);
+        $resultado['meta']['año'] = $anioBase;
+
+        $bloques = $this->extraerBloques($sheet, $highestRow, $highestColIndex, $anioBase);
+
+        // En el horario del instructor, el código de ficha sale del texto de la celda.
+        $instructorNombre = (string) ($resultado['meta']['instructor_nombre'] ?? '');
+        foreach ($bloques as $i => $bloque) {
+            $texto = (string) ($bloque['texto_crudo'] ?? '');
+            $codigo = null;
+            if (preg_match('/\b(\d{7})\b/', $texto, $m)) {
+                $codigo = (int) $m[1];
+            }
+
+            $bloques[$i]['codigo_ficha'] = $codigo;
+            $bloques[$i]['instructor'] = $instructorNombre;
+            // La ficha ocupa la línea del código; los descriptivos quedan del texto restante.
+            $bloques[$i]['descripcion'] = trim(preg_replace('/\b\d{7}\b/', '', $texto));
+        }
+
+        $resultado['bloques'] = $bloques;
+        $resultado['meta']['total_bloques'] = count($bloques);
+
         return $resultado;
+    }
+
+    /**
+     * Detecta el nombre del instructor en las primeras filas del encabezado.
+     * Se toma el primer texto alfabético suficientemente largo que no sea
+     * el nombre de un mes ni una palabra de la grilla.
+     */
+    private function detectarNombreInstructor($sheet, int $maxRow, int $maxCol): ?string
+    {
+        for ($r = 1; $r <= min(8, $maxRow); $r++) {
+            for ($c = 1; $c <= $maxCol; $c++) {
+                $val = trim((string) $sheet->getCell([$c, $r])->getValue());
+                if ($val === '' || !preg_match('/[A-Za-zÁÉÍÓÚÑáéíóúñ]/', $val)) {
+                    continue;
+                }
+
+                $mayus = strtoupper($val);
+                $esMes = false;
+                foreach (array_keys($this->mesesMap) as $mes) {
+                    if (str_contains($mayus, $mes)) {
+                        $esMes = true;
+                        break;
+                    }
+                }
+                if ($esMes || in_array($mayus, $this->diasKeywords, true)) {
+                    continue;
+                }
+
+                if (strlen($val) >= 6 && strlen($val) <= 80) {
+                    return $val;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function estructuraBase(string $tipo): array
@@ -165,11 +228,6 @@ class HorarioParser
                 foreach ($colDates as $colIdx => $fecha) {
                     $cellKey = "{$colIdx}_{$cr}";
 
-                    // Saltar si ya fue procesado como parte de una celda combinada
-                    if (isset($processedBlocks[$cellKey] ?? false)) {
-                        continue;
-                    }
-
                     $rawText = trim((string)$sheet->getCell([$colIdx, $cr])->getValue());
                     if ($rawText === '') {
                         continue;
@@ -197,6 +255,7 @@ class HorarioParser
                         'especialidad'      => $datos['especialidad'] ?? '',
                         'nivel'             => $datos['nivel'] ?? '',
                         'grupo_convergente' => $datos['grupo_convergente'] ?? '',
+                        'texto_crudo'       => $rawText,
                     ];
                 }
             }

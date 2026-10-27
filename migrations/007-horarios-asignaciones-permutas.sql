@@ -38,9 +38,9 @@ ALTER TABLE `sesion`
     ADD COLUMN IF NOT EXISTS `apertura_real` TIME NULL AFTER `hora_fin`,
     ADD COLUMN IF NOT EXISTS `cierre_real` TIME NULL AFTER `apertura_real`;
 
--- Modificar ENUM de estado para incluir 'Cancelado' y 'Permutado'
+-- Modificar ENUM de estado para incluir 'Permutado' conservando los existentes
 ALTER TABLE `sesion` 
-    MODIFY COLUMN `estado` ENUM('Activo', 'Cancelado', 'Permutado') NOT NULL DEFAULT 'Activo';
+    MODIFY COLUMN `estado` ENUM('Activo', 'Cancelado', 'Finalizada', 'Permutado') NOT NULL DEFAULT 'Activo';
 
 -- ============================================================================
 -- 3. Tabla permuta_sesion (registro de solicitudes y resoluciones)

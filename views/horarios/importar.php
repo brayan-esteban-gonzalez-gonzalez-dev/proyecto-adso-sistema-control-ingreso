@@ -38,6 +38,27 @@
 
         <div class="form-group" style="margin-bottom: 25px;">
             <label class="form-label" style="font-weight: 600; display: block; margin-bottom: 8px;">
+                Tipo de horario <span style="color: var(--accent-red, #ef4444); font-weight: bold;">*</span>
+            </label>
+            <select name="tipo_horario" class="form-control" required style="width: 100%; padding: 10px 12px;">
+                <option value="ficha" selected>Horario de la ficha (mensual)</option>
+                <option value="instructor">Horario del instructor (6 meses)</option>
+            </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 25px;">
+            <label class="form-label" style="font-weight: 600; display: block; margin-bottom: 8px;">
+                Año del horario
+            </label>
+            <input type="number" name="anio" class="form-control" min="2000" max="2100"
+                   value="<?= (int) date('Y') ?>" style="width: 160px; padding: 10px 12px;">
+            <span class="text-muted" style="font-size: 0.8rem; display: block; margin-top: 6px;">
+                Se usa como año base; si el calendario pasa de diciembre a enero, se suma un año automáticamente.
+            </span>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 25px;">
+            <label class="form-label" style="font-weight: 600; display: block; margin-bottom: 8px;">
                 Seleccionar Archivo Excel (.xlsx / .xls) <span style="color: var(--accent-red, #ef4444); font-weight: bold;">*</span>
             </label>
             <div style="border: 2px dashed var(--border-color, #334155); border-radius: 8px; padding: 30px; text-align: center; background: rgba(255,255,255,0.02); transition: border-color 0.2s;" id="dropArea">

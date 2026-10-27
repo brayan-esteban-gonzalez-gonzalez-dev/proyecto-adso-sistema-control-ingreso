@@ -13,6 +13,7 @@ require_once ROOT_PATH . '/helpers/HorarioParser.php';
 require_once ROOT_PATH . '/helpers/HorarioValidator.php';
 require_once ROOT_PATH . '/helpers/HorarioSincronizador.php';
 require_once ROOT_PATH . '/helpers/HorarioReporte.php';
+require_once ROOT_PATH . '/models/AsignacionInstructor.php';
 
 class HorarioController
 {
@@ -25,6 +26,7 @@ class HorarioController
     private HorarioSincronizador $horarioSincronizador;
     private HorarioReporte $horarioReporte;
     private PermutaSesion $permutaModel;
+    private AsignacionInstructor $asignacionModel;
 
     public function __construct(PDO $db)
     {
@@ -32,9 +34,10 @@ class HorarioController
         $this->sesionModel = new Sesion($db);
         $this->fichaModel = new Ficha($db);
         $this->usuarioModel = new Usuario($db);
+        $this->asignacionModel = new AsignacionInstructor($db);
         $this->horarioParser = new HorarioParser();
-        $this->horarioValidator = new HorarioValidator();
-        $this->horarioSincronizador = new HorarioSincronizador($db);
+        $this->horarioValidator = new HorarioValidator($this->usuarioModel, $this->asignacionModel);
+        $this->horarioSincronizador = new HorarioSincronizador($db, $this->usuarioModel, $this->asignacionModel);
         $this->horarioReporte = new HorarioReporte();
 
         require_once ROOT_PATH . '/models/PermutaSesion.php';
@@ -333,13 +336,43 @@ class HorarioController
         }
 
         try {
+            $tipoHorario = ($_POST['tipo_horario'] ?? 'ficha') === 'instructor' ? 'instructor' : 'ficha';
+            $anio = (int) ($_POST['anio'] ?? date('Y'));
+            if ($anio < 2000 || $anio > 2100) {
+                $anio = (int) date('Y');
+            }
+
             $parseResult = $this->horarioParser->parsear($fileTmp, [
-                'tipo' => 'ficha',
-                'año'  => (int)date('Y'),
+                'tipo' => $tipoHorario,
+                'año'  => $anio,
             ]);
 
             // Validación (Tarea A.2)
-            $validacion = $this->horarioValidator->validar($parseResult['bloques'] ?? []);
+            if ($tipoHorario === 'instructor') {
+                $resultado = $this->procesarHorarioInstructor($parseResult);
+                $pageTitle = 'Resultado de la Importación';
+                require_once ROOT_PATH . '/views/horarios/resultado.php';
+                return;
+            }
+
+            $fichaDetectada = $this->fichaModel->getByCodigo($parseResult['meta']['codigo_ficha'] ?? 0);
+
+            if (!$fichaDetectada) {
+                $pageTitle = 'Errores de Validación';
+                $errores = ['La ficha con código ' . ($parseResult['meta']['codigo_ficha'] ?? 'desconocido') . ' no está registrada en el sistema.'];
+                require_once ROOT_PATH . '/views/horarios/errores_validacion.php';
+                exit;
+            }
+
+            $fichaId = (int) $fichaDetectada['id'];
+            foreach ($parseResult['bloques'] as $i => $bloque) {
+                $parseResult['bloques'][$i]['codigo_ficha'] = (string) ($fichaDetectada['codigo'] ?? '');
+            }
+
+            $validacion = $this->horarioValidator->validar(
+                $parseResult['bloques'] ?? [],
+                ['ficha_id' => $fichaId]
+            );
 
             if (!$validacion['valido']) {
                 $pageTitle = 'Errores de Validación';
@@ -349,7 +382,6 @@ class HorarioController
             }
 
             // Sincronización (Tarea A.3)
-            $fichaId = $this->fichaModel->getByCodigo($parseResult['meta']['codigo_ficha'] ?? 0)['id'] ?? 0;
             $reporteSincronizacion = $this->horarioSincronizador->sincronizar($parseResult['bloques'] ?? [], $fichaId);
 
             // Reporte consolidado (Tarea A.4)
@@ -367,6 +399,71 @@ class HorarioController
             header('Location: ' . BASE_URL . '?action=horarios/importar');
             exit;
         }
+    }
+
+    /**
+     * Procesa el horario semestral de un instructor (RF-HOR-03, 36, 39, 40).
+     */
+    private function procesarHorarioInstructor(array $parseResult): array
+    {
+        $nombreInstructor = trim((string) ($parseResult['meta']['instructor_nombre'] ?? ''));
+        $instructor = $nombreInstructor !== ''
+            ? $this->usuarioModel->getInstructorPorNombre($nombreInstructor)
+            : null;
+
+        if (!$instructor) {
+            $errores = ['No se pudo identificar al instructor en el encabezado del archivo'
+                . ($nombreInstructor !== '' ? " (\"{$nombreInstructor}\")" : '')
+                . '. Verifique que esté registrado.'];
+            $pageTitle = 'Errores de Validación';
+            require_once ROOT_PATH . '/views/horarios/errores_validacion.php';
+            exit;
+        }
+
+        // Mapa de fichas registradas
+        $fichas = $this->fichaModel->getAll();
+        $mapaFichas = [];
+        foreach ($fichas as $f) {
+            $mapaFichas[(string) $f['codigo']] = (int) $f['id'];
+        }
+
+        $errores = [];
+        foreach ($parseResult['bloques'] as $i => $bloque) {
+            $codigo = (string) ($bloque['codigo_ficha'] ?? '');
+            if ($codigo === '') {
+                $errores[] = 'El bloque del ' . ($bloque['fecha'] ?? '?') . ' (' . ($bloque['hora_inicio'] ?? '?') . ') no indica la ficha asignada.';
+                continue;
+            }
+            if (!isset($mapaFichas[$codigo])) {
+                $errores[] = "La ficha {$codigo} no está registrada en el sistema.";
+                continue;
+            }
+            $parseResult['bloques'][$i]['codigo_ficha'] = $codigo;
+        }
+
+        $validacion = $this->horarioValidator->validar(
+            $parseResult['bloques'] ?? [],
+            ['validar_asignaciones' => false]
+        );
+        $errores = array_merge($errores, $validacion['errores']);
+
+        if (!empty($errores)) {
+            $pageTitle = 'Errores de Validación';
+            require_once ROOT_PATH . '/views/horarios/errores_validacion.php';
+            exit;
+        }
+
+        $reporteSincronizacion = $this->horarioSincronizador->sincronizarAsignaciones(
+            $parseResult['bloques'] ?? [],
+            (int) $instructor['id'],
+            $mapaFichas
+        );
+
+        return $this->horarioReporte->generarReporte(
+            $parseResult,
+            ['valido' => true, 'errores' => []],
+            $reporteSincronizacion
+        );
     }
 
     // =====================================================================
