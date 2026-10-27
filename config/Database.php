@@ -110,8 +110,8 @@ class Database {
      */
     private function runMigrationScript(PDO $pdo): void {
         $sqlPath = defined('ROOT_PATH') 
-            ? ROOT_PATH . '/migrations/db_ingreso_aprendices.sql' 
-            : __DIR__ . '/../migrations/db_ingreso_aprendices.sql';
+            ? ROOT_PATH . '/migrations/db_ingreso_aprendices_27_08.sql' 
+            : __DIR__ . '/../migrations/db_ingreso_aprendices_27_08.sql';
         
         if (!file_exists($sqlPath)) {
             die("Error: No se encontró el archivo de migración SQL en: {$sqlPath}");

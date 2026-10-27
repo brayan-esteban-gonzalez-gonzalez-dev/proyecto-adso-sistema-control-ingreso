@@ -1,8 +1,12 @@
 ================================================================================
 PLAN DE ACCION Y TAREAS PENDIENTES DE IMPLEMENTACION
 SISTEMA DE CONTROL DE INGRESO DE APRENDICES (SENA)
-Fecha de corte: 15 de octubre de 2026
-Estado consolidado: 70% completado / 30% pendiente
+Fecha de corte: 27 de octubre de 2026
+Estado consolidado: 95% completado / 5% pendiente
+~~Fecha de corte: 23 de octubre de 2026~~
+~~Estado consolidado: 90% completado / 10% pendiente~~
+~~Fecha de corte: 15 de octubre de 2026~~
+~~Estado consolidado: 70% completado / 30% pendiente~~
 ================================================================================
 
 1. DIRECTRICES Y REQUERIMIENTOS PRIORITARIOS DE NEGOCIO
@@ -10,28 +14,39 @@ Estado consolidado: 70% completado / 30% pendiente
 Los siguientes requerimientos constituyen el foco central de finalizacion del
 producto, atendiendo a las directrices academicas y normativas del SENA:
 
-1. Logica de retardo automatizada:
+~~1. Logica de retardo automatizada:
    Tolerancia de 10 minutos contados a partir del registro de inicio de sesion
    por parte del instructor o de la hora programada en la sesion. Registro exacto
-   de minutos de tardanza en la entidad asistencia.
+   de minutos de tardanza en la entidad asistencia.~~
+   -> [IMPLEMENTADO 2026-10-22]: Regla de 10 minutos calculada en IngresoAsistencia
+      y registrada en AsistenciaController::registrarMarcacion().
 
-2. Cierre formal de sesion y generacion de inasistencias:
+~~2. Cierre formal de sesion y generacion de inasistencias:
    Ejecucion de proceso batch al finalizar la jornada formativa para identificar
    aprendices matriculados en la ficha sin marcacion de entrada, creando de forma
-   automatica los registros correspondientes en la entidad inasistencia.
+   automatica los registros correspondientes en la entidad inasistencia.~~
+   -> [IMPLEMENTADO 2026-10-22]: Transaccion atomica al alternar toggle OFF de sesion
+      que inserta aprendices sin marca en la tabla inasistencia.
 
-3. Flujo de doble validacion de excusas medicas:
+~~3. Flujo de doble validacion de excusas medicas:
    Mecanismo de aprobacion colegiada cuando dos o mas instructores comparten
    la formacion de una ficha en la misma jornada o franja horaria.
+   [PENDIENTE DE IMPLEMENTACION — Ver detalle en Fase 2].~~
+   -> [IMPLEMENTADO 2026-10-26]: Regla RF-HOR-34 implementada en ExcusaMedica::requiereDobleAprobacion()
+      y ExcusaController::procesar(), exigiendo visto bueno de ambos instructores (o administrador).
 
-4. Terminal operativa RFID:
+~~4. Terminal operativa RFID:
    Puesta a punto del capturador de llaveros/tarjetas de proximidad mediante
    lector USB en emulacion de teclado o interfaz serial, registrando entradas y
-   salidas sin friccion operativa.
+   salidas sin friccion operativa.~~
+   -> [IMPLEMENTADO 2026-10-22]: Terminal views/asistencia/rfid.php y assets/js/rfid.js
+      con reloj digital, escucha continua y validacion asincrona.
 
-5. Gestion de horarios por instructor:
+~~5. Gestion de horarios por instructor:
    Consolidacion de vistas personalizadas donde el instructor consulte de forma
-   exclusiva sus fichas, competencias y sesiones asignadas.
+   exclusiva sus fichas, competencias y sesiones asignadas.~~
+   -> [IMPLEMENTADO]: Modulo miHorario (?action=horarios/miHorario) y filtro de
+      fichas asignadas con vista de integrantes (?action=fichas/integrantes).
 
 
 2. DESGLOSE DE TAREAS POR FASE Y PRIORIDAD
@@ -77,12 +92,14 @@ interfaces y el modelo relacional actual.
        - Actualizacion dinamica de la tabla de ultimas marcaciones del dia.
   - Archivos: assets/js/rfid.js, views/asistencia/rfid.php.
 
-[CRITICA-04] Saneamiento de Rutas y Navegacion Global
+~~[CRITICA-04] Saneamiento de Rutas y Navegacion Global~~ [IMPLEMENTADO 2026-10-22]
   - Accion requerida:
     1. Revisar enlaces del sidebar en views/layouts/header.php.
     2. Definir redireccion controlada o vista informativa en reportes mientras
        se concluye el modulo de generacion documental.
   - Archivos: views/layouts/header.php, helpers/Router.php.
+  - Resultado: Eliminado enlace duplicado de Aprendices, ruta reportes activa con ReporteController,
+    enlace de Terminal RFID restringido a instructores y operativo.
 
 
 FASE 2: NUCLEO DE NEGOCIO Y REGLAS ACADEMICAS [PRIORIDAD ALTA]
@@ -90,7 +107,7 @@ FASE 2: NUCLEO DE NEGOCIO Y REGLAS ACADEMICAS [PRIORIDAD ALTA]
 Objetivo: Implementar la logica institucional de puntualidad, ausentismo y
 control docente.
 
-[ALTA-01] Motor de Reglas de Retardo (Regla de los 10 Minutos)
+~~[ALTA-01] Motor de Reglas de Retardo (Regla de los 10 Minutos)~~ [IMPLEMENTADO 2026-10-22]
   - Especificacion funcional:
     1. Una sesion de clase define hora_inicio (ejemplo: 07:00).
     2. La hora base de referencia es el maximo entre:
@@ -105,7 +122,7 @@ control docente.
        - estado_asistencia = 'Retardo'.
   - Archivos: models/IngresoAsistencia.php, controllers/AsistenciaController.php.
 
-[ALTA-02] Modulo de Cierre de Sesion y Generacion Batch de Inasistencias
+~~[ALTA-02] Modulo de Cierre de Sesion y Generacion Batch de Inasistencias~~ [IMPLEMENTADO 2026-10-22]
   - Especificacion funcional:
     1. El instructor o administrador ejecuta la accion "Finalizar Sesion" o
        el sistema lo ejecuta mediante tarea programada al vencer la hora_fin.
@@ -119,23 +136,28 @@ control docente.
   - Archivos: models/Sesion.php, controllers/HorarioController.php,
               models/IngresoAsistencia.php.
 
-[ALTA-03] Flujo de Doble Aprobacion de Excusas (Co-docencia)
+~~[ALTA-03] Flujo de Doble Aprobacion de Excusas (Co-docencia)~~ [IMPLEMENTADO 2026-10-26]
   - Especificacion funcional:
-    1. Identificar si la sesion o ficha cuenta con mas de un instructor asignado.
-    2. Permitir el registro de revisiones individuales por cada instructor en la
-       tabla estado_excusa.
-    3. La excusa pasa a estado general 'Aprobada' unicamente cuando se registra
-       el consenso favorable de los instructores involucrados.
-  - Archivos: models/ExcusaMedica.php, controllers/ExcusaController.php,
-              views/excusas/revisar.php.
+    1. Identificar si la sesion formativa o ficha cuenta con mas de un instructor asignado
+       (cruce de Ficha.instructor_id e instructores vinculados en Sesion).
+    2. Registrar revisiones y votos individuales de cada instructor en una entidad/tabla de revision:
+       - Campos: excusa_id, instructor_id, estado ('Aprobada', 'Rechazada'), observaciones, fecha_revision.
+    3. Regla de negocio de resolucion:
+       - Si cualquier instructor asignado vota 'Rechazada': la excusa pasa a estado general 'Rechazada'.
+       - Solo si el 100% de los instructores asignados votan 'Aprobada': la excusa pasa a estado general 'Aprobada'
+         y la inasistencia vinculada se marca como 'Justificada'.
+       - Mientras falten instructores por emitir voto: el estado general permanece en 'En revisión'.
+  - [IMPLEMENTADO 2026-10-26]: Integrado en ExcusaMedica::requiereDobleAprobacion(), ExcusaMedica::aprobar()
+    y views/excusas/revisar.php cumpliendo con RF-HOR-34.
 
-[ALTA-04] Formulario de Creacion y Modificacion Manual de Sesiones
+~~[ALTA-04] Formulario de Creacion y Modificacion Manual de Sesiones~~ [IMPLEMENTADO 2026-10-26]
   - Especificacion funcional:
     1. Proveer interfaz CRUD manual para sesiones de horario que complemente
        la importacion semestral Excel.
-    2. Campos: Ficha, Competencia, Instructor, Fecha, Hora Inicio, Hora Fin,
-       Tipo de Instructor, Especialidad, Nivel, Grupo Convergente.
-  - Archivos: controllers/HorarioController.php, views/horarios/form.php.
+    2. Permitir a administradores e instructores lideres crear sesiones extraordinarias,
+       editar horarios existentes o darlas de baja.
+  - [IMPLEMENTADO 2026-10-26]: CRUD completo en controllers/HorarioController.php (crear, editar, guardar, eliminar),
+    vista views/horarios/form.php y enlace en views/horarios/index.php. Proteccion de sesiones con asistencia (RF-HOR-27).
 
 FASE 3: GESTION DE ENTIDADES MAESTRAS [PRIORIDAD MEDIA]
 --------------------------------------------------------------------------------
@@ -151,9 +173,9 @@ Objetivo: Descentralizar la administracion de entidades de soporte del sistema.
   - Ruta: ?action=competencias
   - Archivos: models/Competencia.php, controllers/CompetenciaController.php, views/competencias/.
 
-[MEDIA-03] Modulo CRUD de Jornadas
+~~[MEDIA-03] Modulo CRUD de Jornadas~~ [IMPLEMENTADO 2026-10-22]
   - Especificacion: Administracion de franjas horarias maestras (Manana, Tarde, Noche).
-  - Archivos a construir:
+  - Archivos construidos:
     - models/Jornada.php
     - controllers/JornadaController.php
     - views/jornadas/index.php, views/jornadas/form.php
@@ -169,48 +191,57 @@ FASE 4: REPORTES FORMALES Y ANALITICA AVANZADA [PRIORIDAD BAJA]
 --------------------------------------------------------------------------------
 Objetivo: Generar valor gerencial y facilitar la auditoria academica.
 
-[BAJA-01] Motor de Reportes y Exportacion PDF / Excel
+~~[BAJA-01] Motor de Reportes y Exportacion PDF / Excel~~ [IMPLEMENTADO 2026-10-22]
   - Especificacion:
-    1. Incorporacion de biblioteca PDF (FPDF o TCPDF en librerias/).
-    2. Creacion de controllers/ReporteController.php.
-    3. Generacion de reportes oficiales institucionales:
-       - Asistencia consolidada por ficha formativa (porcentaje de ausentismo).
-       - Reporte individual de asistencia por aprendiz para comites de evaluacion.
+    1. Creacion de controllers/ReporteController.php (metodos index y generar).
+    2. Generacion de reportes institucionales usando librerias/fpdf/fpdf.php:
+       - Asistencia consolidada por ficha formativa.
+       - Reporte individual de asistencia por aprendiz.
        - Relacion de excusas medicas presentadas, aprobadas y desestimadas.
-    4. Exportacion de tablas consolidadas en formato CSV / Excel.
-  - Archivos: controllers/ReporteController.php, views/reportes/index.php.
+    3. Exportacion de tablas en formato CSV compatible con Microsoft Excel.
+  - Archivos: controllers/ReporteController.php, views/reportes/index.php, models/Reporte.php.
 
-[BAJA-02] Tablero de Control con Analitica Visual (Dashboard Chart.js)
+~~[BAJA-02] Tablero de Control con Analitica Visual (Dashboard Chart.js) [PENDIENTE]~~
+[BAJA-02] Tablero de Control con Analitica Visual (Dashboard Chart.js) [IMPLEMENTADO 2026-10-27]
   - Especificacion:
-    1. Integracion de Chart.js mediante CDN o archivo local en assets/js/.
-    2. Construccion de servicio JSON de indicadores (?action=dashboard/datosGraficos).
-    3. Visualizacion en views/dashboard/index.php:
-       - Grafico de barras: Asistencias vs Inasistencias por mes calendario.
-       - Grafico circular: Proporcion de excusas aprobadas, rechazadas y pendientes.
-       - Grafico de lineas: Evolucion de puntualidad en los ultimos 30 dias.
-  - Archivos: controllers/DashboardController.php, views/dashboard/index.php.
+    1. Integracion de graficas dinamicas interactivas en el Dashboard principal.
+    2. Servicio JSON con metricas consolidadas (?action=dashboard/datosGraficos).
+    3. Tres graficas: Asistencias vs Inasistencias (barras), Excusas (dona/circular) y Puntualidad ultimos 30 dias (linea).
+  - [IMPLEMENTADO 2026-10-27]:
+    1. Implementado DashboardController::datosGraficos() con json_encode y filtro por aprendiz/global.
+    2. Cargado Chart.js v4 UMD por CDN en views/layouts/header.php.
+    3. Incluido partial views/dashboard/_graficos.php en views/dashboard/index.php.
+    4. Conectado script assets/js/dashboard.js condicionalmente en views/layouts/footer.php.
+    5. Agregados estilos CSS para .charts-grid, .chart-box, .chart-title, .chart-wide en assets/css/style.css.
+  - Archivos intervenidos: controllers/DashboardController.php, views/dashboard/index.php, views/layouts/header.php, views/layouts/footer.php, assets/css/style.css.
   
 3. MATRIZ DE PLANIFICACION Y ENTREGABLES
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-CODIGO       DESCRIPCION                              PRIORIDAD    ESTIMACION
+CODIGO       DESCRIPCION                              ESTADO / PRIORIDAD  ESTIMACION
 --------------------------------------------------------------------------------
-CRITICA-01   Alineacion vista excusas/form.php        Critica      4 horas
-CRITICA-02   Metodos RFID en AsistenciaController     Critica      6 horas
-CRITICA-03   Script terminal assets/js/rfid.js        Critica      4 horas
-CRITICA-04   Saneamiento de navegacion y rutas        Critica      2 horas
-ALTA-01      Motor de retardo (regla 10 minutos)      Alta         5 horas
-ALTA-02      Cierre de sesion y lote de inasistencias Alta         6 horas
-ALTA-03      Doble aprobacion de excusas (consenso)   Alta         5 horas
-ALTA-04      Formulario manual de sesiones            Alta         4 horas
-MEDIA-01     Modulo CRUD Programas                    Media        4 horas
-MEDIA-02     Modulo CRUD Competencias                 Media        4 horas
-MEDIA-03     Modulo CRUD Jornadas                     Media        3 horas
-MEDIA-04     Portal de horarios por instructor        Media        4 horas
-BAJA-01      Motor de Reportes PDF (FPDF)             Baja         8 horas
-BAJA-02      Analitica visual en Dashboard (Chart.js) Baja         5 horas
+~~CRITICA-01   Alineacion vista excusas/form.php        IMPLEMENTADO~~       0 horas (ant. 4h)
+~~CRITICA-02   Metodos RFID en AsistenciaController     IMPLEMENTADO~~       0 horas (ant. 6h)
+~~CRITICA-03   Script terminal assets/js/rfid.js        IMPLEMENTADO~~       0 horas (ant. 4h)
+~~CRITICA-04   Saneamiento de navegacion y rutas        IMPLEMENTADO~~       0 horas (ant. 2h)
+~~ALTA-01      Motor de retardo (regla 10 minutos)      IMPLEMENTADO~~       0 horas (ant. 5h)
+~~ALTA-02      Cierre de sesion y lote de inasistencias IMPLEMENTADO~~       0 horas (ant. 6h)
+ALTA-03      Doble aprobacion de excusas (consenso)   Alta (PENDIENTE)     5 horas
+~~ALTA-04      Formulario manual de sesiones            Alta (PENDIENTE)     4 horas~~
+~~ALTA-04      Formulario manual de sesiones            IMPLEMENTADO por Dev 2 en rama horario~~
+~~MEDIA-01     Modulo CRUD Programas                    IMPLEMENTADO~~       0 horas (ant. 4h)
+~~MEDIA-02     Modulo CRUD Competencias                 IMPLEMENTADO~~       0 horas (ant. 4h)
+~~MEDIA-03     Modulo CRUD Jornadas                     IMPLEMENTADO~~       0 horas (ant. 3h)
+~~MEDIA-04     Portal de horarios por instructor        IMPLEMENTADO~~       0 horas (ant. 4h)
+~~BAJA-01      Motor de Reportes PDF (FPDF)             IMPLEMENTADO~~       0 horas (ant. 8h)
+~~BAJA-02      Analitica visual en Dashboard (Chart.js) Baja (PENDIENTE)     5 horas~~
+~~BAJA-02      Analitica visual en Dashboard (Chart.js) IMPLEMENTADO~~       0 horas (ant. 5h)
 --------------------------------------------------------------------------------
-TOTAL ESTIMADO DE IMPLEMENTACION:                                  60 horas
+~~TOTAL HORAS PENDIENTES DE IMPLEMENTACION:                          14 horas~~
+~~(Horas completadas acumuladas: 46 horas)~~
+~~TOTAL HORAS PENDIENTES DE IMPLEMENTACION:                          10 horas~~
+TOTAL HORAS PENDIENTES DE IMPLEMENTACION:                          0 horas (funcionales)
+(BAJA-02 cerrado 2026-10-27. Quedan SEG-01 a SEG-07 y migraciones 007/008 sin aplicar.)
 --------------------------------------------------------------------------------
 
 4. DEPENDENCIAS CRITICAS DE DESPLIEGUE
@@ -218,10 +249,30 @@ TOTAL ESTIMADO DE IMPLEMENTACION:                                  60 horas
 1. Entorno de pruebas con lector fisico RFID USB para validacion del driver
    de teclado en el navegador cliente.
 2. Permisos de escritura garantizados en servidor para la carpeta assets/uploads/
-   (soporte de evidencias y plantillas).
-3. Base de datos db_ingreso_aprendices ejecutada con migracion 003 aplicada
-   (soporte de campos de sesion para importador y motor de retardos).
+   (soporte de evidencias de excusas medicas).
+3. Base de datos db_ingreso_aprendices ejecutada con migraciones aplicadas
+   (003 campos de sesion, 004 codigo programa, 005 toggle sesion y 006 inasistencia estado).
+4. [AGREGADO 2026-10-26] Falta aplicar, con permiso explicito, las migraciones
+   007-horarios-asignaciones-permutas.sql y 008-auditoria-importaciones.sql.
+   No estan ejecutadas.
 
-================================================================================
+5. SEGURIDAD Y DUPLICADOS DEL TRACK A [AGREGADO 2026-10-26]
+--------------------------------------------------------------------------------
+Detalle en .agents/reporssecuriti.md. No se corrigio codigo en ese reporte.
+
+[SEG-01] Subida de Excel solo por extension, sin tope de tamano ni
+         is_uploaded_file(). Prioridad alta.
+[SEG-02] procesar() muestra $e->getMessage() al usuario. Prioridad alta.
+[SEG-03] confirmar_permutas en el POST salta la pantalla de confirmacion.
+         confirmarPermutas() no revalida la carga guardada en sesion.
+[SEG-04] Sincronizacion sin transaccion. Auditoria que traga excepciones.
+[SEG-05] El importador no usa Sesion::validarSolapamiento() ni
+         Sesion::tieneAsistencias(). Las reglas quedan duplicadas y distintas.
+[SEG-06] Borrar o aislar HorarioController::parsearExcelHorarios(). Sigue en
+         el controlador, ya no se llama, y aun crea instructores temporales.
+[SEG-07] Unificar la normalizacion de nombres: closure en
+         Usuario::getInstructorPorNombre() y HorarioController::normalizarNombre().
+
+===============================================================================
 FIN DEL DOCUMENTO — PENDIENTE_IMPLEMENTAR.txt
-================================================================================
+===============================================================================

@@ -1,4 +1,21 @@
-<?php require_once ROOT_PATH . '/views/layouts/header.php'; ?>
+<?php
+require_once ROOT_PATH . '/views/layouts/header.php';
+
+// Compatibilidad: el reporte nuevo usa 'meta'/'sincronizacion', el antiguo usaba
+// 'ficha_detectada'/'creadas'/etc. Se normalizan aquí para no romper la vista.
+$meta         = $resultado['meta'] ?? [];
+$sincronizacion = $resultado['sincronizacion'] ?? [];
+$codigoFicha  = $meta['codigo_ficha'] ?? ($resultado['ficha_detectada']['codigo'] ?? null);
+$fichaId      = $resultado['ficha_detectada']['id'] ?? null;
+
+$totalBloques = $resultado['total_bloques'] ?? ($resultado['total_procesadas'] ?? 0);
+$creadas      = $sincronizacion['creadas'] ?? ($resultado['creadas'] ?? 0);
+$actualizadas = $sincronizacion['actualizadas'] ?? ($resultado['actualizadas'] ?? 0);
+$omitidas     = $sincronizacion['omitidas'] ?? ($resultado['omitidas'] ?? 0);
+$protegidas   = $sincronizacion['protegidas'] ?? 0;
+$erroresLista = $sincronizacion['errores'] ?? [];
+$detalles     = $resultado['detalles'] ?? [];
+?>
 
 <div class="toolbar">
     <div class="toolbar-left">
@@ -10,8 +27,8 @@
         <a href="<?= BASE_URL ?>?action=horarios/importar" class="btn btn-secondary">
             <i class="fas fa-redo"></i> Importar Otro Archivo
         </a>
-        <?php if (!empty($resultado['ficha_detectada'])): ?>
-        <a href="<?= BASE_URL ?>?action=horarios&ficha_id=<?= $resultado['ficha_detectada']['id'] ?>" class="btn btn-primary">
+        <?php if ($fichaId): ?>
+        <a href="<?= BASE_URL ?>?action=horarios&ficha_id=<?= (int) $fichaId ?>" class="btn btn-primary">
             <i class="fas fa-calendar-check"></i> Ver Horario de la Ficha
         </a>
         <?php endif; ?>
@@ -19,17 +36,16 @@
 </div>
 
 <!-- Tarjeta de Ficha Detectada -->
-<?php if (!empty($resultado['ficha_detectada'])): ?>
+<?php if (!empty($codigoFicha)): ?>
 <div class="card mb-4" style="background: rgba(16, 185, 129, 0.05); border-left: 4px solid var(--accent-green); padding: 18px 24px; margin-bottom: 25px;">
     <div style="display: flex; align-items: center; gap: 15px;">
         <i class="fas fa-check-circle" style="font-size: 2rem; color: var(--accent-green);"></i>
         <div>
             <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; color: #fff;">
-                Ficha Detectada: <strong><?= htmlspecialchars($resultado['ficha_detectada']['codigo']) ?></strong> — <?= htmlspecialchars($resultado['ficha_detectada']['nombre_programa']) ?>
+                Ficha Detectada: <strong><?= htmlspecialchars((string) $codigoFicha) ?></strong>
             </h3>
             <span class="text-muted" style="font-size: 0.9rem;">
-                Jornada: <strong><?= htmlspecialchars($resultado['ficha_detectada']['nombre_jornada'] ?? 'N/A') ?></strong> | 
-                Líder: <strong><?= htmlspecialchars($resultado['ficha_detectada']['nombre_instructor'] ?? 'No asignado') ?></strong>
+                Total de bloques procesados: <strong><?= (int) $totalBloques ?></strong>
             </span>
         </div>
     </div>
@@ -40,32 +56,32 @@
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px;">
     <div class="card" style="text-align: center; padding: 20px;">
         <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">Total Bloques</span>
-        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #fff;"><?= $resultado['total_procesadas'] ?></h2>
+        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #fff;"><?= (int) $totalBloques ?></h2>
     </div>
 
     <div class="card" style="text-align: center; padding: 20px; border-top: 3px solid var(--accent-green, #10b981);">
         <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-green);">Sesiones Creadas</span>
-        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: var(--accent-green);"><?= $resultado['creadas'] ?></h2>
+        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: var(--accent-green);"><?= (int) $creadas ?></h2>
     </div>
 
     <div class="card" style="text-align: center; padding: 20px; border-top: 3px solid #38bdf8;">
         <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #38bdf8;">Actualizadas</span>
-        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #38bdf8;"><?= $resultado['actualizadas'] ?? 0 ?></h2>
+        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #38bdf8;"><?= (int) $actualizadas ?></h2>
     </div>
 
     <div class="card" style="text-align: center; padding: 20px; border-top: 3px solid #a855f7;">
-        <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #a855f7;">Instructores Nuevos</span>
-        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #a855f7;"><?= $resultado['instructores_nuevos'] ?? 0 ?></h2>
+        <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #a855f7;">Protegidas</span>
+        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #a855f7;"><?= (int) $protegidas ?></h2>
     </div>
 
     <div class="card" style="text-align: center; padding: 20px; border-top: 3px solid var(--accent-yellow, #f59e0b);">
         <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #f59e0b;">Sin Cambios (Omitidas)</span>
-        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #f59e0b;"><?= $resultado['omitidas'] ?></h2>
+        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #f59e0b;"><?= (int) $omitidas ?></h2>
     </div>
 
     <div class="card" style="text-align: center; padding: 20px; border-top: 3px solid var(--accent-red, #ef4444);">
         <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #ef4444;">Errores</span>
-        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #ef4444;"><?= $resultado['errores'] ?></h2>
+        <h2 style="font-size: 2.2rem; margin: 8px 0 0 0; color: #ef4444;"><?= count($erroresLista) ?></h2>
     </div>
 </div>
 
@@ -82,7 +98,7 @@
         </div>
     </div>
 
-    <?php if (!empty($resultado['detalles'])): ?>
+    <?php if (!empty($detalles) || !empty($erroresLista)): ?>
     <div class="table-wrapper">
         <table class="data-table" id="tablaDetalles">
             <thead>
@@ -92,22 +108,28 @@
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($resultado['detalles'] as $item): ?>
+                <?php foreach ($detalles as $item): ?>
                 <tr>
                     <td>
-                        <?php if ($item['tipo'] === 'success'): ?>
+                        <?php if (($item['tipo'] ?? '') === 'success'): ?>
                             <span class="badge badge-green"><i class="fas fa-check"></i> Creado</span>
-                        <?php elseif ($item['tipo'] === 'info'): ?>
+                        <?php elseif (($item['tipo'] ?? '') === 'info'): ?>
                             <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);"><i class="fas fa-sync-alt"></i> Actualizado</span>
-                        <?php elseif ($item['tipo'] === 'warning'): ?>
+                        <?php elseif (($item['tipo'] ?? '') === 'warning'): ?>
                             <span class="badge badge-yellow" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;"><i class="fas fa-equals"></i> Sin cambios</span>
                         <?php else: ?>
                             <span class="badge badge-danger"><i class="fas fa-times-circle"></i> Error</span>
                         <?php endif; ?>
                     </td>
-                    <td style="font-size: 0.92rem; color: <?= $item['tipo'] === 'error' ? '#fca5a5' : ($item['tipo'] === 'warning' ? '#fde68a' : ($item['tipo'] === 'info' ? '#7dd3fc' : '#cbd5e1')) ?>;">
-                        <?= htmlspecialchars($item['mensaje']) ?>
+                    <td style="font-size: 0.92rem; color: <?= ($item['tipo'] ?? '') === 'error' ? '#fca5a5' : (($item['tipo'] ?? '') === 'warning' ? '#fde68a' : (($item['tipo'] ?? '') === 'info' ? '#7dd3fc' : '#cbd5e1')) ?>;">
+                        <?= htmlspecialchars((string) ($item['mensaje'] ?? '')) ?>
                     </td>
+                </tr>
+                <?php endforeach; ?>
+                <?php foreach ($erroresLista as $mensaje): ?>
+                <tr>
+                    <td><span class="badge badge-danger"><i class="fas fa-times-circle"></i> Error</span></td>
+                    <td style="font-size: 0.92rem; color: #fca5a5;"><?= htmlspecialchars((string) $mensaje) ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>

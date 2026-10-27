@@ -19,6 +19,35 @@ class Sesion {
     /**
      * Obtiene todas las sesiones con información de ficha e instructor
      */
+    /**
+     * Obtiene sesiones filtradas por ficha y/o instructor (RF-HOR-31)
+     */
+    public function getFiltradas(?int $fichaId = null, ?int $instructorId = null): array
+    {
+        $sql = "SELECT s.*, 
+                       f.codigo AS codigo_ficha,
+                       CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor,
+                       c.nombre AS nombre_competencia
+                FROM {$this->table} s
+                INNER JOIN Ficha f ON s.Ficha_id = f.id
+                INNER JOIN Usuario u ON s.Instructor_id = u.id
+                LEFT JOIN competencia c ON s.Competencia_id = c.id
+                WHERE 1=1";
+        $params = [];
+        if ($fichaId !== null && $fichaId > 0) {
+            $sql .= " AND s.Ficha_id = :ficha_id";
+            $params[':ficha_id'] = $fichaId;
+        }
+        if ($instructorId !== null && $instructorId > 0) {
+            $sql .= " AND s.Instructor_id = :instructor_id";
+            $params[':instructor_id'] = $instructorId;
+        }
+        $sql .= " ORDER BY s.fecha DESC, s.hora_inicio ASC";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
     public function getAll(): array {
         $sql = "SELECT s.*, 
                        f.codigo AS codigo_ficha,
@@ -266,11 +295,139 @@ class Sesion {
     }
 
     /**
-     * Abre una nueva sesión de asistencia para una ficha (toggle ON).
+     * Verifica si una sesión tiene asistencias registradas
+     */
+    public function tieneAsistencias(int $sesionId): bool
+    {
+        $sql = "SELECT COUNT(*) AS total FROM asistencia WHERE Sesion_id = :id";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':id' => $sesionId]);
+        $row = $stmt->fetch();
+        return (int)($row['total'] ?? 0) > 0;
+    }
+
+    /**
+     * Valida solapamientos de horario para instructor o ficha (RF-HOR-17, RF-HOR-18, RF-HOR-22)
+     * 
+     * @return array{valido: bool, mensaje: string}
+     */
+    public function validarSolapamiento(int $fichaId, int $instructorId, string $fecha, string $horaInicio, string $horaFin, ?int $excluirId = null): array
+    {
+        // 1. Validar que la ficha no tenga otro bloque solapado
+        $sqlFicha = "SELECT s.*, CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor
+                     FROM {$this->table} s
+                     INNER JOIN Usuario u ON s.Instructor_id = u.id
+                     WHERE s.Ficha_id = :ficha_id
+                       AND s.fecha = :fecha
+                       AND s.estado != 'Cancelado'
+                       AND (s.hora_inicio < :hora_fin AND s.hora_fin > :hora_inicio)";
+        if ($excluirId !== null) {
+            $sqlFicha .= " AND s.id != :excluir_id";
+        }
+        $paramsFicha = [
+            ':ficha_id'    => $fichaId,
+            ':fecha'       => $fecha,
+            ':hora_inicio' => $horaInicio,
+            ':hora_fin'    => $horaFin,
+        ];
+        if ($excluirId !== null) {
+            $paramsFicha[':excluir_id'] = $excluirId;
+        }
+        $stmtFicha = $this->conn->prepare($sqlFicha);
+        $stmtFicha->execute($paramsFicha);
+        $conflictoFicha = $stmtFicha->fetch();
+
+        if ($conflictoFicha) {
+            return [
+                'valido'  => false,
+                'mensaje' => "La ficha ya tiene clase programada de {$conflictoFicha['hora_inicio']} a {$conflictoFicha['hora_fin']} con el instructor {$conflictoFicha['nombre_instructor']}."
+            ];
+        }
+
+        // 2. Validar que el instructor no esté en otra ficha a la misma hora
+        $sqlInst = "SELECT s.*, f.codigo AS codigo_ficha
+                    FROM {$this->table} s
+                    INNER JOIN Ficha f ON s.Ficha_id = f.id
+                    WHERE s.Instructor_id = :instructor_id
+                      AND s.fecha = :fecha
+                      AND s.estado != 'Cancelado'
+                      AND (s.hora_inicio < :hora_fin AND s.hora_fin > :hora_inicio)";
+        if ($excluirId !== null) {
+            $sqlInst .= " AND s.id != :excluir_id";
+        }
+        $paramsInst = [
+            ':instructor_id' => $instructorId,
+            ':fecha'         => $fecha,
+            ':hora_inicio'   => $horaInicio,
+            ':hora_fin'      => $horaFin,
+        ];
+        if ($excluirId !== null) {
+            $paramsInst[':excluir_id'] = $excluirId;
+        }
+        $stmtInst = $this->conn->prepare($sqlInst);
+        $stmtInst->execute($paramsInst);
+        $conflictoInst = $stmtInst->fetch();
+
+        if ($conflictoInst) {
+            return [
+                'valido'  => false,
+                'mensaje' => "El instructor ya tiene asignada la ficha {$conflictoInst['codigo_ficha']} en esa misma fecha de {$conflictoInst['hora_inicio']} a {$conflictoInst['hora_fin']}."
+            ];
+        }
+
+        return ['valido' => true, 'mensaje' => 'Horario disponible sin conflictos.'];
+    }
+
+    /**
+     * Obtiene sesiones de una ficha en un rango de fechas con nombres y jornadas (para Aprendices, RF-HOR-29)
+     */
+    public function getByFichaRango(int $fichaId, string $desde, string $hasta): array
+    {
+        $sql = "SELECT s.*,
+                       f.codigo AS codigo_ficha,
+                       p.nombre AS nombre_programa,
+                       j.nombre AS nombre_jornada,
+                       c.nombre AS nombre_competencia,
+                       CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor
+                FROM {$this->table} s
+                INNER JOIN Ficha f ON s.Ficha_id = f.id
+                INNER JOIN Usuario u ON s.Instructor_id = u.id
+                LEFT JOIN Programa p ON f.Programa_id = p.id
+                LEFT JOIN jornada j ON f.jornada_id = j.id
+                LEFT JOIN competencia c ON s.Competencia_id = c.id
+                WHERE s.Ficha_id = :ficha_id
+                  AND s.fecha BETWEEN :desde AND :hasta
+                ORDER BY s.fecha ASC, s.hora_inicio ASC";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':ficha_id' => $fichaId,
+            ':desde'    => $desde,
+            ':hasta'    => $hasta,
+        ]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Detecta si una columna existe en la tabla sesion
+     */
+    private function tieneColumna(string $columna): bool
+    {
+        try {
+            $stmt = $this->conn->prepare("SHOW COLUMNS FROM {$this->table} LIKE :col");
+            $stmt->execute([':col' => $columna]);
+            return (bool) $stmt->fetch();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Inicia una sesión de asistencia para una ficha (toggle ON).
      *
-     * Inserta un registro con estado 'Activo', hora_fin = NULL, fecha y hora actuales.
+     * Si existe una sesión programada para hoy, asocia la apertura real (RF-HOR-41, RF-HOR-42).
+     * Si no, crea el registro.
      *
-     * @return int|false  ID de la sesión creada, o false si falla.
+     * @return int|false ID de la sesión creada/abierta, o false si falla.
      */
     public function abrirSesion(int $fichaId, int $instructorId): int|false
     {
@@ -280,10 +437,45 @@ class Sesion {
             return false;
         }
 
-        $sql = "INSERT INTO {$this->table}
-                    (Ficha_id, Instructor_id, fecha, hora_inicio, hora_fin, estado)
-                VALUES
-                    (:ficha_id, :instructor_id, CURDATE(), CURTIME(), NULL, 'Activo')";
+        $tieneAperturaReal = $this->tieneColumna('apertura_real');
+
+        // Buscar si hay una sesión programada para hoy en esta ficha e instructor
+        $sqlProgramada = "SELECT * FROM {$this->table}
+                          WHERE Ficha_id = :ficha_id
+                            AND Instructor_id = :instructor_id
+                            AND fecha = CURDATE()
+                            AND estado = 'Activo'
+                          ORDER BY hora_inicio ASC
+                          LIMIT 1";
+        $stmtProg = $this->conn->prepare($sqlProgramada);
+        $stmtProg->execute([
+            ':ficha_id'      => $fichaId,
+            ':instructor_id' => $instructorId,
+        ]);
+        $programada = $stmtProg->fetch();
+
+        if ($programada && $tieneAperturaReal) {
+            // Abrir la sesión programada registrando apertura_real
+            $sqlUpdate = "UPDATE {$this->table}
+                          SET apertura_real = CURTIME()
+                          WHERE id = :id";
+            $stmtUp = $this->conn->prepare($sqlUpdate);
+            $stmtUp->execute([':id' => $programada['id']]);
+            return (int) $programada['id'];
+        }
+
+        // Si no hay programada o no tiene apertura_real, crear una nueva
+        if ($tieneAperturaReal) {
+            $sql = "INSERT INTO {$this->table}
+                        (Ficha_id, Instructor_id, fecha, hora_inicio, hora_fin, apertura_real, estado)
+                    VALUES
+                        (:ficha_id, :instructor_id, CURDATE(), CURTIME(), NULL, CURTIME(), 'Activo')";
+        } else {
+            $sql = "INSERT INTO {$this->table}
+                        (Ficha_id, Instructor_id, fecha, hora_inicio, hora_fin, estado)
+                    VALUES
+                        (:ficha_id, :instructor_id, CURDATE(), CURTIME(), NULL, 'Activo')";
+        }
         $stmt = $this->conn->prepare($sql);
         $ok = $stmt->execute([
             ':ficha_id'      => $fichaId,
@@ -297,7 +489,7 @@ class Sesion {
      * Cierra una sesión de asistencia (toggle OFF).
      *
      * Usa una transacción para:
-     *  1. Actualizar estado a 'Finalizada' y registrar hora_fin.
+     *  1. Actualizar estado a 'Finalizada', registrar hora_fin y cierre_real.
      *  2. Insertar inasistencias para los aprendices activos de la ficha
      *     que NO tengan registro en la tabla `asistencia` para esa sesión.
      *
@@ -329,14 +521,24 @@ class Sesion {
         }
 
         $fichaId = (int) $sesion['Ficha_id'];
+        $tieneCierreReal = $this->tieneColumna('cierre_real');
 
         try {
             $this->conn->beginTransaction();
 
-            // 1. Cerrar la sesión
-            $sqlUpdate = "UPDATE {$this->table}
-                          SET estado = 'Finalizada', hora_fin = CURTIME()
-                          WHERE id = :id";
+            // 1. Cerrar la sesión preservando hora_fin programada (RF-HOR-42)
+            if ($tieneCierreReal) {
+                $sqlUpdate = "UPDATE {$this->table}
+                              SET estado = 'Finalizada',
+                                  hora_fin = COALESCE(hora_fin, CURTIME()),
+                                  cierre_real = CURTIME()
+                              WHERE id = :id";
+            } else {
+                $sqlUpdate = "UPDATE {$this->table}
+                              SET estado = 'Finalizada',
+                                  hora_fin = COALESCE(hora_fin, CURTIME())
+                              WHERE id = :id";
+            }
             $stmtUpdate = $this->conn->prepare($sqlUpdate);
             $stmtUpdate->execute([':id' => $sesionId]);
 
@@ -379,3 +581,4 @@ class Sesion {
         }
     }
 }
+

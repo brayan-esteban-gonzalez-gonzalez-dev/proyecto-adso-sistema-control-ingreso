@@ -253,6 +253,7 @@ class ExcusaController
 
         $csrf_token = Auth::generateCSRF();
         $pageTitle  = 'Revisar Excusa Médica';
+        $requiereDobleAprobacion = $this->model->requiereDobleAprobacion($id);
         require_once ROOT_PATH . '/views/excusas/revisar.php';
     }
 
@@ -295,11 +296,11 @@ class ExcusaController
 
         try {
             if ($accion === 'aprobar') {
-                $this->model->aprobar($idExcusa, $instructorId, $comentario);
-                Auth::setFlash('success', 'Excusa médica aprobada correctamente. La inasistencia ha sido justificada.');
+                $res = $this->model->registrarRevision($idExcusa, $instructorId, 'Aprobada', $comentario);
+                Auth::setFlash($res['ok'] ? 'success' : 'error', $res['mensaje']);
             } elseif ($accion === 'rechazar') {
-                $this->model->rechazar($idExcusa, $instructorId, $comentario);
-                Auth::setFlash('success', 'Excusa médica rechazada.');
+                $res = $this->model->registrarRevision($idExcusa, $instructorId, 'Rechazada', $comentario);
+                Auth::setFlash($res['ok'] ? 'success' : 'error', $res['mensaje']);
             } else {
                 Auth::setFlash('error', 'Acción de revisión no válida.');
             }

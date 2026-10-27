@@ -135,6 +135,13 @@ $horarioSesion    = (!empty($excusa['sesion_hora_inicio']) && !empty($excusa['se
                           placeholder="Ingrese las observaciones institucionales respecto a la aprobación o rechazo (opcional)..."></textarea>
             </div>
 
+            <?php if (!empty($requiereDobleAprobacion)): ?>
+            <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 6px; padding: 12px; margin-bottom: 20px; font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-users" style="color: var(--accent-blue); font-size: 1.1rem;"></i>
+                <span><strong>Regla de Co-docencia (RF-HOR-34):</strong> Esta jornada cuenta con 2 o más instructores asignados a la ficha. La excusa requiere validación de ambos instructores para exonerar la inasistencia.</span>
+            </div>
+            <?php endif; ?>
+
             <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 6px; padding: 12px; margin-bottom: 20px; font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 10px;">
                 <i class="fas fa-info-circle" style="color: var(--accent-green); font-size: 1.1rem;"></i>
                 <span>Al <strong>Aprobar</strong>, la inasistencia se marcará formalmente como justificada y quedará exonerada del cómputo negativo en los reportes de asistencia del aprendiz.</span>

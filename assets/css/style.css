@@ -2016,3 +2016,37 @@ hr {
     animation: rowHighlight 3s ease-out;
 }
 
+/* ─── Dashboard Charts ─── */
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-top: 24px;
+}
+
+.charts-grid .card {
+    padding: 20px;
+}
+
+.chart-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+}
+
+.chart-box {
+    position: relative;
+    height: 280px;
+}
+
+.chart-wide {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 768px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+

@@ -31,7 +31,6 @@ class AprendizController {
         header('Location: ' . BASE_URL . '?action=usuarios/crear');
         exit;
     }
-
     /**
      * Formulario de edición
      */

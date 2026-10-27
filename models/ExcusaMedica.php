@@ -205,18 +205,199 @@ class ExcusaMedica
     }
 
     /**
-     * Aprueba una excusa: registra 'Aprobada' en estado_excusa y actualiza la inasistencia.
+     * Verifica si una excusa requiere doble validación por co-docencia en la jornada (RF-HOR-34)
      */
-    public function aprobar(int $idExcusa, int $idInstructor, string $comentario = ''): bool
+    public function requiereDobleAprobacion(int $idExcusa): bool
     {
-        $ok = $this->registrarEstado($idExcusa, $idInstructor, 'Aprobada', $comentario);
-        if ($ok) {
-            $inasistenciaId = $this->obtenerInasistenciaIdDeExcusa($idExcusa);
-            if ($inasistenciaId !== null) {
-                $this->actualizarEstadoInasistencia($inasistenciaId, 'Justificada');
+        $sql = "SELECT s.Ficha_id, s.fecha
+                FROM {$this->table} e
+                INNER JOIN inasistencia i ON e.Inasistencia_id = i.id
+                INNER JOIN sesion s ON i.Sesion_id = s.id
+                WHERE e.id = :id
+                LIMIT 1";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':id' => $idExcusa]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            return false;
+        }
+
+        $fichaId = (int) $row['Ficha_id'];
+        $fecha   = $row['fecha'];
+
+        $sqlCount = "SELECT COUNT(DISTINCT Instructor_id) AS total_instructores
+                     FROM sesion
+                     WHERE Ficha_id = :ficha_id
+                       AND fecha = :fecha
+                       AND estado != 'Cancelado'";
+        $stmtCount = $this->conn->prepare($sqlCount);
+        $stmtCount->execute([
+            ':ficha_id' => $fichaId,
+            ':fecha'    => $fecha,
+        ]);
+        $countRow = $stmtCount->fetch();
+        return ((int)($countRow['total_instructores'] ?? 0)) >= 2;
+    }
+
+    /**
+     * Registra la revisión de un instructor sobre una excusa.
+     * Si requiere doble aprobación, solo marca como 'Aprobada' cuando todos los
+     * instructores de la jornada hayan aprobado.
+     */
+    public function registrarRevision(int $idExcusa, int $instructorId, string $estado, ?string $respuesta = null): array
+    {
+        $estado = in_array($estado, ['Aprobada', 'Rechazada'], true) ? $estado : 'Rechazada';
+
+        // Insertar o actualizar la revisión del instructor
+        $sql = "INSERT INTO {$this->tableEstado} (Excusa_id, Instructor_id, estado, respuesta, fecha)
+                VALUES (:excusa_id, :instructor_id, :estado, :respuesta, NOW())
+                ON DUPLICATE KEY UPDATE estado = :estado2, respuesta = :respuesta2, fecha = NOW()";
+        $stmt = $this->conn->prepare($sql);
+        $ok = $stmt->execute([
+            ':excusa_id'   => $idExcusa,
+            ':instructor_id'=> $instructorId,
+            ':estado'      => $estado,
+            ':respuesta'   => $respuesta,
+            ':estado2'     => $estado,
+            ':respuesta2'  => $respuesta,
+        ]);
+
+        if (!$ok) {
+            return ['ok' => false, 'mensaje' => 'No se pudo registrar la revisión.'];
+        }
+
+        // Si es rechazo → rechazar inmediatamente
+        if ($estado === 'Rechazada') {
+            $this->actualizarEstadoExcusa($idExcusa, 'Rechazada', $respuesta);
+            return ['ok' => true, 'mensaje' => 'Excusa rechazada.'];
+        }
+
+        // Si requiere doble aprobación, verificar si ya todos aprobaron
+        if ($this->requiereDobleAprobacion($idExcusa)) {
+            if ($this->todosInstructoresAprobaron($idExcusa)) {
+                $this->actualizarEstadoExcusa($idExcusa, 'Aprobada', $respuesta);
+                return ['ok' => true, 'mensaje' => 'Excusa aprobada por unanimidad.'];
+            } else {
+                $this->actualizarEstadoExcusa($idExcusa, 'En revisión', $respuesta);
+                return ['ok' => true, 'mensaje' => 'Revisión registrada. Esperando aprobación de los demás instructores.'];
             }
         }
-        return $ok;
+
+        // Caso normal (un solo instructor)
+        $this->actualizarEstadoExcusa($idExcusa, 'Aprobada', $respuesta);
+        return ['ok' => true, 'mensaje' => 'Excusa aprobada.'];
+    }
+
+    /**
+     * Verifica si todos los instructores que dan clase en esa jornada ya aprobaron.
+     */
+    private function todosInstructoresAprobaron(int $idExcusa): bool
+    {
+        $sql = "SELECT s.Ficha_id, s.fecha
+                FROM {$this->table} e
+                INNER JOIN inasistencia i ON e.Inasistencia_id = i.id
+                INNER JOIN sesion s ON i.Sesion_id = s.id
+                WHERE e.id = :id LIMIT 1";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':id' => $idExcusa]);
+        $row = $stmt->fetch();
+        if (!$row) return false;
+
+        $fichaId = (int)$row['Ficha_id'];
+        $fecha   = $row['fecha'];
+
+        // Total de instructores que dan clase ese día
+        $sqlTotal = "SELECT COUNT(DISTINCT Instructor_id) AS total
+                     FROM sesion
+                     WHERE Ficha_id = :ficha_id AND fecha = :fecha AND estado != 'Cancelado'";
+        $stmtTotal = $this->conn->prepare($sqlTotal);
+        $stmtTotal->execute([':ficha_id' => $fichaId, ':fecha' => $fecha]);
+        $total = (int)($stmtTotal->fetch()['total'] ?? 0);
+
+        // Total de aprobaciones registradas
+        $sqlAprob = "SELECT COUNT(DISTINCT ee.Instructor_id) AS aprobados
+                     FROM {$this->tableEstado} ee
+                     INNER JOIN {$this->table} e ON ee.Excusa_id = e.id
+                     INNER JOIN inasistencia i ON e.Inasistencia_id = i.id
+                     INNER JOIN sesion s ON i.Sesion_id = s.id
+                     WHERE e.id = :id AND ee.estado = 'Aprobada'
+                       AND s.Ficha_id = :ficha_id AND s.fecha = :fecha";
+        $stmtAprob = $this->conn->prepare($sqlAprob);
+        $stmtAprob->execute([':id' => $idExcusa, ':ficha_id' => $fichaId, ':fecha' => $fecha]);
+        $aprobados = (int)($stmtAprob->fetch()['aprobados'] ?? 0);
+
+        return $aprobados >= $total && $total > 0;
+    }
+
+    private function actualizarEstadoExcusa(int $idExcusa, string $estado, ?string $respuesta): void
+    {
+        $sql = "UPDATE {$this->tableEstado}
+                SET estado = :estado, respuesta = :respuesta
+                WHERE Excusa_id = :id
+                ORDER BY id DESC LIMIT 1";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':estado'    => $estado,
+            ':respuesta' => $respuesta,
+            ':id'        => $idExcusa
+        ]);
+    }
+
+    /**
+     * Aprueba una excusa: registra 'Aprobada' en estado_excusa y actualiza la inasistencia.
+     * Soporta regla de doble validación por co-docencia en la jornada (RF-HOR-34).
+     *
+     * @return array{ok: bool, completa: bool, mensaje: string}
+     */
+    public function aprobar(int $idExcusa, int $idInstructor, string $comentario = '', bool $esAdmin = false): array
+    {
+        $requiereDoble = $this->requiereDobleAprobacion($idExcusa);
+
+        if (!$requiereDoble || $esAdmin) {
+            $ok = $this->registrarEstado($idExcusa, $idInstructor, 'Aprobada', $comentario);
+            if ($ok) {
+                $inasistenciaId = $this->obtenerInasistenciaIdDeExcusa($idExcusa);
+                if ($inasistenciaId !== null) {
+                    $this->actualizarEstadoInasistencia($inasistenciaId, 'Justificada');
+                }
+            }
+            return [
+                'ok' => $ok,
+                'completa' => true,
+                'mensaje' => 'Excusa médica aprobada correctamente. La inasistencia ha sido justificada.'
+            ];
+        }
+
+        // Requiere doble validación (RF-HOR-34)
+        $check = $this->conn->prepare("SELECT id, Instructor_id, estado, respuesta FROM {$this->tableEstado} WHERE Excusa_id = :id LIMIT 1");
+        $check->execute([':id' => $idExcusa]);
+        $prev = $check->fetch();
+
+        if ($prev && (int)$prev['Instructor_id'] !== $idInstructor && $prev['estado'] === 'Pendiente') {
+            // Segunda firma recibida de co-docente
+            $comentarioFinal = trim($prev['respuesta'] . " | 2da aprobación: " . $comentario);
+            $ok = $this->registrarEstado($idExcusa, $idInstructor, 'Aprobada', $comentarioFinal);
+            if ($ok) {
+                $inasistenciaId = $this->obtenerInasistenciaIdDeExcusa($idExcusa);
+                if ($inasistenciaId !== null) {
+                    $this->actualizarEstadoInasistencia($inasistenciaId, 'Justificada');
+                }
+            }
+            return [
+                'ok' => $ok,
+                'completa' => true,
+                'mensaje' => 'Doble validación completada con éxito. La inasistencia ha sido justificada.'
+            ];
+        }
+
+        // Primera aprobación registrada
+        $comentarioParcial = "[1 de 2 firmas requeridas por co-docencia] " . $comentario;
+        $ok = $this->registrarEstado($idExcusa, $idInstructor, 'Pendiente', $comentarioParcial);
+        return [
+            'ok' => $ok,
+            'completa' => false,
+            'mensaje' => 'Primera aprobación registrada. Por regla de co-docencia (RF-HOR-34), se requiere la validación del segundo instructor de la jornada.'
+        ];
     }
 
     /**

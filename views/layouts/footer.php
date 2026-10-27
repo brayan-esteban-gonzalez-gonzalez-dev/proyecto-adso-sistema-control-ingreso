@@ -17,5 +17,8 @@
 <?php if (isset($loadRfidJs) && $loadRfidJs): ?>
     <script src="<?= BASE_URL ?>assets/js/rfid.js?v=<?= file_exists(ROOT_PATH . '/assets/js/rfid.js') ? filemtime(ROOT_PATH . '/assets/js/rfid.js') : '1.0' ?>"></script>
 <?php endif; ?>
+<?php if (isset($loadDashboardJs) && $loadDashboardJs): ?>
+    <script src="<?= BASE_URL ?>assets/js/dashboard.js?v=<?= file_exists(ROOT_PATH . '/assets/js/dashboard.js') ? filemtime(ROOT_PATH . '/assets/js/dashboard.js') : '1.0' ?>"></script>
+<?php endif; ?>
 </body>
 </html>

@@ -2,10 +2,10 @@
 
 <div class="toolbar">
     <div class="toolbar-left">
-        <form method="GET" action="<?= BASE_URL ?>" class="filter-form" style="display: flex; gap: 10px; align-items: center;">
+        <form method="GET" action="<?= BASE_URL ?>" class="filter-form" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <input type="hidden" name="action" value="horarios">
             <div class="form-group mb-0" style="margin-bottom: 0;">
-                <select name="ficha_id" class="form-control" onchange="this.form.submit()" style="min-width: 250px;">
+                <select name="ficha_id" class="form-control" onchange="this.form.submit()" style="min-width: 220px;">
                     <option value="">-- Todas las Fichas --</option>
                     <?php foreach ($fichas as $f): ?>
                         <option value="<?= $f['id'] ?>" <?= ($fichaId == $f['id']) ? 'selected' : '' ?>>
@@ -14,6 +14,18 @@
                     <?php endforeach; ?>
                 </select>
             </div>
+            <?php if (!empty($instructores)): ?>
+            <div class="form-group mb-0" style="margin-bottom: 0;">
+                <select name="instructor_id" class="form-control" onchange="this.form.submit()" style="min-width: 220px;">
+                    <option value="">-- Todos los Instructores --</option>
+                    <?php foreach ($instructores as $inst): ?>
+                        <option value="<?= $inst['id'] ?>" <?= ($instructorId == $inst['id']) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($inst['nombre'] . ' ' . $inst['apellido']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
         </form>
         <div class="search-box">
             <i class="fas fa-search"></i>
@@ -25,10 +37,21 @@
         <a href="<?= BASE_URL ?>?action=horarios/miHorario" class="btn btn-secondary">
             <i class="fas fa-calendar-week"></i> Mi calendario
         </a>
+        <a href="<?= BASE_URL ?>?action=horarios/permutas" class="btn btn-secondary">
+            <i class="fas fa-arrows-rotate"></i> Permutas
+        </a>
+        <?php endif; ?>
+        <?php if (Auth::isAdmin()): ?>
+        <a href="<?= BASE_URL ?>?action=horarios/permutas" class="btn btn-secondary">
+            <i class="fas fa-arrows-rotate"></i> Auditoría Permutas
+        </a>
         <?php endif; ?>
         <?php if (Auth::isAdminOrInstructor()): ?>
+        <a href="<?= BASE_URL ?>?action=horarios/crear<?= $fichaId ? '&ficha_id='.$fichaId : '' ?><?= $instructorId ? '&instructor_id='.$instructorId : '' ?>" class="btn btn-success">
+            <i class="fas fa-plus-circle"></i> Nueva Sesión
+        </a>
         <a href="<?= BASE_URL ?>?action=horarios/importar" class="btn btn-primary">
-            <i class="fas fa-file-excel"></i> Importar Horarios desde Excel
+            <i class="fas fa-file-excel"></i> Importar Excel
         </a>
         <?php endif; ?>
     </div>
@@ -118,18 +141,29 @@
                             <span class="badge badge-green">Activo</span>
                         <?php elseif ($s['estado'] === 'Finalizada'): ?>
                             <span class="badge badge-secondary">Finalizada</span>
+                        <?php elseif ($s['estado'] === 'Permutado'): ?>
+                            <span class="badge badge-purple" title="Sesión modificada por permuta">Permutado</span>
+                        <?php elseif ($s['estado'] === 'Cancelado'): ?>
+                            <span class="badge badge-danger">Cancelado</span>
                         <?php else: ?>
-                            <span class="badge badge-danger"><?= htmlspecialchars($s['estado']) ?></span>
+                            <span class="badge badge-outline"><?= htmlspecialchars($s['estado']) ?></span>
                         <?php endif; ?>
                     </td>
                     <?php if (Auth::isAdminOrInstructor()): ?>
                     <td>
-                        <a href="<?= BASE_URL ?>?action=horarios/eliminar&id=<?= $s['id'] ?><?= $fichaId ? '&ficha_id='.$fichaId : '' ?>" 
-                           class="btn btn-sm btn-danger" 
-                           data-confirm="¿Estás seguro de eliminar esta sesión de clase?"
-                           title="Eliminar sesión">
-                            <i class="fas fa-trash"></i>
-                        </a>
+                        <div style="display: flex; gap: 6px;">
+                            <a href="<?= BASE_URL ?>?action=horarios/editar&id=<?= $s['id'] ?>" 
+                               class="btn btn-sm btn-secondary" 
+                               title="Editar sesión">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="<?= BASE_URL ?>?action=horarios/eliminar&id=<?= $s['id'] ?><?= $fichaId ? '&ficha_id='.$fichaId : '' ?>" 
+                               class="btn btn-sm btn-danger" 
+                               data-confirm="¿Estás seguro de eliminar esta sesión de clase?"
+                               title="Eliminar sesión">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
                     </td>
                     <?php endif; ?>
                 </tr>
