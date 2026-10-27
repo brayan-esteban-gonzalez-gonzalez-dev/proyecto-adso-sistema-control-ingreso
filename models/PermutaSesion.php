@@ -294,4 +294,47 @@ class PermutaSesion
             ? ['ok' => true, 'mensaje' => 'Solicitud de permuta rechazada.']
             : ['ok' => false, 'mensaje' => 'No se pudo rechazar la solicitud.'];
     }
+
+    /**
+     * RF-HOR-15: permutas aprobadas cuyas sesiones pertenecen a una ficha
+     * dentro de un rango de fechas. Se usan para detectar si un Excel nuevo
+     * revertiría una permuta antes de aplicarlo.
+     */
+    public function getAprobadasEnFicha(int $fichaId, string $desde, string $hasta): array
+    {
+        $sql = "SELECT p.*,
+                       so.fecha AS fecha_origen, so.hora_inicio AS hora_ini_origen, so.hora_fin AS hora_fin_origen,
+                       so.Ficha_id AS ficha_origen_id, so.Instructor_id AS instructor_origen_id,
+                       fo.codigo AS ficha_origen_codigo,
+                       sd.fecha AS fecha_destino, sd.hora_inicio AS hora_ini_destino, sd.hora_fin AS hora_fin_destino,
+                       sd.Ficha_id AS ficha_destino_id, sd.Instructor_id AS instructor_destino_id,
+                       fd.codigo AS ficha_destino_codigo,
+                       CONCAT(us.nombre, ' ', us.apellido) AS nombre_solicitante,
+                       CONCAT(ur.nombre, ' ', ur.apellido) AS nombre_receptor
+                FROM {$this->table} p
+                INNER JOIN sesion so ON p.sesion_origen_id = so.id
+                INNER JOIN Ficha fo ON so.Ficha_id = fo.id
+                INNER JOIN sesion sd ON p.sesion_destino_id = sd.id
+                INNER JOIN Ficha fd ON sd.Ficha_id = fd.id
+                INNER JOIN Usuario us ON p.instructor_solicitante_id = us.id
+                INNER JOIN Usuario ur ON p.instructor_receptor_id = ur.id
+                WHERE p.estado = 'Aprobada'
+                  AND (
+                        (so.Ficha_id = :ficha_origen AND so.fecha BETWEEN :desde_origen AND :hasta_origen)
+                     OR (sd.Ficha_id = :ficha_destino AND sd.fecha BETWEEN :desde_destino AND :hasta_destino)
+                  )
+                ORDER BY p.fecha_resolucion DESC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':ficha_origen'   => $fichaId,
+            ':desde_origen'   => $desde,
+            ':hasta_origen'   => $hasta,
+            ':ficha_destino'  => $fichaId,
+            ':desde_destino'  => $desde,
+            ':hasta_destino'  => $hasta,
+        ]);
+
+        return $stmt->fetchAll();
+    }
 }

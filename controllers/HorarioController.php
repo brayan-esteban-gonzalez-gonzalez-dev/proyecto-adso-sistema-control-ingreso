@@ -14,6 +14,7 @@ require_once ROOT_PATH . '/helpers/HorarioValidator.php';
 require_once ROOT_PATH . '/helpers/HorarioSincronizador.php';
 require_once ROOT_PATH . '/helpers/HorarioReporte.php';
 require_once ROOT_PATH . '/models/AsignacionInstructor.php';
+require_once ROOT_PATH . '/models/ImportacionHorario.php';
 
 class HorarioController
 {
@@ -349,7 +350,7 @@ class HorarioController
 
             // Validación (Tarea A.2)
             if ($tipoHorario === 'instructor') {
-                $resultado = $this->procesarHorarioInstructor($parseResult);
+                $resultado = $this->procesarHorarioInstructor($parseResult, $fileName);
                 $pageTitle = 'Resultado de la Importación';
                 require_once ROOT_PATH . '/views/horarios/resultado.php';
                 return;
@@ -381,15 +382,29 @@ class HorarioController
                 exit;
             }
 
+            // RF-HOR-15: detectar si el Excel revertiría permutas aprobadas.
+            $confirmarPermutas = !empty($_POST['confirmar_permutas']);
+            if (!$confirmarPermutas) {
+                $permutasAfectadas = $this->detectarPermutasAfectadas($parseResult['bloques'] ?? [], $fichaId);
+                if (!empty($permutasAfectadas)) {
+                    $_SESSION['importacion_pendiente'] = [
+                        'bloques' => $parseResult['bloques'],
+                        'meta'    => $parseResult['meta'],
+                        'anio'    => $anio,
+                        'archivo' => $fileName,
+                        'ficha_id' => $fichaId,
+                    ];
+                    $pageTitle = 'Confirmar importación con permutas';
+                    require_once ROOT_PATH . '/views/horarios/confirmar_permutas.php';
+                    return;
+                }
+            }
+
             // Sincronización (Tarea A.3)
             $reporteSincronizacion = $this->horarioSincronizador->sincronizar($parseResult['bloques'] ?? [], $fichaId);
 
-            // Reporte consolidado (Tarea A.4)
-            $resultado = $this->horarioReporte->generarReporte(
-                $parseResult,
-                $validacion,
-                $reporteSincronizacion
-            );
+            $resultado = $this->procesarResultadoFicha($parseResult, $validacion, $reporteSincronizacion, $fileName, $anio, $fichaId, $confirmarPermutas);
+            unset($_SESSION['importacion_pendiente']);
 
             $pageTitle = 'Resultado de la Importación';
             require_once ROOT_PATH . '/views/horarios/resultado.php';
@@ -402,9 +417,191 @@ class HorarioController
     }
 
     /**
+     * RF-HOR-15: confirma y aplica una importación que revertiría permutas.
+     */
+    public function confirmarPermutas(): void
+    {
+        Auth::requireAdmin();
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST'
+            || !Auth::validateCSRF($_POST['csrf_token'] ?? '')) {
+            Auth::setFlash('error', 'Token de seguridad inválido o expirado.');
+            header('Location: ' . BASE_URL . '?action=horarios/importar');
+            exit;
+        }
+
+        $pendiente = $_SESSION['importacion_pendiente'] ?? null;
+        if (!is_array($pendiente) || empty($pendiente['bloques'])) {
+            Auth::setFlash('error', 'No hay una importación pendiente de confirmar.');
+            header('Location: ' . BASE_URL . '?action=horarios/importar');
+            exit;
+        }
+
+        $fichaId = (int) ($pendiente['ficha_id'] ?? 0);
+        $reporteSincronizacion = $this->horarioSincronizador->sincronizar($pendiente['bloques'], $fichaId);
+
+        $parseResult = [
+            'tipo'    => 'ficha',
+            'meta'    => $pendiente['meta'] ?? [],
+            'bloques' => $pendiente['bloques'],
+        ];
+
+        $resultado = $this->procesarResultadoFicha(
+            $parseResult,
+            ['valido' => true, 'errores' => []],
+            $reporteSincronizacion,
+            (string) ($pendiente['archivo'] ?? ''),
+            (int) ($pendiente['anio'] ?? date('Y')),
+            $fichaId,
+            true
+        );
+
+        unset($_SESSION['importacion_pendiente']);
+
+        $pageTitle = 'Resultado de la Importación';
+        require_once ROOT_PATH . '/views/horarios/resultado.php';
+    }
+
+    /**
+     * Genera el reporte, registra la auditoría y devuelve el resultado.
+     */
+    private function procesarResultadoFicha(
+        array $parseResult,
+        array $validacion,
+        array $reporteSincronizacion,
+        string $archivo,
+        int $anio,
+        int $fichaId,
+        bool $permutasConfirmadas
+    ): array {
+        $resultado = $this->horarioReporte->generarReporte($parseResult, $validacion, $reporteSincronizacion);
+
+        $this->registrarImportacion([
+            'usuario_id'   => (int) Auth::getUserId(),
+            'tipo'         => 'ficha',
+            'archivo'      => $archivo,
+            'anio'         => $anio,
+            'codigo_ficha' => $parseResult['meta']['codigo_ficha'] ?? null,
+            'creadas'      => $reporteSincronizacion['creadas'] ?? 0,
+            'actualizadas' => $reporteSincronizacion['actualizadas'] ?? 0,
+            'omitidas'     => $reporteSincronizacion['omitidas'] ?? 0,
+            'canceladas'   => $reporteSincronizacion['canceladas'] ?? 0,
+            'protegidas'   => $reporteSincronizacion['protegidas'] ?? 0,
+            'errores'      => $reporteSincronizacion['errores'] ?? [],
+            'permutas_confirmadas' => $permutasConfirmadas,
+        ]);
+
+        return $resultado;
+    }
+
+    /**
+     * RF-HOR-15: permutas aprobadas que el Excel dejaría sin efecto.
+     */
+    private function detectarPermutasAfectadas(array $bloques, int $fichaId): array
+    {
+        if (empty($bloques)) {
+            return [];
+        }
+
+        $fechas = array_column($bloques, 'fecha');
+        $desde = min($fechas);
+        $hasta = max($fechas);
+
+        $permutas = $this->permutaModel->getAprobadasEnFicha($fichaId, $desde, $hasta);
+        if (empty($permutas)) {
+            return [];
+        }
+
+        $indiceExcel = [];
+        foreach ($bloques as $bloque) {
+            $indiceExcel[$bloque['fecha'] . '|' . $bloque['hora_inicio']] = $bloque;
+        }
+
+        $afectadas = [];
+        foreach ($permutas as $permuta) {
+            $sesiones = [
+                [
+                    'fecha' => $permuta['fecha_origen'],
+                    'hora_inicio' => $permuta['hora_ini_origen'],
+                    'hora_fin' => $permuta['hora_fin_origen'],
+                    'ficha_id' => (int) $permuta['ficha_origen_id'],
+                    'instructor_id' => (int) $permuta['instructor_origen_id'],
+                    'codigo' => $permuta['ficha_origen_codigo'],
+                ],
+                [
+                    'fecha' => $permuta['fecha_destino'],
+                    'hora_inicio' => $permuta['hora_ini_destino'],
+                    'hora_fin' => $permuta['hora_fin_destino'],
+                    'ficha_id' => (int) $permuta['ficha_destino_id'],
+                    'instructor_id' => (int) $permuta['instructor_destino_id'],
+                    'codigo' => $permuta['ficha_destino_codigo'],
+                ],
+            ];
+
+            foreach ($sesiones as $sesion) {
+                if ($sesion['ficha_id'] !== $fichaId) {
+                    continue;
+                }
+
+                $key = $sesion['fecha'] . '|' . $sesion['hora_inicio'];
+                $actual = $this->usuarioModel->getById($sesion['instructor_id']);
+                $nombreActual = $actual ? trim($actual['nombre'] . ' ' . $actual['apellido']) : '';
+
+                $motivo = null;
+                if (!isset($indiceExcel[$key])) {
+                    $motivo = 'el bloque ya no aparece en el Excel';
+                } else {
+                    $nombreExcel = trim((string) ($indiceExcel[$key]['instructor'] ?? ''));
+                    if ($nombreActual !== '' && $this->normalizarNombre($nombreExcel) !== $this->normalizarNombre($nombreActual)) {
+                        $motivo = "el Excel asigna {$nombreExcel} en lugar de {$nombreActual}";
+                    }
+                }
+
+                if ($motivo !== null) {
+                    $afectadas[] = [
+                        'permuta_id'       => (int) $permuta['id'],
+                        'fecha'            => $sesion['fecha'],
+                        'hora_inicio'      => $sesion['hora_inicio'],
+                        'hora_fin'         => $sesion['hora_fin'],
+                        'codigo_ficha'     => $sesion['codigo'],
+                        'instructor_actual' => $nombreActual,
+                        'motivo'           => $motivo,
+                    ];
+                }
+            }
+        }
+
+        return $afectadas;
+    }
+
+    private function normalizarNombre(string $texto): string
+    {
+        $texto = mb_strtolower(trim($texto), 'UTF-8');
+        $texto = str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ'],
+            ['a', 'e', 'i', 'o', 'u', 'u', 'n'],
+            $texto
+        );
+        return preg_replace('/\s+/', ' ', $texto);
+    }
+
+    /**
+     * RF-HOR-08: registra la importación en la tabla de auditoría.
+     */
+    private function registrarImportacion(array $datos): void
+    {
+        try {
+            $modelo = new ImportacionHorario($this->db);
+            $modelo->registrar($datos);
+        } catch (Throwable $e) {
+            // La auditoría no debe impedir el resultado de la importación.
+        }
+    }
+
+    /**
      * Procesa el horario semestral de un instructor (RF-HOR-03, 36, 39, 40).
      */
-    private function procesarHorarioInstructor(array $parseResult): array
+    private function procesarHorarioInstructor(array $parseResult, string $archivo = ''): array
     {
         $nombreInstructor = trim((string) ($parseResult['meta']['instructor_nombre'] ?? ''));
         $instructor = $nombreInstructor !== ''
@@ -459,11 +656,27 @@ class HorarioController
             $mapaFichas
         );
 
-        return $this->horarioReporte->generarReporte(
+        $resultado = $this->horarioReporte->generarReporte(
             $parseResult,
             ['valido' => true, 'errores' => []],
             $reporteSincronizacion
         );
+
+        $this->registrarImportacion([
+            'usuario_id'    => (int) Auth::getUserId(),
+            'tipo'          => 'instructor',
+            'archivo'       => $archivo,
+            'anio'          => (int) ($parseResult['meta']['año'] ?? date('Y')),
+            'instructor_id' => (int) $instructor['id'],
+            'creadas'       => $reporteSincronizacion['creadas'] ?? 0,
+            'actualizadas'  => $reporteSincronizacion['actualizadas'] ?? 0,
+            'omitidas'      => $reporteSincronizacion['omitidas'] ?? 0,
+            'canceladas'    => $reporteSincronizacion['canceladas'] ?? 0,
+            'protegidas'    => $reporteSincronizacion['protegidas'] ?? 0,
+            'errores'       => $reporteSincronizacion['errores'] ?? [],
+        ]);
+
+        return $resultado;
     }
 
     // =====================================================================
