@@ -1,8 +1,10 @@
 ================================================================================
 INFORME DE ESTADO EJECUTIVO DEL PROYECTO
 SISTEMA DE CONTROL DE INGRESO DE APRENDICES (SENA)
-Fecha de corte: 23 de octubre de 2026
-Version del documento: 4.0
+Fecha de corte: 27 de octubre de 2026
+Version del documento: 4.1
+~~Fecha de corte: 23 de octubre de 2026~~
+~~Version del documento: 4.0~~
 ~~Fecha de corte: 15 de octubre de 2026~~
 ~~Version del documento: 3.0~~
 ================================================================================
@@ -10,7 +12,9 @@ Version del documento: 4.0
 1. RESUMEN EJECUTIVO
 --------------------------------------------------------------------------------
 El proyecto Sistema de Control de Ingreso de Aprendices registra un avance
-global consolidado del 90% frente a los requerimientos tecnicos y funcionales.
+global consolidado del 95% frente a los requerimientos tecnicos y funcionales.
+~~El proyecto Sistema de Control de Ingreso de Aprendices registra un avance
+global consolidado del 90% frente a los requerimientos tecnicos y funcionales.~~
 ~~El proyecto Sistema de Control de Ingreso de Aprendices registra un avance
 global consolidado del 78% frente a los requerimientos tecnicos y funcionales.~~
 
@@ -237,7 +241,7 @@ MODULO / COMPONENTE                     ESTADO       OBSERVACIONES EJECUTIVAS
                                                      y formato CSV para hojas de calculo.
                                                      Ruta ?action=reportes activa sin 404.
 
-16. Tableros Analiticos (Dashboard)     [PARCIAL]    Tarjetas de totales operativas.
+~~16. Tableros Analiticos (Dashboard)     [PARCIAL]    Tarjetas de totales operativas.
                                                      _graficos.php y dashboard.js
                                                      existen y no se incluyen.
                                                      Falta dashboard/datosGraficos.
@@ -246,7 +250,13 @@ MODULO / COMPONENTE                     ESTADO       OBSERVACIONES EJECUTIVAS
                                                        DashboardController::datosGraficos().
                                                      - Cargar libreria Chart.js.
                                                      - Incluir partial _graficos.php en
-                                                       views/dashboard/index.php.
+                                                       views/dashboard/index.php.~~
+16. Tableros Analiticos (Dashboard)     [OPERATIVO]  Implementado (2026-10-27):
+                                                     Endpoint JSON datosGraficos() con
+                                                     Reporte::indicadores() y filtro por rol,
+                                                     Chart.js v4 UMD cargado via CDN,
+                                                     inclusion de _graficos.php y dashboard.js,
+                                                     estilos responsivos en style.css.
 
 ~~17. Formulario Manual de Sesiones       [PENDIENTE]  Complemento a importacion Excel.
                                                      [QUÉ TOCA HACER]:
@@ -323,17 +333,19 @@ Factores identificados pendientes:
 7. METRICAS CONSOLIDADAS DE AVANCE
 --------------------------------------------------------------------------------
 Indicador General de Proyecto:
-  Avance total:              90%
-  Pendiente de ejecucion:    10%
+  Avance total:              95%
+  Pendiente de ejecucion:    5%
+~~Avance total:              90%~~
+~~Pendiente de ejecucion:    10%~~
 ~~Avance total:              78%~~
 ~~Pendiente de ejecucion:    22%~~
 
 Desglose por Areas:
 - Modelo de Datos y Migraciones:     98% completado
-- Logica de Negocio y Controladores: 92% completado
-- Vistas e Interfaz Grafica:         90% completado
+- Logica de Negocio y Controladores: 95% completado
+- Vistas e Interfaz Grafica:         95% completado
 - Integracion de Hardware (RFID):   100% completado
-- Analitica y Reportes:              80% completado
+- Analitica y Reportes:             100% completado
 
 Cambio respecto a la version 3.0 (78%):
 - Terminal RFID paso de parcial a 100% operativa.

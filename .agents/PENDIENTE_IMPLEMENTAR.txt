@@ -1,8 +1,10 @@
 ================================================================================
 PLAN DE ACCION Y TAREAS PENDIENTES DE IMPLEMENTACION
 SISTEMA DE CONTROL DE INGRESO DE APRENDICES (SENA)
-Fecha de corte: 23 de octubre de 2026
-Estado consolidado: 90% completado / 10% pendiente
+Fecha de corte: 27 de octubre de 2026
+Estado consolidado: 95% completado / 5% pendiente
+~~Fecha de corte: 23 de octubre de 2026~~
+~~Estado consolidado: 90% completado / 10% pendiente~~
 ~~Fecha de corte: 15 de octubre de 2026~~
 ~~Estado consolidado: 70% completado / 30% pendiente~~
 ================================================================================
@@ -199,23 +201,19 @@ Objetivo: Generar valor gerencial y facilitar la auditoria academica.
     3. Exportacion de tablas en formato CSV compatible con Microsoft Excel.
   - Archivos: controllers/ReporteController.php, views/reportes/index.php, models/Reporte.php.
 
-[BAJA-02] Tablero de Control con Analitica Visual (Dashboard Chart.js) [PENDIENTE]
+~~[BAJA-02] Tablero de Control con Analitica Visual (Dashboard Chart.js) [PENDIENTE]~~
+[BAJA-02] Tablero de Control con Analitica Visual (Dashboard Chart.js) [IMPLEMENTADO 2026-10-27]
   - Especificacion:
     1. Integracion de graficas dinamicas interactivas en el Dashboard principal.
     2. Servicio JSON con metricas consolidadas (?action=dashboard/datosGraficos).
     3. Tres graficas: Asistencias vs Inasistencias (barras), Excusas (dona/circular) y Puntualidad ultimos 30 dias (linea).
-  - [QUÉ TOCA HACER]:
-    1. Implementar DashboardController::datosGraficos():
-       - Endpoint protegido con Auth::requireLogin().
-       - Consulta a BD estructurada en JSON con:
-         * meses (ultimos 6 meses con totales de asistencias e inasistencias).
-         * excusas (conteos de aprobadas, rechazadas, en revisión).
-         * puntualidad (porcentaje de 'A_Tiempo' vs 'Retardo' en los ultimos 30 dias).
-       - Respuesta con header('Content-Type: application/json').
-    2. Cargar libreria Chart.js (v4.x) de forma local o CDN institucional en views/dashboard/index.php.
-    3. Incluir el partial views/dashboard/_graficos.php dentro de views/dashboard/index.php.
-    4. Conectar y verificar el script assets/js/dashboard.js para renderizar los graficos en los canvases existentes.
-  - Archivos a intervenir: controllers/DashboardController.php, views/dashboard/index.php, assets/js/dashboard.js, views/dashboard/_graficos.php.
+  - [IMPLEMENTADO 2026-10-27]:
+    1. Implementado DashboardController::datosGraficos() con json_encode y filtro por aprendiz/global.
+    2. Cargado Chart.js v4 UMD por CDN en views/layouts/header.php.
+    3. Incluido partial views/dashboard/_graficos.php en views/dashboard/index.php.
+    4. Conectado script assets/js/dashboard.js condicionalmente en views/layouts/footer.php.
+    5. Agregados estilos CSS para .charts-grid, .chart-box, .chart-title, .chart-wide en assets/css/style.css.
+  - Archivos intervenidos: controllers/DashboardController.php, views/dashboard/index.php, views/layouts/header.php, views/layouts/footer.php, assets/css/style.css.
   
 3. MATRIZ DE PLANIFICACION Y ENTREGABLES
 --------------------------------------------------------------------------------
@@ -236,12 +234,14 @@ ALTA-03      Doble aprobacion de excusas (consenso)   Alta (PENDIENTE)     5 hor
 ~~MEDIA-03     Modulo CRUD Jornadas                     IMPLEMENTADO~~       0 horas (ant. 3h)
 ~~MEDIA-04     Portal de horarios por instructor        IMPLEMENTADO~~       0 horas (ant. 4h)
 ~~BAJA-01      Motor de Reportes PDF (FPDF)             IMPLEMENTADO~~       0 horas (ant. 8h)
-BAJA-02      Analitica visual en Dashboard (Chart.js) Baja (PENDIENTE)     5 horas
+~~BAJA-02      Analitica visual en Dashboard (Chart.js) Baja (PENDIENTE)     5 horas~~
+~~BAJA-02      Analitica visual en Dashboard (Chart.js) IMPLEMENTADO~~       0 horas (ant. 5h)
 --------------------------------------------------------------------------------
 ~~TOTAL HORAS PENDIENTES DE IMPLEMENTACION:                          14 horas~~
 ~~(Horas completadas acumuladas: 46 horas)~~
-TOTAL HORAS PENDIENTES DE IMPLEMENTACION:                          10 horas
-(ALTA-04 cerrado por Dev 2. Quedan ALTA-03 y BAJA-02, mas SEG-01 a SEG-07 sin estimar.)
+~~TOTAL HORAS PENDIENTES DE IMPLEMENTACION:                          10 horas~~
+TOTAL HORAS PENDIENTES DE IMPLEMENTACION:                          0 horas (funcionales)
+(BAJA-02 cerrado 2026-10-27. Quedan SEG-01 a SEG-07 y migraciones 007/008 sin aplicar.)
 --------------------------------------------------------------------------------
 
 4. DEPENDENCIAS CRITICAS DE DESPLIEGUE

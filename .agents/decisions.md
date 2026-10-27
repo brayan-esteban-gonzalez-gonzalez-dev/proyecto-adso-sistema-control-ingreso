@@ -44,3 +44,9 @@ Formato sugerido por entrada:
   - Se reforzó `PermutaSesion::aprobarPermuta()` para validar disponibilidad horaria atómica de ambos instructores (RF-HOR-25) y sincronizar resilientemente la tabla `asignacion_instructor` (RF-HOR-43).
   - Se implementó en `HorarioController::index()` y `views/horarios/index.php` el filtro por Instructor además del de Ficha para administradores (RF-HOR-31).
   - Se implementó en `ExcusaMedica` y `ExcusaController` la regla de co-docencia en la jornada formativa (RF-HOR-34), requiriendo validación de dos instructores distintos (o administrador) antes de justificar formalmente una inasistencia.
+- **2026-10-27 — Integración de Analítica Visual en Dashboard (Chart.js - BAJA-02):**
+  - Se implementó el endpoint JSON `DashboardController::datosGraficos()` consumiendo `Reporte::indicadores()`, aplicando filtro personalizado por `$usuarioId` para el rol Aprendiz y datos globales para Administrador e Instructor.
+  - Se incluyó la carga de Chart.js v4 UMD vía CDN en `views/layouts/header.php`.
+  - Se integró el partial `views/dashboard/_graficos.php` en `views/dashboard/index.php` para todos los roles, conectando con la carga condicional de `assets/js/dashboard.js` en `views/layouts/footer.php`.
+  - Se incorporaron las reglas de estilo en `assets/css/style.css` (`.charts-grid`, `.chart-box`, `.chart-title`, `.chart-wide` y diseño responsive).
+

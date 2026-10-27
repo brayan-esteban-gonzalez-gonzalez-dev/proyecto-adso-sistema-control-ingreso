@@ -130,4 +130,7 @@
 </div>
 <?php endif; ?>
 
+<!-- Gráficas analíticas (todos los roles) -->
+<?php require_once ROOT_PATH . '/views/dashboard/_graficos.php'; ?>
+
 <?php require_once ROOT_PATH . '/views/layouts/footer.php'; ?>
