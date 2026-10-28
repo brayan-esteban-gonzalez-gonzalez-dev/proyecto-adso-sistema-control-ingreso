@@ -1,0 +1,6 @@
+Options -Indexes
+RewriteEngine On
+RewriteRule ^(config|controllers|models|helpers|jobs|librerias|views|migrations)(/|$) - [F,L]
+<FilesMatch "\.(env|md|sql|lock|zip|bak|phar|log|json)$">
+    Require all denied
+</FilesMatch>
