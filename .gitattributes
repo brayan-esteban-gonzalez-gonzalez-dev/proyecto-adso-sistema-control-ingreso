@@ -1,0 +1,16 @@
+# .gitattributes — Sistema Control de Ingreso SENA
+# Archivos excluidos al generar paquetes de distribución (git archive / export)
+# Rutas ancladas con / para que solo afecten al nivel raíz del proyecto
+# y NO a composer.json / AGENTS.md internos dentro de librerias/
+
+/AGENTS.md              export-ignore
+/CONTEXTO_TRANSICION.md export-ignore
+/README.md              export-ignore
+/.agents                export-ignore
+/migrations             export-ignore
+/composer.json          export-ignore
+/composer.lock          export-ignore
+/composer.phar          export-ignore
+/*.zip                  export-ignore
+/.gitignore             export-ignore
+/.gitattributes         export-ignore

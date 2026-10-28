@@ -7,12 +7,13 @@
 .env
 .env.local
 .env.*.local
+.env.*
+*.env
 
-# Composer (dependencias instaladas)
-librerias/
-!librerias/fpdf/
+# NOTA: librerias/ NO se ignora — está versionada en git
+# (PhpSpreadsheet + phpdotenv + FPDF forman parte del deploy)
 
-# Sistema de uploads (evidencias de excusas)
+# Sistema de uploads generados en runtime (evidencias de excusas)
 assets/uploads/
 
 # IDE y editores
@@ -35,6 +36,10 @@ cache/
 *.bak
 *.zip
 sistema-control-ingreso.mwb.bak.zip
+
+# Empaquetado
+*.tar.gz
+*.tar
 
 # Node (si en algún momento se usa)
 node_modules/
