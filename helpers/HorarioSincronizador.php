@@ -393,11 +393,19 @@ class HorarioSincronizador
             return null;
         }
 
-        $instructor = $this->usuarioModel->getInstructorPorNombre($nombre);
-        if (!$instructor) {
-            return null;
+        $coincidencias = $this->usuarioModel->buscarInstructor($nombre);
+        if (count($coincidencias) === 1) {
+            return (int) $coincidencias[0]['id'];
         }
 
-        return (int) $instructor['id'];
+        if (count($coincidencias) > 1) {
+            $nombres = implode(', ', array_map(
+                fn($inst) => trim((string) $inst['nombre'] . ' ' . (string) $inst['apellido']),
+                $coincidencias
+            ));
+            error_log('[SCIA][HorarioSincronizador] Instructor ambiguo "' . $nombre . '" (' . $nombres . '): no se asigna automáticamente.');
+        }
+
+        return null;
     }
 }

@@ -16,11 +16,13 @@ class HorarioValidator
     private array $errores = [];
     private ?Usuario $usuarioModel;
     private ?AsignacionInstructor $asignacionModel;
+    private ?Sesion $sesionModel;
 
-    public function __construct(?Usuario $usuarioModel = null, ?AsignacionInstructor $asignacionModel = null)
+    public function __construct(?Usuario $usuarioModel = null, ?AsignacionInstructor $asignacionModel = null, ?Sesion $sesionModel = null)
     {
         $this->usuarioModel = $usuarioModel;
         $this->asignacionModel = $asignacionModel;
+        $this->sesionModel = $sesionModel;
     }
 
     /**
@@ -31,6 +33,7 @@ class HorarioValidator
      *                        'ficha_id'      => int  (obligatorio para RF-HOR-38)
      *                        'codigo_ficha'  => string
      *                        'validar_asignaciones' => bool (por defecto true si hay modelo)
+     *                        'mapa_fichas'   => array código_ficha => id (importación de instructor)
      * @return array ['valido' => bool, 'errores' => array]
      */
     public function validar(array $bloques, array $contexto = []): array
@@ -54,6 +57,9 @@ class HorarioValidator
         if ($validarAsignaciones && $fichaId > 0) {
             $this->validarAsignacionesInstructor($bloques, $fichaId);
         }
+
+        // RF-HOR-17/18 contra la base de datos: sesiones ya guardadas.
+        $this->validarContraBaseDatos($bloques, $contexto);
 
         return $this->resultado();
     }
@@ -112,8 +118,17 @@ class HorarioValidator
                 continue;
             }
 
-            if ($this->usuarioModel->getInstructorPorNombre($nombre) === null) {
+            $coincidencias = $this->usuarioModel->buscarInstructor($nombre);
+            if (empty($coincidencias)) {
                 $this->agregarError("El instructor {$nombre} no está registrado ({$fecha}, {$hora}). Regístrelo o corrija el nombre y suba el archivo de nuevo.");
+                continue;
+            }
+            if (count($coincidencias) > 1) {
+                $nombres = implode(', ', array_map(
+                    fn($inst) => trim((string) $inst['nombre'] . ' ' . (string) $inst['apellido']),
+                    $coincidencias
+                ));
+                $this->agregarError("El instructor {$nombre} es ambiguo: coincide con varios instructores registrados ({$nombres}). Especifique el documento en el archivo o corrija el nombre ({$fecha}, {$hora}).");
             }
         }
     }
@@ -256,11 +271,12 @@ class HorarioValidator
                 continue;
             }
 
-            $instructor = $this->usuarioModel?->getInstructorPorNombre($nombre);
-            if ($instructor === null) {
-                // Ya se reportó en RF-HOR-16.
+            $coincidencias = $this->usuarioModel?->buscarInstructor($nombre) ?? [];
+            if (count($coincidencias) !== 1) {
+                // Sin instructor o ambiguo: ya se reportó en RF-HOR-16.
                 continue;
             }
+            $instructor = $coincidencias[0];
 
             $asignacion = $this->asignacionModel->existeAsignacion(
                 (int) $instructor['id'],
@@ -288,5 +304,63 @@ class HorarioValidator
             $finB = $inicioB;
         }
         return $inicioA < $finB && $inicioB < $finA;
+    }
+
+    /**
+     * RF-HOR-17/18 contra la base de datos: los bloques del archivo también
+     * pueden chocar con sesiones ya guardadas (no solo entre sí).
+     *
+     * Contexto soportado:
+     *  - 'ficha_id'    => int  (importación de ficha)
+     *  - 'mapa_fichas' => array código_ficha => id (importación de instructor)
+     */
+    private function validarContraBaseDatos(array $bloques, array $contexto): void
+    {
+        if ($this->sesionModel === null || $this->usuarioModel === null) {
+            return;
+        }
+
+        $fichaIdGlobal = (int) ($contexto['ficha_id'] ?? 0);
+        $mapaFichas = is_array($contexto['mapa_fichas'] ?? null) ? $contexto['mapa_fichas'] : [];
+
+        // Resuelve instructores por nombre (solo coincidencia única) y arma el
+        // mapa nombre => id para el modelo.
+        $mapaInstructores = [];
+        foreach ($bloques as $bloque) {
+            $nombre = trim((string) ($bloque['instructor'] ?? ''));
+            if ($nombre === '' || isset($mapaInstructores[$nombre])) {
+                continue;
+            }
+            $coincidencias = $this->usuarioModel->buscarInstructor($nombre);
+            if (count($coincidencias) === 1) {
+                $mapaInstructores[$nombre] = (int) $coincidencias[0]['id'];
+            }
+        }
+
+        if ($fichaIdGlobal > 0) {
+            $errores = $this->sesionModel->validarBloquesImportacion($bloques, $fichaIdGlobal, $mapaInstructores);
+            foreach ($errores as $mensaje) {
+                $this->agregarError($mensaje);
+            }
+            return;
+        }
+
+        // Caso horario de instructor: cada bloque apunta a su ficha por código.
+        $porFicha = [];
+        foreach ($bloques as $bloque) {
+            $codigo = (string) ($bloque['codigo_ficha'] ?? '');
+            $fichaId = (int) ($mapaFichas[$codigo] ?? 0);
+            if ($fichaId <= 0) {
+                continue;
+            }
+            $porFicha[$fichaId][] = $bloque;
+        }
+
+        foreach ($porFicha as $fichaId => $bloquesFicha) {
+            $errores = $this->sesionModel->validarBloquesImportacion($bloquesFicha, $fichaId, $mapaInstructores);
+            foreach ($errores as $mensaje) {
+                $this->agregarError($mensaje);
+            }
+        }
     }
 }

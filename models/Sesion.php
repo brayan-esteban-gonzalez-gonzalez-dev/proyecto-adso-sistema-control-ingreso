@@ -379,6 +379,99 @@ class Sesion {
     }
 
     /**
+     * RF-HOR-17/18: valida los bloques de una importación contra las sesiones
+     * YA GUARDADAS en la base de datos (HorarioValidator solo compara bloques
+     * entre sí, en memoria).
+     *
+     * Los slots que la propia importación va a actualizar NO se reportan como
+     * conflicto: el sincronizador los identifica por la misma clave
+     * (fecha | hora_inicio) dentro de la ficha.
+     *
+     * @param array $bloques        Bloques normalizados (fecha, hora_inicio, hora_fin)
+     * @param int   $fichaId        Ficha destino (0 = no se puede validar ficha)
+     * @param array $mapaInstructores Mapa nombre => id del instructor resuelto
+     *                               (0 o ausente = instructor no resuelto, aún
+     *                               así se valida el cruce de la ficha).
+     * @return array Mensajes de conflicto detectados (vacío si no hay).
+     */
+    public function validarBloquesImportacion(array $bloques, int $fichaId, array $mapaInstructores = []): array
+    {
+        $errores = [];
+        if (empty($bloques) || $fichaId <= 0) {
+            return $errores;
+        }
+
+        foreach ($bloques as $bloque) {
+            $fecha = (string) ($bloque['fecha'] ?? '');
+            $inicio = (string) ($bloque['hora_inicio'] ?? '');
+            $fin = (string) ($bloque['hora_fin'] ?? ($inicio !== '' ? $inicio : ''));
+
+            if ($fecha === '' || $inicio === '' || $fin === '') {
+                continue;
+            }
+
+            // 1. La ficha ya tiene una sesión que solapa (slot distinto al que se actualizará).
+            // Cada marcador nombrado se usa una sola vez: con ATTR_EMULATE_PREPARES
+            // en false, PDO/MySQL rechaza el mismo nombre repetido (HY093).
+            $sqlFicha = "SELECT s.*, CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor
+                         FROM {$this->table} s
+                         INNER JOIN Usuario u ON s.Instructor_id = u.id
+                         WHERE s.Ficha_id = :ficha_id
+                           AND s.fecha = :fecha
+                           AND s.estado != 'Cancelado'
+                           AND (s.hora_inicio < :hora_fin AND s.hora_fin > :hora_cmp)
+                           AND s.hora_inicio <> :hora_slot";
+            $stmtFicha = $this->conn->prepare($sqlFicha);
+            $stmtFicha->execute([
+                ':ficha_id'  => $fichaId,
+                ':fecha'     => $fecha,
+                ':hora_fin'  => $fin,
+                ':hora_cmp'  => $inicio,
+                ':hora_slot' => $inicio,
+            ]);
+            $conflictoFicha = $stmtFicha->fetch();
+            if ($conflictoFicha) {
+                $errores[] = "La ficha ya tiene registrada una clase el {$fecha} de "
+                    . $conflictoFicha['hora_inicio'] . ' a ' . $conflictoFicha['hora_fin']
+                    . ' con el instructor ' . $conflictoFicha['nombre_instructor']
+                    . ' (se solapa con el bloque de ' . $inicio . ' a ' . $fin . ').';
+            }
+
+            // 2. El instructor ya está en OTRA ficha a la misma hora.
+            // El cruce dentro de la misma ficha ya lo reporta la consulta anterior.
+            $nombre = trim((string) ($bloque['instructor'] ?? ''));
+            $instructorId = (int) ($mapaInstructores[$nombre] ?? 0);
+            if ($instructorId > 0) {
+                $sqlInst = "SELECT s.*, f.codigo AS codigo_ficha
+                            FROM {$this->table} s
+                            INNER JOIN Ficha f ON s.Ficha_id = f.id
+                            WHERE s.Instructor_id = :instructor_id
+                              AND s.fecha = :fecha
+                              AND s.estado != 'Cancelado'
+                              AND s.Ficha_id <> :ficha_id
+                              AND (s.hora_inicio < :hora_fin AND s.hora_fin > :hora_cmp)";
+                $stmtInst = $this->conn->prepare($sqlInst);
+                $stmtInst->execute([
+                    ':instructor_id' => $instructorId,
+                    ':fecha'         => $fecha,
+                    ':ficha_id'      => $fichaId,
+                    ':hora_fin'      => $fin,
+                    ':hora_cmp'      => $inicio,
+                ]);
+                $conflictoInst = $stmtInst->fetch();
+                if ($conflictoInst) {
+                    $errores[] = "El instructor {$nombre} ya tiene registrada la ficha "
+                        . $conflictoInst['codigo_ficha'] . " el {$fecha} de "
+                        . $conflictoInst['hora_inicio'] . ' a ' . $conflictoInst['hora_fin']
+                        . ' en el sistema.';
+                }
+            }
+        }
+
+        return $errores;
+    }
+
+    /**
      * Obtiene sesiones de una ficha en un rango de fechas con nombres y jornadas (para Aprendices, RF-HOR-29)
      */
     public function getByFichaRango(int $fichaId, string $desde, string $hasta): array

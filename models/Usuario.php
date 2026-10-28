@@ -119,9 +119,17 @@ class Usuario {
     }
 
     /**
-     * Busca un instructor por coincidencia de nombre y apellido
+     * Devuelve TODAS las coincidencias de instructor para un nombre (o documento).
+     *
+     * Estrategia (sin ambigüedad silenciosa):
+     *  1. Si la búsqueda es numérica, coincide por `identificacion` exacto.
+     *  2. Coincidencia exacta normalizada (nombre+apellido o apellido+nombre).
+     *  3. Si no hay exactas, coincidencia parcial: todas las partes de 3+ letras
+     *     contenidas en el nombre completo.
+     *
+     * Los llamadores deciden: 0 = no registrado, 1 = único, >1 = ambiguo.
      */
-    public function getInstructorPorNombre(string $nombreBusqueda): ?array {
+    public function buscarInstructor(string $nombreBusqueda): array {
         $instructores = $this->getInstructores();
         $normalizar = function($str) {
             $str = mb_strtolower(trim($str), 'UTF-8');
@@ -135,22 +143,31 @@ class Usuario {
 
         $busqueda = $normalizar($nombreBusqueda);
         if (empty($busqueda)) {
-            return null;
+            return [];
         }
 
-        // 1. Coincidencia exacta completa
-        foreach ($instructores as $inst) {
-            $nomCompleto1 = $normalizar($inst['nombre'] . ' ' . $inst['apellido']);
-            $nomCompleto2 = $normalizar($inst['apellido'] . ' ' . $inst['nombre']);
-
-            if ($nomCompleto1 === $busqueda || $nomCompleto2 === $busqueda) {
-                return $inst;
+        // 1. Coincidencia por documento (identificación exacta)
+        if (ctype_digit(preg_replace('/\s+/', '', $busqueda) ?? '')) {
+            $documento = (int) preg_replace('/\s+/', '', $busqueda);
+            $porDocumento = [];
+            foreach ($instructores as $inst) {
+                if ((int) $inst['identificacion'] === $documento) {
+                    $porDocumento[] = $inst;
+                }
             }
+            return $porDocumento;
         }
 
-        // 2. Coincidencia por partes de palabras
+        // 2. Coincidencias exactas completas (ambos órdenes)
+        $exactas = $this->coincidenciasExactas($instructores, $busqueda, $normalizar);
+        if (!empty($exactas)) {
+            return $exactas;
+        }
+
+        // 3. Coincidencias parciales: TODAS las que cumplan (puede haber varias).
         $partes = array_filter(explode(' ', $busqueda), fn($p) => mb_strlen($p) >= 3);
         if (count($partes) >= 2) {
+            $parciales = [];
             foreach ($instructores as $inst) {
                 $nomCompleto = $normalizar($inst['nombre'] . ' ' . $inst['apellido']);
                 $todasEncontradas = true;
@@ -161,11 +178,44 @@ class Usuario {
                     }
                 }
                 if ($todasEncontradas) {
-                    return $inst;
+                    $parciales[] = $inst;
                 }
             }
+            return $parciales;
         }
 
+        return [];
+    }
+
+    /**
+     * Devuelve coincidencias exactas de nombre completo (nombre apellido y
+     * apellido nombre), todos sus registros.
+     */
+    private function coincidenciasExactas(array $instructores, string $busqueda, callable $normalizar): array {
+        $exactas = [];
+        foreach ($instructores as $inst) {
+            $nomCompleto1 = $normalizar($inst['nombre'] . ' ' . $inst['apellido']);
+            $nomCompleto2 = $normalizar($inst['apellido'] . ' ' . $inst['nombre']);
+
+            if ($nomCompleto1 === $busqueda || $nomCompleto2 === $busqueda) {
+                $exactas[] = $inst;
+            }
+        }
+        return $exactas;
+    }
+
+    /**
+     * Busca un instructor por coincidencia de nombre y apellido.
+     *
+     * Devuelve el instructor SOLO si la búsqueda resuelve a un único registro.
+     * Si hay 0 o varias coincidencias devuelve null; los llamadores que
+     * necesiten distinguir la ambigüedad deben usar buscarInstructor().
+     */
+    public function getInstructorPorNombre(string $nombreBusqueda): ?array {
+        $coincidencias = $this->buscarInstructor($nombreBusqueda);
+        if (count($coincidencias) === 1) {
+            return $coincidencias[0];
+        }
         return null;
     }
 

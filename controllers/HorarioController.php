@@ -19,6 +19,12 @@ require_once ROOT_PATH . '/models/ImportacionHorario.php';
 
 class HorarioController
 {
+    /** Vigencia de la importación pendiente de confirmar (RF-HOR-15): 1 hora. */
+    private const IMPORTACION_PENDIENTE_TTL = 3600;
+    /** Límites de tamaño para no inflar la sesión con la carga pendiente. */
+    private const IMPORTACION_PENDIENTE_MAX_BLOQUES = 2000;
+    private const IMPORTACION_PENDIENTE_MAX_BYTES = 524288; // 512 KB en JSON
+
     private PDO $db;
     private Sesion $sesionModel;
     private Ficha $fichaModel;
@@ -38,7 +44,7 @@ class HorarioController
         $this->usuarioModel = new Usuario($db);
         $this->asignacionModel = new AsignacionInstructor($db);
         $this->horarioParser = new HorarioParser();
-        $this->horarioValidator = new HorarioValidator($this->usuarioModel, $this->asignacionModel);
+        $this->horarioValidator = new HorarioValidator($this->usuarioModel, $this->asignacionModel, $this->sesionModel);
         $this->horarioSincronizador = new HorarioSincronizador($db, $this->usuarioModel, $this->asignacionModel);
         $this->horarioReporte = new HorarioReporte();
 
@@ -413,27 +419,34 @@ class HorarioController
             }
 
             // RF-HOR-15: detectar si el Excel revertiría permutas aprobadas.
-            $confirmarPermutas = !empty($_POST['confirmar_permutas']);
-            if (!$confirmarPermutas) {
-                $permutasAfectadas = $this->detectarPermutasAfectadas($parseResult['bloques'] ?? [], $fichaId);
-                if (!empty($permutasAfectadas)) {
-                    $_SESSION['importacion_pendiente'] = [
-                        'bloques' => $parseResult['bloques'],
-                        'meta'    => $parseResult['meta'],
-                        'anio'    => $anio,
-                        'archivo' => $fileName,
-                        'ficha_id' => $fichaId,
-                    ];
-                    $pageTitle = 'Confirmar importación con permutas';
-                    require_once ROOT_PATH . '/views/horarios/confirmar_permutas.php';
-                    return;
+            // Si hay permutas afectadas SIEMPRE se muestra la vista de
+            // confirmación; no existe atajo por POST (no se puede saltar).
+            $permutasAfectadas = $this->detectarPermutasAfectadas($parseResult['bloques'] ?? [], $fichaId);
+            if (!empty($permutasAfectadas)) {
+                if ($this->excedeTamanoPendiente($parseResult['bloques'] ?? [])) {
+                    Auth::setFlash('error', 'El archivo genera una importación demasiado grande para dejarla pendiente en sesión. Divida el archivo y suba partes más pequeñas.');
+                    header('Location: ' . BASE_URL . '?action=horarios/importar');
+                    exit;
                 }
+
+                $_SESSION['importacion_pendiente'] = [
+                    'bloques' => $parseResult['bloques'],
+                    'meta'    => $parseResult['meta'],
+                    'anio'    => $anio,
+                    'archivo' => $fileName,
+                    'ficha_id' => $fichaId,
+                    'usuario_id' => (int) Auth::getUserId(),
+                    'creada_en' => time(),
+                ];
+                $pageTitle = 'Confirmar importación con permutas';
+                require_once ROOT_PATH . '/views/horarios/confirmar_permutas.php';
+                return;
             }
 
             // Sincronización (Tarea A.3)
             $reporteSincronizacion = $this->horarioSincronizador->sincronizar($parseResult['bloques'] ?? [], $fichaId);
 
-            $resultado = $this->procesarResultadoFicha($parseResult, $validacion, $reporteSincronizacion, $fileName, $anio, $fichaId, $confirmarPermutas);
+            $resultado = $this->procesarResultadoFicha($parseResult, $validacion, $reporteSincronizacion, $fileName, $anio, $fichaId, false);
             unset($_SESSION['importacion_pendiente']);
 
             $pageTitle = 'Resultado de la Importación';
@@ -468,7 +481,46 @@ class HorarioController
             exit;
         }
 
+        // Solo el usuario que inició la carga (mismo usuario de la sesión PHP)
+        // puede confirmarla.
+        if ((int) ($pendiente['usuario_id'] ?? 0) !== (int) Auth::getUserId()) {
+            unset($_SESSION['importacion_pendiente']);
+            Auth::setFlash('error', 'La importación pendiente no fue iniciada por tu usuario. Sube el archivo de nuevo.');
+            header('Location: ' . BASE_URL . '?action=horarios/importar');
+            exit;
+        }
+
+        // Vigencia: máximo 1 hora (IMPORTACION_PENDIENTE_TTL).
+        $creadaEn = (int) ($pendiente['creada_en'] ?? 0);
+        if ($creadaEn <= 0 || (time() - $creadaEn) > self::IMPORTACION_PENDIENTE_TTL) {
+            unset($_SESSION['importacion_pendiente']);
+            Auth::setFlash('error', 'La importación pendiente caducó (vigencia de 1 hora). Sube el archivo de nuevo.');
+            header('Location: ' . BASE_URL . '?action=horarios/importar');
+            exit;
+        }
+
+        if ($this->excedeTamanoPendiente((array) $pendiente['bloques'])) {
+            unset($_SESSION['importacion_pendiente']);
+            Auth::setFlash('error', 'La importación pendiente excede el tamaño permitido. Sube el archivo de nuevo.');
+            header('Location: ' . BASE_URL . '?action=horarios/importar');
+            exit;
+        }
+
+        // Re-validar TODO (incluido el cruce contra la base de datos): los
+        // datos guardados en sesión no se consideran confiables.
         $fichaId = (int) ($pendiente['ficha_id'] ?? 0);
+        $validacion = $this->horarioValidator->validar(
+            $pendiente['bloques'],
+            ['ficha_id' => $fichaId]
+        );
+        if (!$validacion['valido']) {
+            unset($_SESSION['importacion_pendiente']);
+            $pageTitle = 'Errores de Validación';
+            $errores = $validacion['errores'];
+            require_once ROOT_PATH . '/views/horarios/errores_validacion.php';
+            exit;
+        }
+
         $reporteSincronizacion = $this->horarioSincronizador->sincronizar($pendiente['bloques'], $fichaId);
 
         $parseResult = [
@@ -479,7 +531,7 @@ class HorarioController
 
         $resultado = $this->procesarResultadoFicha(
             $parseResult,
-            ['valido' => true, 'errores' => []],
+            $validacion,
             $reporteSincronizacion,
             (string) ($pendiente['archivo'] ?? ''),
             (int) ($pendiente['anio'] ?? date('Y')),
@@ -617,6 +669,19 @@ class HorarioController
     }
 
     /**
+     * RF-HOR-15: la importación pendiente vive en sesión; se acota su tamaño
+     * para no inflar $_SESSION (límite de bloques y de bytes en JSON).
+     */
+    private function excedeTamanoPendiente(array $bloques): bool
+    {
+        if (count($bloques) > self::IMPORTACION_PENDIENTE_MAX_BLOQUES) {
+            return true;
+        }
+        $json = json_encode($bloques, JSON_UNESCAPED_UNICODE);
+        return $json === false || strlen($json) > self::IMPORTACION_PENDIENTE_MAX_BYTES;
+    }
+
+    /**
      * RF-HOR-08: registra la importación en la tabla de auditoría.
      */
     private function registrarImportacion(array $datos): void
@@ -625,7 +690,10 @@ class HorarioController
             $modelo = new ImportacionHorario($this->db);
             $modelo->registrar($datos);
         } catch (Throwable $e) {
-            // La auditoría no debe impedir el resultado de la importación.
+            // La auditoría no debe impedir el resultado de la importación,
+            // pero el fallo sí debe quedar evidenciado en el log del sistema.
+            error_log('[SCIA][HorarioController] No se pudo registrar la auditoría de importación: '
+                . $e->getFile() . ':' . $e->getLine() . ' - ' . $e->getMessage());
         }
     }
 
@@ -635,11 +703,11 @@ class HorarioController
     private function procesarHorarioInstructor(array $parseResult, string $archivo = ''): array
     {
         $nombreInstructor = trim((string) ($parseResult['meta']['instructor_nombre'] ?? ''));
-        $instructor = $nombreInstructor !== ''
-            ? $this->usuarioModel->getInstructorPorNombre($nombreInstructor)
-            : null;
+        $coincidencias = $nombreInstructor !== ''
+            ? $this->usuarioModel->buscarInstructor($nombreInstructor)
+            : [];
 
-        if (!$instructor) {
+        if (empty($coincidencias)) {
             $errores = ['No se pudo identificar al instructor en el encabezado del archivo'
                 . ($nombreInstructor !== '' ? " (\"{$nombreInstructor}\")" : '')
                 . '. Verifique que esté registrado.'];
@@ -647,6 +715,19 @@ class HorarioController
             require_once ROOT_PATH . '/views/horarios/errores_validacion.php';
             exit;
         }
+
+        if (count($coincidencias) > 1) {
+            $nombres = implode(', ', array_map(
+                fn($inst) => trim((string) $inst['nombre'] . ' ' . (string) $inst['apellido']),
+                $coincidencias
+            ));
+            $errores = ['El instructor del archivo ("' . $nombreInstructor . '") es ambiguo: coincide con varios instructores registrados (' . $nombres . '). Corrija el encabezado o especifique el documento.'];
+            $pageTitle = 'Errores de Validación';
+            require_once ROOT_PATH . '/views/horarios/errores_validacion.php';
+            exit;
+        }
+
+        $instructor = $coincidencias[0];
 
         // Mapa de fichas registradas
         $fichas = $this->fichaModel->getAll();
@@ -671,7 +752,7 @@ class HorarioController
 
         $validacion = $this->horarioValidator->validar(
             $parseResult['bloques'] ?? [],
-            ['validar_asignaciones' => false]
+            ['validar_asignaciones' => false, 'mapa_fichas' => $mapaFichas]
         );
         $errores = array_merge($errores, $validacion['errores']);
 
