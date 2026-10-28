@@ -19,6 +19,82 @@ $flash = Auth::getFlash();
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/style.css?v=<?= file_exists(ROOT_PATH . '/assets/css/style.css') ? filemtime(ROOT_PATH . '/assets/css/style.css') : '1.0' ?>">
+    <script>
+        // Función inmediata anti-FOUC
+        (function() {
+            var savedTheme = localStorage.getItem('scia_theme');
+            var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            var theme = savedTheme ? savedTheme : (systemDark ? 'dark' : 'dark');
+            if (savedTheme) {
+                theme = savedTheme;
+            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+                theme = 'light';
+            }
+            document.documentElement.setAttribute('data-bs-theme', theme);
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+
+        // Actualizar icono, texto y tooltip del botón según el tema activo
+        window.actualizarBotonTemaGlobal = function(tema) {
+            var btn = document.getElementById('darkModeToggle');
+            var icon = document.getElementById('themeIcon');
+            var text = document.getElementById('themeText');
+            if (!icon && !text) return;
+
+            if (tema === 'dark') {
+                if (icon) icon.className = 'fas fa-sun bi bi-sun-fill';
+                if (text) text.textContent = 'Modo Claro';
+                if (btn) btn.setAttribute('title', 'Cambiar a Modo Claro');
+            } else {
+                if (icon) icon.className = 'fas fa-moon bi bi-moon-fill';
+                if (text) text.textContent = 'Modo Oscuro';
+                if (btn) btn.setAttribute('title', 'Cambiar a Modo Oscuro');
+            }
+        };
+
+        // Alternar tema de forma inmediata, persistente y robusta
+        window.toggleDarkMode = function() {
+            var html = document.documentElement;
+            var body = document.body;
+            var temaActual = html.getAttribute('data-bs-theme') || localStorage.getItem('scia_theme') || 'dark';
+            var nuevoTema = (temaActual === 'dark') ? 'light' : 'dark';
+
+            html.setAttribute('data-bs-theme', nuevoTema);
+            html.setAttribute('data-theme', nuevoTema);
+            if (body) {
+                body.setAttribute('data-bs-theme', nuevoTema);
+                body.setAttribute('data-theme', nuevoTema);
+            }
+            localStorage.setItem('scia_theme', nuevoTema);
+            window.actualizarBotonTemaGlobal(nuevoTema);
+
+            // Refrescar gráficos Chart.js si existen instancias
+            if (typeof Chart !== 'undefined' && Chart.instances) {
+                Object.values(Chart.instances).forEach(function(chart) {
+                    try {
+                        var textColor = (nuevoTema === 'dark') ? '#94a3b8' : '#475569';
+                        var gridColor = (nuevoTema === 'dark') ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+                        if (chart.options.scales) {
+                            Object.values(chart.options.scales).forEach(function(scale) {
+                                if (scale.ticks) scale.ticks.color = textColor;
+                                if (scale.grid) scale.grid.color = gridColor;
+                            });
+                        }
+                        if (chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) {
+                            chart.options.plugins.legend.labels.color = textColor;
+                        }
+                        chart.update();
+                    } catch(e) {}
+                });
+            }
+        };
+
+        // Sincronizar estado del botón tan pronto el DOM esté listo
+        document.addEventListener('DOMContentLoaded', function() {
+            var currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'dark';
+            window.actualizarBotonTemaGlobal(currentTheme);
+        });
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js" defer></script>
 </head>
 <body>
@@ -151,6 +227,9 @@ $flash = Auth::getFlash();
                 <h1 class="page-title"><?= htmlspecialchars($pageTitle ?? 'Dashboard') ?></h1>
             </div>
             <div class="header-right">
+                <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="darkModeToggle" title="Cambiar modo de vista" type="button" onclick="toggleDarkMode()">
+                    <i id="themeIcon" class="fas fa-sun bi bi-sun-fill"></i> <span class="d-none d-md-inline" id="themeText">Modo Claro</span>
+                </button>
                <span class="header-date">
                 <i class="fas fa-calendar-day"></i>
                     <?php

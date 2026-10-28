@@ -100,4 +100,45 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 5000);
     }
 
+    // ═══════════════════════════════════════════════════════
+    // MODO OSCURO / CLARO — CONTROL Y PERSISTENCIA
+    // ═══════════════════════════════════════════════════════
+    const darkModeToggle = document.getElementById('darkModeToggle');
+
+    // Registrar listener como respaldo solo si el elemento no tiene ya onclick directo
+    if (darkModeToggle && !darkModeToggle.hasAttribute('onclick')) {
+        darkModeToggle.addEventListener('click', function () {
+            if (typeof window.toggleDarkMode === 'function') {
+                window.toggleDarkMode();
+            }
+        });
+    }
+
+    // Sincronizar estado visual al cargar app.js
+    const temaActivo = document.documentElement.getAttribute('data-bs-theme') || 
+                       localStorage.getItem('scia_theme') || 'dark';
+
+    if (typeof window.actualizarBotonTemaGlobal === 'function') {
+        window.actualizarBotonTemaGlobal(temaActivo);
+    }
+
+    // Sincronizar preferencia del sistema si el usuario no ha forzado un tema manual
+    if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+            if (!localStorage.getItem('scia_theme')) {
+                const temaAuto = e.matches ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-bs-theme', temaAuto);
+                document.documentElement.setAttribute('data-theme', temaAuto);
+                if (document.body) {
+                    document.body.setAttribute('data-bs-theme', temaAuto);
+                    document.body.setAttribute('data-theme', temaAuto);
+                }
+                if (typeof window.actualizarBotonTemaGlobal === 'function') {
+                    window.actualizarBotonTemaGlobal(temaAuto);
+                }
+            }
+        });
+    }
+
 });
+

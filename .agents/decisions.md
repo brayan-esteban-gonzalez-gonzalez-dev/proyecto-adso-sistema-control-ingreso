@@ -109,4 +109,14 @@ Formato sugerido por entrada:
   - Respuestas JSON estructuradas con `success`, `message`, `aprendiz_nombre`, `hora`, `csrf_token` y nómina actualizada en tiempo real.
   - En `views/asistencia/rfid.php` se integró el formulario "Respaldo Manual / Olvido de Carnet" con input `#inputPinRespaldo` y botón "Marcar por Documento".
   - En `assets/js/rfid.js` se conectó la petición AJAX asíncrona y se blindó el lector RFID para prevenir pérdida de foco mientras el instructor digita en `#inputPinRespaldo`.
-
+- **2026-10-28 — Paleta Institucional SENA (#39A900) y Modo Oscuro Dinámico:**
+  - Se actualizó `assets/css/style.css` definiendo las variables institucionales SENA (`--sena-green: #39A900;`, `--sena-green-hover: #2e8600;`, `--sena-green-light`, `--sena-green-glow`) y mapeando `--accent-green` a la identidad oficial.
+  - Se implementó la arquitectura de temas nativa compatible con Bootstrap 5 (`data-bs-theme="dark"` / `data-bs-theme="light"` y `data-theme`): grises neutros oscuros (`#121212`, `#1d202b`) para el modo oscuro y grises neutros claros (`#f4f6f8`, `#ffffff`) para el modo claro, con transiciones suaves en toda la interfaz.
+  - Se integró el botón interruptor `#darkModeToggle` en `views/layouts/header.php` junto al perfil/fecha de la cabecera superior con icono dinámico (Sol/Luna) y texto descriptivo.
+- **2026-10-28 — Corrección de Reactividad en Interruptor de Modo Oscuro/Claro:**
+  - **Diagnóstico del bloqueo:** La falta de versionado de `assets/js/app.js` en `views/layouts/footer.php` provocaba que navegadores con caché previa mantuvieran scripts antiguos sin listeners, y la presencia simultánea de `onclick="toggleDarkMode()"` con un `addEventListener` en `app.js` generaba un doble toggle concurrente (oscuro -> claro -> oscuro en el mismo click), haciendo parecer que el botón no cambiaba.
+  - **Solución técnica implementada:**
+    1. Se centralizó la lógica en `window.toggleDarkMode` y `window.actualizarBotonTemaGlobal` dentro del `<head>` de [views/layouts/header.php](file:///c:/xampp/htdocs/proyects/segundoCrud/git/proyecto-adso-sistema-control-ingreso-main/views/layouts/header.php), ejecutándose de forma autónoma e inmediata con `onclick="toggleDarkMode()"` sin depender del ciclo de carga de scripts externos.
+    2. Se acondicionó `assets/js/app.js` para registrar el listener como respaldo exclusivamente si `onclick` no existe, previniendo rebotes de eventos.
+    3. Se agregó cache-busting dinámico con `filemtime` a `app.js` en [views/layouts/footer.php](file:///c:/xampp/htdocs/proyects/segundoCrud/git/proyecto-adso-sistema-control-ingreso-main/views/layouts/footer.php) (`?v=...`), forzando al navegador a obtener la última versión.
+    4. Se reforzó en [assets/css/style.css](file:///c:/xampp/htdocs/proyects/segundoCrud/git/proyecto-adso-sistema-control-ingreso-main/assets/css/style.css) la especificidad de `:root[data-bs-theme="light"], html[data-bs-theme="light"], body[data-bs-theme="light"]` asegurando la aplicación visual instantánea de los fondos `#f4f6f8` y `#ffffff`.

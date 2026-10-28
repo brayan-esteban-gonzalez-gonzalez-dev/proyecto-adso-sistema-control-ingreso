@@ -13,7 +13,7 @@
 <?php endif; ?>
 
 
-    <script src="<?= BASE_URL ?>assets/js/app.js"></script>
+    <script src="<?= BASE_URL ?>assets/js/app.js?v=<?= file_exists(ROOT_PATH . '/assets/js/app.js') ? filemtime(ROOT_PATH . '/assets/js/app.js') : '1.0' ?>"></script>
 <?php if (isset($loadRfidJs) && $loadRfidJs): ?>
     <script src="<?= BASE_URL ?>assets/js/rfid.js?v=<?= file_exists(ROOT_PATH . '/assets/js/rfid.js') ? filemtime(ROOT_PATH . '/assets/js/rfid.js') : '1.0' ?>"></script>
 <?php endif; ?>
