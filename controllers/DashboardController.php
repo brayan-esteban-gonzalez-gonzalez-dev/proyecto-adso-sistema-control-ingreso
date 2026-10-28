@@ -1,6 +1,8 @@
 <?php
+declare(strict_types=1);
+
 /**
- * Muestra la vista principal con estadisticas del sistema.
+ * Muestra la vista principal con estadísticas del sistema o portal del aprendiz.
  */
 class DashboardController {
     private PDO $db;
@@ -10,23 +12,36 @@ class DashboardController {
     }
 
     /**
-     * Muestra el dashboard con estadisticas
+     * Muestra el dashboard con estadísticas adaptadas al rol
      */
     public function index(): void {
-        $pageTitle = 'Dashboard';
+        Auth::requireLogin();
 
-        $usuarioModel  = new Usuario($this->db);
-        $fichaModel    = new Ficha($this->db);
-        $aprendizModel = new Aprendiz($this->db);
-        $excusaModel   = new ExcusaMedica($this->db);
+        if (Auth::isAprendiz()) {
+            $pageTitle = 'Portal del Aprendiz — Mi Asistencia';
+            require_once ROOT_PATH . '/models/Reporte.php';
 
-        $stats = [
-            'total_usuarios'    => $usuarioModel->count(),
-            'total_instructores'=> $usuarioModel->countByRol(2),
-            'total_fichas'      => $fichaModel->count(),
-            'total_aprendices'  => $aprendizModel->count(),
-            'excusas_pendientes'=> $excusaModel->countPendientes(),
-        ];
+            $reporteModel     = new Reporte($this->db);
+            $usuarioId        = (int) Auth::getUserId();
+            $metricasAprendiz = $reporteModel->getMetricasAprendiz($usuarioId);
+            $stats            = [];
+        } else {
+            $pageTitle = 'Dashboard';
+
+            $usuarioModel  = new Usuario($this->db);
+            $fichaModel    = new Ficha($this->db);
+            $aprendizModel = new Aprendiz($this->db);
+            $excusaModel   = new ExcusaMedica($this->db);
+
+            $stats = [
+                'total_usuarios'     => $usuarioModel->count(),
+                'total_instructores' => $usuarioModel->countByRol(2),
+                'total_fichas'       => $fichaModel->count(),
+                'total_aprendices'   => $aprendizModel->count(),
+                'excusas_pendientes' => $excusaModel->countPendientes(),
+            ];
+            $metricasAprendiz = null;
+        }
 
         require_once ROOT_PATH . '/views/dashboard/index.php';
     }

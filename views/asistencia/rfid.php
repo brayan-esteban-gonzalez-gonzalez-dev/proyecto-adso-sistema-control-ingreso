@@ -34,9 +34,9 @@ require_once ROOT_PATH . '/views/layouts/header.php';
             <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
                 <h2 style="font-size:1rem; font-weight:700; color:var(--text-primary); margin:0;">
                     <i class="fas fa-layer-group" style="color:var(--accent-blue); margin-right:6px;"></i>
-                    Mis Fichas — Control de Asistencia
+                    <?= Auth::isAdmin() ? 'Control Global de Fichas — Asistencia' : 'Mis Fichas — Control de Asistencia' ?>
                 </h2>
-                <span class="badge badge-blue" id="fichasCount">0 fichas</span>
+                <span class="badge badge-blue" id="fichasCount"><?= count($fichas ?? []) ?> fichas</span>
             </div>
 
             <?php if (empty($fichas)): ?>
@@ -99,6 +99,136 @@ require_once ROOT_PATH . '/views/layouts/header.php';
                 <?php endforeach; ?>
             </div>
             <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- ═══ Terminal Dual: RFID y Marcación Manual ═══ -->
+    <div class="rfid-dual-grid" id="rfidDualGrid">
+        <!-- Tarjeta 1: Indicador Lector RFID USB -->
+        <div class="card" id="cardLectorRfid">
+            <div class="card-header" style="margin-bottom:12px;">
+                <h3 style="font-size:0.95rem; font-weight:700; margin:0; display:flex; align-items:center; gap:8px;">
+                    <i class="fas fa-wifi" style="color:var(--accent-green);"></i>
+                    Terminal RFID (Lector USB)
+                </h3>
+            </div>
+            <div class="rfid-status-box" id="rfidStatusBox">
+                <div class="rfid-icon-pulse" id="rfidIconPulse">
+                    <i class="fas fa-id-card"></i>
+                </div>
+                <div>
+                    <strong style="display:block; font-size:0.92rem;" id="rfidStatusTitle">Terminal en Espera</strong>
+                    <span style="font-size:0.8rem; color:var(--text-secondary);" id="rfidStatusDesc">
+                        Enciende la asistencia de al menos una ficha para recibir carnets RFID.
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjeta 2: Respaldo Manual / Olvido de Carnet -->
+        <div class="card" id="cardManualDoc">
+            <div class="card-header" style="margin-bottom:12px;">
+                <h3 style="font-size:0.95rem; font-weight:700; margin:0; display:flex; align-items:center; gap:8px;">
+                    <i class="fas fa-keyboard" style="color:var(--accent-blue);"></i>
+                    Respaldo Manual / Olvido de Carnet
+                </h3>
+            </div>
+            <div>
+                <form id="formMarcacionManual" onsubmit="event.preventDefault(); window.registrarMarcacionManualPin();" class="rfid-manual-form">
+                    <select id="selectFichaManual" class="rfid-select-ficha" title="Ficha para marcación manual" disabled>
+                        <option value="">Seleccione Ficha Activa...</option>
+                    </select>
+
+                    <input type="text"
+                           id="inputPinRespaldo"
+                           name="documento"
+                           class="rfid-input-doc"
+                           placeholder="Ingrese documento o PIN del aprendiz..."
+                           autocomplete="off"
+                           disabled>
+
+                    <button type="submit" id="btnMarcarPorDocumento" class="btn btn-primary" disabled>
+                        <i class="fas fa-id-card-alt"></i> Marcar por Documento
+                    </button>
+                </form>
+                <div style="margin-top:8px;" id="manualDocStatus">
+                    <small style="color:var(--text-muted);">
+                        <i class="fas fa-info-circle"></i> Respaldo manual en caso de olvido, daño o extravío del llavero RFID.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Mecanismo 2: Nómina Interactiva en Tiempo Real (Marcación con 1 Clic) ═══ -->
+    <div class="card mt-3" id="panelNominaSesion">
+        <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+            <div>
+                <h2 style="font-size:1rem; font-weight:700; color:var(--text-primary); margin:0; display:flex; align-items:center; gap:8px;">
+                    <i class="fas fa-users-rectangle" style="color:var(--accent-blue);"></i>
+                    Mecanismo 2 — Nómina de Aprendices en Sesión Activa
+                </h2>
+                <small style="color:var(--text-secondary); display:block; margin-top:2px;" id="subtituloNomina">
+                    Visualiza y marca asistencia con un solo clic.
+                </small>
+            </div>
+
+            <!-- KPIs de la sesión activa -->
+            <div class="rfid-kpi-bar" id="nominaKpis">
+                <div class="rfid-kpi-chip chip-total">
+                    <span>Total:</span> <span class="num" id="kpiTotal">0</span>
+                </div>
+                <div class="rfid-kpi-chip chip-presentes">
+                    <span>Presentes:</span> <span class="num" id="kpiPresentes">0</span>
+                </div>
+                <div class="rfid-kpi-chip chip-retardos">
+                    <span>Retardos:</span> <span class="num" id="kpiRetardos">0</span>
+                </div>
+                <div class="rfid-kpi-chip chip-pendientes">
+                    <span>Pendientes:</span> <span class="num" id="kpiPendientes">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Buscador interactivo en vivo -->
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
+            <div class="rfid-search-wrapper">
+                <i class="fas fa-search"></i>
+                <input type="search"
+                       id="buscadorNomina"
+                       class="rfid-search-input"
+                       placeholder="Buscar por nombre o documento..."
+                       autocomplete="off"
+                       disabled>
+            </div>
+
+            <div style="font-size:0.82rem; color:var(--text-muted);" id="nominaFiltroInfo">
+                Mostrando aprendices activos de la ficha seleccionada.
+            </div>
+        </div>
+
+        <!-- Tabla interactiva de aprendices -->
+        <div class="table-wrapper">
+            <table class="data-table" id="tablaNomina">
+                <thead>
+                    <tr>
+                        <th style="width:140px;">Documento</th>
+                        <th>Aprendiz</th>
+                        <th style="width:130px;">Carnet RFID</th>
+                        <th style="width:120px;">Entrada</th>
+                        <th style="width:120px;">Estado</th>
+                        <th style="width:160px; text-align:center;">Acción Manual</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaNominaBody">
+                    <tr id="nominaPlaceholderRow">
+                        <td colspan="6" style="text-align:center; color:var(--text-muted); padding:36px;">
+                            <i class="fas fa-toggle-off" style="font-size:1.8rem; display:block; margin-bottom:10px; opacity:0.4;"></i>
+                            <span>No hay sesiones de asistencia encendidas. Activa una ficha arriba para cargar la nómina en vivo.</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 

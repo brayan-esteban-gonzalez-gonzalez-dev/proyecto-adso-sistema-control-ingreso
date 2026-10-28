@@ -113,6 +113,14 @@ class Auth {
     }
 
     /**
+     * Retorna el primer nombre o nombre completo del usuario autenticado
+     */
+    public static function getUserName(): string {
+        self::init();
+        return $_SESSION['user_nombre'] ?? self::getUserFullName();
+    }
+
+    /**
      * Redirige al login si el usuario no está autenticado
      */
     public static function requireLogin(): void {

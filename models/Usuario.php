@@ -416,4 +416,26 @@ class Usuario {
         $stmt->execute([':rol_id' => $rolId]);
         return (int) $stmt->fetch()['total'];
     }
+
+    /**
+     * Busca un aprendiz activo (Rol_id = 3, estado = 'Activo') por documento o ID.
+     */
+    public function buscarAprendizActivo(string|int $termino): ?array
+    {
+        $sql = "SELECT u.*, f.codigo AS codigo_ficha, p.nombre AS nombre_programa
+                FROM {$this->table} u
+                LEFT JOIN ficha f ON u.Ficha_id = f.id
+                LEFT JOIN programa p ON f.Programa_id = p.id
+                WHERE (u.identificacion = :termino OR u.id = :termino_id)
+                  AND u.Rol_id = 3
+                  AND u.estado = 'Activo'
+                LIMIT 1";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':termino'    => (string)$termino,
+            ':termino_id' => is_numeric($termino) ? (int)$termino : 0,
+        ]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
 }

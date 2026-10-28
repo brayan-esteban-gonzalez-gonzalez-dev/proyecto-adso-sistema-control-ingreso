@@ -366,4 +366,178 @@ class IngresoAsistencia
         }
         return false;
     }
+
+    /**
+     * Busca un aprendiz activo por su número de documento (identificacion)
+     * y valida su pertenencia estricta a la ficha de la sesión activa.
+     *
+     * @param string $documento Número de identificación del aprendiz
+     * @param int $fichaIdSesion ID de la ficha de la sesión activa
+     * @return array{ok: bool, error?: string, mensaje: string, aprendiz?: array}
+     */
+    public function buscarAprendizPorDocumento(string $documento, int $fichaIdSesion): array
+    {
+        $documento = trim($documento);
+        if ($documento === '') {
+            return [
+                'ok'      => false,
+                'error'   => 'empty_document',
+                'mensaje' => 'El número de documento no puede estar vacío.',
+            ];
+        }
+
+        $sql = "SELECT u.id, u.identificacion AS documento, u.nombre, u.apellido,
+                       CONCAT(u.nombre, ' ', u.apellido) AS nombre_completo,
+                       u.Ficha_id, u.codigo_llavero AS rfid_tag, u.estado,
+                       f.codigo AS codigo_ficha
+                FROM usuario u
+                LEFT JOIN ficha f ON u.Ficha_id = f.id
+                WHERE u.identificacion = :documento
+                  AND u.Rol_id = 3
+                LIMIT 1";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':documento' => $documento]);
+        $aprendiz = $stmt->fetch();
+
+        if (!$aprendiz) {
+            return [
+                'ok'      => false,
+                'error'   => 'not_found',
+                'mensaje' => "Aprendiz con documento \"{$documento}\" no encontrado o no tiene rol de Aprendiz.",
+            ];
+        }
+
+        if ($aprendiz['estado'] !== 'Activo') {
+            return [
+                'ok'      => false,
+                'error'   => 'inactive',
+                'mensaje' => "El aprendiz {$aprendiz['nombre_completo']} se encuentra en estado \"{$aprendiz['estado']}\".",
+            ];
+        }
+
+        if ((int)$aprendiz['Ficha_id'] !== $fichaIdSesion) {
+            $fichaCod = $aprendiz['codigo_ficha'] ?? 'desconocida';
+            return [
+                'ok'       => false,
+                'error'    => 'wrong_ficha',
+                'mensaje'  => "El aprendiz {$aprendiz['nombre_completo']} (Doc: {$aprendiz['documento']}) no pertenece a la ficha en sesión activa (está matriculado en Ficha {$fichaCod}).",
+                'aprendiz' => $aprendiz,
+            ];
+        }
+
+        return [
+            'ok'       => true,
+            'mensaje'  => 'Aprendiz localizado con éxito.',
+            'aprendiz' => $aprendiz,
+        ];
+    }
+
+    /**
+     * Busca un aprendiz activo por su ID primario de usuario
+     * y valida su pertenencia estricta a la ficha de la sesión activa.
+     *
+     * @param int $aprendizId ID del usuario aprendiz
+     * @param int $fichaIdSesion ID de la ficha de la sesión activa
+     * @return array{ok: bool, error?: string, mensaje: string, aprendiz?: array}
+     */
+    public function buscarAprendizPorId(int $aprendizId, int $fichaIdSesion): array
+    {
+        if ($aprendizId <= 0) {
+            return [
+                'ok'      => false,
+                'error'   => 'invalid_id',
+                'mensaje' => 'ID de aprendiz inválido.',
+            ];
+        }
+
+        $sql = "SELECT u.id, u.identificacion AS documento, u.nombre, u.apellido,
+                       CONCAT(u.nombre, ' ', u.apellido) AS nombre_completo,
+                       u.Ficha_id, u.codigo_llavero AS rfid_tag, u.estado,
+                       f.codigo AS codigo_ficha
+                FROM usuario u
+                LEFT JOIN ficha f ON u.Ficha_id = f.id
+                WHERE u.id = :id
+                  AND u.Rol_id = 3
+                LIMIT 1";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':id' => $aprendizId]);
+        $aprendiz = $stmt->fetch();
+
+        if (!$aprendiz) {
+            return [
+                'ok'      => false,
+                'error'   => 'not_found',
+                'mensaje' => 'Aprendiz no encontrado en el sistema.',
+            ];
+        }
+
+        if ($aprendiz['estado'] !== 'Activo') {
+            return [
+                'ok'      => false,
+                'error'   => 'inactive',
+                'mensaje' => "El aprendiz {$aprendiz['nombre_completo']} se encuentra en estado \"{$aprendiz['estado']}\".",
+            ];
+        }
+
+        if ((int)$aprendiz['Ficha_id'] !== $fichaIdSesion) {
+            $fichaCod = $aprendiz['codigo_ficha'] ?? 'desconocida';
+            return [
+                'ok'       => false,
+                'error'    => 'wrong_ficha',
+                'mensaje'  => "El aprendiz {$aprendiz['nombre_completo']} (Doc: {$aprendiz['documento']}) no pertenece a la ficha en sesión activa (está matriculado en Ficha {$fichaCod}).",
+                'aprendiz' => $aprendiz,
+            ];
+        }
+
+        return [
+            'ok'       => true,
+            'mensaje'  => 'Aprendiz localizado con éxito.',
+            'aprendiz' => $aprendiz,
+        ];
+    }
+
+    /**
+     * Obtiene la nómina completa de aprendices de una ficha con su estado
+     * en la sesión activa actual (Pendiente, Presente, Retardo).
+     *
+     * @param int $fichaId ID de la ficha
+     * @param int $sesionId ID de la sesión activa
+     * @return array Lista de aprendices con estado de asistencia en la sesión
+     */
+    public function getNominaSesionActiva(int $fichaId, int $sesionId): array
+    {
+        $sql = "SELECT 
+                    u.id,
+                    u.identificacion AS documento,
+                    u.nombre,
+                    u.apellido,
+                    CONCAT(u.nombre, ' ', u.apellido) AS nombre_completo,
+                    u.codigo_llavero AS rfid_tag,
+                    a.id AS asistencia_id,
+                    a.hora_entrada,
+                    a.hora_salida,
+                    COALESCE(a.minutos_retardo, 0) AS minutos_retardo,
+                    CASE 
+                        WHEN a.id IS NULL THEN 'Pendiente'
+                        WHEN a.minutos_retardo > 0 THEN 'Retardo'
+                        ELSE 'Presente'
+                    END AS estado_asistencia
+                FROM usuario u
+                LEFT JOIN asistencia a 
+                    ON a.Usuario_id = u.id 
+                   AND a.Sesion_id  = :sesion_id
+                WHERE u.Ficha_id = :ficha_id
+                  AND u.Rol_id   = 3
+                  AND u.estado   = 'Activo'
+                ORDER BY u.apellido ASC, u.nombre ASC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':ficha_id'  => $fichaId,
+            ':sesion_id' => $sesionId,
+        ]);
+        return $stmt->fetchAll();
+    }
 }

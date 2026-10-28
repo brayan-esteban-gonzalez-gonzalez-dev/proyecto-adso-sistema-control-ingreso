@@ -295,6 +295,34 @@ class Sesion {
     }
 
     /**
+     * Obtiene todas las sesiones activas en el día actual (para Administrador o filtrado por instructor).
+     *
+     * @param int|null $instructorId Si es null, retorna todas las sesiones activas hoy.
+     * @return array
+     */
+    public function obtenerSesionesActivasHoy(?int $instructorId = null): array
+    {
+        $sql = "SELECT s.*,
+                       f.id       AS ficha_id_ref,
+                       f.codigo   AS codigo_ficha,
+                       p.nombre   AS nombre_programa
+                FROM {$this->table} s
+                INNER JOIN ficha f    ON s.Ficha_id    = f.id
+                LEFT  JOIN programa p ON f.Programa_id = p.id
+                WHERE s.fecha  = CURDATE()
+                  AND s.estado = 'Activo'";
+        $params = [];
+        if ($instructorId !== null && $instructorId > 0) {
+            $sql .= " AND s.Instructor_id = :instructor_id";
+            $params[':instructor_id'] = $instructorId;
+        }
+        $sql .= " ORDER BY s.hora_inicio ASC";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    /**
      * Verifica si una sesión tiene asistencias registradas
      */
     public function tieneAsistencias(int $sesionId): bool
@@ -648,27 +676,34 @@ class Sesion {
      */
     public function cerrarSesion(int $sesionId, int $instructorId): array
     {
-        // Verificar que la sesión existe, está activa y pertenece al instructor
+        // 1. Verificar que la sesión existe y está activa
         $sql = "SELECT s.*, f.id AS fk_ficha_id
                 FROM {$this->table} s
-                INNER JOIN Ficha f ON s.Ficha_id = f.id
+                INNER JOIN ficha f ON s.Ficha_id = f.id
                 WHERE s.id = :id
-                  AND s.Instructor_id = :instructor_id
                   AND s.estado = 'Activo'
                 LIMIT 1";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([
-            ':id'            => $sesionId,
-            ':instructor_id' => $instructorId,
-        ]);
+        $stmt->execute([':id' => $sesionId]);
         $sesion = $stmt->fetch();
 
         if (!$sesion) {
             return [
                 'ok'            => false,
                 'inasistencias' => 0,
-                'mensaje'       => 'Sesión no encontrada, ya cerrada o no pertenece a este instructor.',
+                'mensaje'       => 'Sesión no encontrada o ya cerrada.',
             ];
+        }
+
+        // Si no es el instructor asignado a la sesión, verificar si es Administrador
+        if ($instructorId > 0 && (int)$sesion['Instructor_id'] !== $instructorId) {
+            if (!Auth::isAdmin()) {
+                return [
+                    'ok'            => false,
+                    'inasistencias' => 0,
+                    'mensaje'       => 'No tienes permisos para cerrar una sesión que no te pertenece.',
+                ];
+            }
         }
 
         $fichaId = (int) $sesion['Ficha_id'];
@@ -693,10 +728,10 @@ class Sesion {
             $stmtUpdate = $this->conn->prepare($sqlUpdate);
             $stmtUpdate->execute([':id' => $sesionId]);
 
-            // 2. Registrar inasistencias para aprendices sin marcación en esta sesión
+            // 2. Registrar inasistencias para aprendices sin marcación en esta sesión (tablas en minúsculas)
             $sqlInasistencia = "INSERT INTO inasistencia (Usuario_id, Ficha_id, Sesion_id, fecha, generado_por)
                                 SELECT u.id, :ficha_id, :sesion_id, CURDATE(), 'sistema_toggle'
-                                FROM Usuario u
+                                FROM usuario u
                                 WHERE u.Ficha_id = :ficha_id2
                                   AND u.Rol_id   = 3
                                   AND u.estado    = 'Activo'
@@ -724,10 +759,11 @@ class Sesion {
 
         } catch (\Throwable $e) {
             $this->conn->rollBack();
+            error_log('[SCIA][Sesion::cerrarSesion] Error: ' . $e->getMessage());
             return [
                 'ok'            => false,
                 'inasistencias' => 0,
-                'mensaje'       => 'Error al cerrar la sesión: ' . $e->getMessage(),
+                'mensaje'       => 'Ocurrió un error interno al cerrar la sesión.',
             ];
         }
     }

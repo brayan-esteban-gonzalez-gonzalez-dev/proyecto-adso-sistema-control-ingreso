@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * Reporte.php — Consultas de reportes institucionales e indicadores.
  */
@@ -299,4 +301,185 @@ class Reporte {
         [$anio, $mes] = explode('-', $ym);
         return ($nombres[(int) $mes] ?? $ym) . ' ' . $anio;
     }
+
+    /**
+     * Calcula métricas completas, historial de marcas y excusas médicas para el portal del aprendiz.
+     *
+     * @param int $usuarioId ID del usuario (aprendiz)
+     * @return array Métricas, historial de marcas y excusas
+     */
+    public function getMetricasAprendiz(int $usuarioId): array
+    {
+        // 1. Obtener datos del aprendiz y ficha
+        $sqlAprendiz = "SELECT u.id, u.nombre, u.apellido, u.identificacion, u.Ficha_id,
+                               f.codigo AS codigo_ficha,
+                               COALESCE(p.nombre, 'Sin programa asignado') AS programa_nombre
+                        FROM usuario u
+                        LEFT JOIN ficha f ON f.id = u.Ficha_id
+                        LEFT JOIN programa p ON p.id = f.Programa_id
+                        WHERE u.id = :uid AND u.Rol_id = 3
+                        LIMIT 1";
+        $stmtA = $this->conn->prepare($sqlAprendiz);
+        $stmtA->execute([':uid' => $usuarioId]);
+        $aprendiz = $stmtA->fetch() ?: [];
+
+        $fichaId = (int) ($aprendiz['Ficha_id'] ?? 0);
+
+        // 2. Sesiones programadas de la ficha
+        $totalSesiones = 0;
+        if ($fichaId > 0) {
+            $sqlSesiones = "SELECT COUNT(*) AS total
+                            FROM sesion s
+                            WHERE s.Ficha_id = :ficha_id
+                              AND s.estado <> 'Cancelado'";
+            $stmtS = $this->conn->prepare($sqlSesiones);
+            $stmtS->execute([':ficha_id' => $fichaId]);
+            $totalSesiones = (int) ($stmtS->fetchColumn() ?: 0);
+        }
+
+        // 3. Métricas de asistencias (a tiempo, retardos, minutos)
+        $sqlAsistencias = "SELECT 
+                               COUNT(*) AS total_asistencias,
+                               SUM(CASE WHEN minutos_retardo = 0 THEN 1 ELSE 0 END) AS asistencias_a_tiempo,
+                               SUM(CASE WHEN minutos_retardo > 0 THEN 1 ELSE 0 END) AS retardos,
+                               COALESCE(SUM(minutos_retardo), 0) AS total_minutos_retardo
+                           FROM asistencia
+                           WHERE Usuario_id = :uid";
+        $stmtAst = $this->conn->prepare($sqlAsistencias);
+        $stmtAst->execute([':uid' => $usuarioId]);
+        $rowAst = $stmtAst->fetch() ?: [];
+
+        $totalAsistencias   = (int) ($rowAst['total_asistencias'] ?? 0);
+        $asistenciasATiempo = (int) ($rowAst['asistencias_a_tiempo'] ?? 0);
+        $retardos           = (int) ($rowAst['retardos'] ?? 0);
+        $minutosRetardo     = (int) ($rowAst['total_minutos_retardo'] ?? 0);
+
+        // 4. Métricas de inasistencias (totales, justificadas con excusa aprobada)
+        $sqlInasistencias = "SELECT 
+                                COUNT(DISTINCT i.id) AS total_inasistencias,
+                                COUNT(DISTINCT CASE WHEN ee.estado = 'Aprobada' THEN i.id ELSE NULL END) AS inasistencias_justificadas,
+                                COUNT(DISTINCT CASE WHEN ee.estado = 'Aprobada' THEN NULL ELSE i.id END) AS inasistencias_injustificadas
+                             FROM inasistencia i
+                             LEFT JOIN excusa e ON e.Inasistencia_id = i.id
+                             LEFT JOIN estado_excusa ee ON ee.Excusa_id = e.id
+                             WHERE i.Usuario_id = :uid";
+        $stmtInast = $this->conn->prepare($sqlInasistencias);
+        $stmtInast->execute([':uid' => $usuarioId]);
+        $rowInast = $stmtInast->fetch() ?: [];
+
+        $totalInasistencias        = (int) ($rowInast['total_inasistencias'] ?? 0);
+        $inasistenciasJustificadas = (int) ($rowInast['inasistencias_justificadas'] ?? 0);
+        $inasistenciasInjustificadas = (int) ($rowInast['inasistencias_injustificadas'] ?? 0);
+
+        // 5. Cálculo del porcentaje de asistencia general
+        $baseSesiones = max($totalSesiones, $totalAsistencias + $totalInasistencias);
+        $porcentajeAsistencia = $baseSesiones > 0
+            ? round(($totalAsistencias / $baseSesiones) * 100, 1)
+            : 100.0;
+        if ($porcentajeAsistencia > 100.0) {
+            $porcentajeAsistencia = 100.0;
+        }
+
+        // 6. Historial detallado de marcas (asistencias + inasistencias unificadas)
+        $sqlHistorial = "SELECT 
+                            'asistencia' AS tipo,
+                            a.id AS registro_id,
+                            a.fecha,
+                            a.hora_entrada,
+                            a.hora_salida,
+                            a.minutos_retardo,
+                            CASE 
+                                WHEN a.minutos_retardo > 0 THEN 'Retardo'
+                                ELSE 'A tiempo'
+                            END AS estado_marca,
+                            COALESCE(c.nombre, 'Formación Técnica') AS competencia,
+                            s.hora_inicio AS sesion_hora_inicio,
+                            s.hora_fin AS sesion_hora_fin,
+                            NULL AS excusa_estado
+                         FROM asistencia a
+                         LEFT JOIN sesion s ON s.id = a.Sesion_id
+                         LEFT JOIN competencia c ON c.id = s.Competencia_id
+                         WHERE a.Usuario_id = :uid_a
+                         
+                         UNION ALL
+                         
+                         SELECT 
+                            'inasistencia' AS tipo,
+                            i.id AS registro_id,
+                            i.fecha,
+                            NULL AS hora_entrada,
+                            NULL AS hora_salida,
+                            0 AS minutos_retardo,
+                            CASE 
+                                WHEN ee.estado = 'Aprobada' THEN 'Justificada'
+                                WHEN ee.estado = 'Rechazada' THEN 'Injustificada'
+                                WHEN e.id IS NOT NULL THEN 'En revisión'
+                                ELSE 'Inasistencia'
+                            END AS estado_marca,
+                            COALESCE(c.nombre, 'Formación Técnica') AS competencia,
+                            s.hora_inicio AS sesion_hora_inicio,
+                            s.hora_fin AS sesion_hora_fin,
+                            ee.estado AS excusa_estado
+                         FROM inasistencia i
+                         LEFT JOIN sesion s ON s.id = i.Sesion_id
+                         LEFT JOIN competencia c ON c.id = s.Competencia_id
+                         LEFT JOIN excusa e ON e.Inasistencia_id = i.id
+                         LEFT JOIN estado_excusa ee ON ee.Excusa_id = e.id
+                         WHERE i.Usuario_id = :uid_i
+                         
+                         ORDER BY fecha DESC, hora_entrada DESC";
+        $stmtH = $this->conn->prepare($sqlHistorial);
+        $stmtH->execute([
+            ':uid_a' => $usuarioId,
+            ':uid_i' => $usuarioId,
+        ]);
+        $historialMarcas = $stmtH->fetchAll();
+
+        // 7. Listado de excusas médicas radicadas por el aprendiz
+        $sqlExcusas = "SELECT 
+                          e.id,
+                          e.fecha,
+                          e.motivo,
+                          e.evidencia,
+                          e.Inasistencia_id,
+                          e.Asistencia_id,
+                          COALESCE(i.fecha, e.fecha) AS fecha_inasistencia,
+                          CASE 
+                              WHEN EXISTS (
+                                  SELECT 1 FROM estado_excusa ee 
+                                  WHERE ee.Excusa_id = e.id AND ee.estado = 'Rechazada'
+                              ) THEN 'Rechazada'
+                              WHEN EXISTS (
+                                  SELECT 1 FROM estado_excusa ee 
+                                  WHERE ee.Excusa_id = e.id AND ee.estado = 'Aprobada'
+                              ) THEN 'Aprobada'
+                              ELSE 'Pendiente'
+                          END AS estado_excusa,
+                          (SELECT ee.respuesta FROM estado_excusa ee WHERE ee.Excusa_id = e.id ORDER BY ee.id DESC LIMIT 1) AS respuesta_instructor,
+                          (SELECT ee.fecha FROM estado_excusa ee WHERE ee.Excusa_id = e.id ORDER BY ee.id DESC LIMIT 1) AS fecha_respuesta
+                       FROM excusa e
+                       LEFT JOIN inasistencia i ON i.id = e.Inasistencia_id
+                       WHERE e.Usuario_id = :uid
+                       ORDER BY e.fecha DESC, e.id DESC";
+        $stmtE = $this->conn->prepare($sqlExcusas);
+        $stmtE->execute([':uid' => $usuarioId]);
+        $excusas = $stmtE->fetchAll();
+
+        return [
+            'aprendiz'                     => $aprendiz,
+            'total_sesiones'               => $totalSesiones,
+            'base_sesiones'                => $baseSesiones,
+            'total_asistencias'            => $totalAsistencias,
+            'asistencias_a_tiempo'         => $asistenciasATiempo,
+            'retardos'                     => $retardos,
+            'total_minutos_retardo'        => $minutosRetardo,
+            'total_inasistencias'          => $totalInasistencias,
+            'inasistencias_justificadas'   => $inasistenciasJustificadas,
+            'inasistencias_injustificadas' => $inasistenciasInjustificadas,
+            'porcentaje_asistencia'        => $porcentajeAsistencia,
+            'historial_marcas'             => $historialMarcas,
+            'excusas'                      => $excusas,
+        ];
+    }
 }
+
