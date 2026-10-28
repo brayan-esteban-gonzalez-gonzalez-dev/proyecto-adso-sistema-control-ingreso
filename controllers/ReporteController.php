@@ -143,6 +143,19 @@ class ReporteController {
     }
 
     /**
+     * Sanitiza una cadena contra inyección de fórmulas en el CSV.
+     * Antepone una comilla simple ('), según la recomendación de OWASP,
+     * cuando el valor inicia (tras espacios/saltos, espacio inseparable o
+     * byte nulo) con =, +, -, @, tabulador o retorno de carro.
+     */
+    private function sanitizarCsv(string $valor): string {
+        if (preg_match('/^[\s\x00\xC2\xA0]*[=\+\-@\t]/', $valor)) {
+            return '\'' . $valor;
+        }
+        return $valor;
+    }
+
+    /**
      * Exporta los datos en formato CSV con BOM UTF-8
      */
     private function exportarCsv(string $titulo, array $headers, array $filas): void {
@@ -157,9 +170,17 @@ class ReporteController {
         // BOM UTF-8 para apertura correcta en Excel
         fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
-        fputcsv($out, $headers, ';');
+        $headersSanitizados = array_map(
+            fn ($valor) => $this->sanitizarCsv((string) $valor),
+            $headers
+        );
+        fputcsv($out, $headersSanitizados, ';');
         foreach ($filas as $fila) {
-            fputcsv($out, $fila, ';');
+            $filaSanitizada = array_map(
+                fn ($valor) => $this->sanitizarCsv((string) $valor),
+                $fila
+            );
+            fputcsv($out, $filaSanitizada, ';');
         }
         fclose($out);
         exit;

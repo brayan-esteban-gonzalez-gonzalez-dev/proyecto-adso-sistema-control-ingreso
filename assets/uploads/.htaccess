@@ -1,0 +1,21 @@
+# Protección del directorio de evidencias (excusas)
+# Estrategia acordada: no bloquear el acceso a PDF/JPG/PNG (las vistas los
+# enlazan directamente), pero impedir la ejecución de código y el indexado.
+
+# No listar el contenido del directorio
+Options -Indexes
+
+# Desactivar el motor de PHP (solo Apache con mod_php; evita error 500 con FPM)
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+
+# Bloquear acceso directo a cualquier archivo de código o script
+<FilesMatch "(?i)\.(php|phtml|php3|php4|php5|php7|php8|phps|phar|cgi|pl|py|sh|htaccess)$">
+    Require all denied
+</FilesMatch>
+
+# Rechazar el acceso al propio archivo de configuración
+<Files ".htaccess">
+    Require all denied
+</Files>
