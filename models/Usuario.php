@@ -1,9 +1,11 @@
 <?php
+declare(strict_types=1);
+
 /**
  * Usuario.php — Modelo de Usuarios
  *
- * CRUD completo para la tabla `Usuario` + autenticación.
- * Nueva DB: tabla `Usuario`, PK `id`, campos: identificacion, email, Rol_id, Ficha_id, codigo_llavero.
+ * CRUD completo para la tabla `usuario` + autenticación.
+ * Nueva DB: tabla `usuario`, PK `id`, campos: identificacion, email, Rol_id, Ficha_id, codigo_llavero.
  */
 class Usuario {
     public const ROL_ADMINISTRADOR = 1;
@@ -11,7 +13,7 @@ class Usuario {
     public const ROL_APRENDIZ      = 3;
 
     private PDO $conn;
-    private string $table = 'Usuario';
+    private string $table = 'usuario';
 
     public function __construct(PDO $db) {
         $this->conn = $db;
@@ -26,9 +28,9 @@ class Usuario {
                        f.codigo AS codigo_ficha,
                        p.nombre AS nombre_programa
                 FROM {$this->table} u
-                INNER JOIN Rol r ON u.Rol_id = r.id
-                LEFT JOIN Ficha f ON u.Ficha_id = f.id
-                LEFT JOIN Programa p ON f.Programa_id = p.id";
+                INNER JOIN rol r ON u.Rol_id = r.id
+                LEFT JOIN ficha f ON u.Ficha_id = f.id
+                LEFT JOIN programa p ON f.Programa_id = p.id";
 
         if ($rolId !== null) {
             $sql .= " WHERE u.Rol_id = :rol_id";
@@ -72,7 +74,7 @@ class Usuario {
     public function getById(int $id): ?array {
         $sql = "SELECT u.*, r.nombre AS nombre_rol
                 FROM {$this->table} u
-                INNER JOIN Rol r ON u.Rol_id = r.id
+                INNER JOIN rol r ON u.Rol_id = r.id
                 WHERE u.id = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':id' => $id]);
@@ -86,7 +88,7 @@ class Usuario {
     public function getByDocumento(string $identificacion): ?array {
         $sql = "SELECT u.*, r.nombre AS nombre_rol
                 FROM {$this->table} u
-                INNER JOIN Rol r ON u.Rol_id = r.id
+                INNER JOIN rol r ON u.Rol_id = r.id
                 WHERE u.identificacion = :identificacion";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':identificacion' => $identificacion]);
@@ -100,7 +102,7 @@ class Usuario {
     public function getByCorreo(string $email): ?array {
         $sql = "SELECT u.*, r.nombre AS nombre_rol
                 FROM {$this->table} u
-                INNER JOIN Rol r ON u.Rol_id = r.id
+                INNER JOIN rol r ON u.Rol_id = r.id
                 WHERE u.email = :email";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':email' => $email]);
@@ -158,45 +160,67 @@ class Usuario {
             return $porDocumento;
         }
 
-        // 2. Coincidencias exactas completas (ambos órdenes)
-        $exactas = $this->coincidenciasExactas($instructores, $busqueda, $normalizar);
-        if (!empty($exactas)) {
-            return $exactas;
-        }
-
-        // 3. Coincidencias parciales: TODAS las que cumplan (puede haber varias).
-        $partes = array_filter(explode(' ', $busqueda), fn($p) => mb_strlen($p) >= 3);
-        if (count($partes) >= 2) {
-            $parciales = [];
-            foreach ($instructores as $inst) {
-                $nomCompleto = $normalizar($inst['nombre'] . ' ' . $inst['apellido']);
-                $todasEncontradas = true;
-                foreach ($partes as $parte) {
-                    if (!str_contains($nomCompleto, $parte)) {
-                        $todasEncontradas = false;
-                        break;
-                    }
-                }
-                if ($todasEncontradas) {
-                    $parciales[] = $inst;
-                }
-            }
-            return $parciales;
-        }
-
-        return [];
-    }
-
-    /**
-     * Devuelve coincidencias exactas de nombre completo (nombre apellido y
-     * apellido nombre), todos sus registros.
-     */
-    private function coincidenciasExactas(array $instructores, string $busqueda, callable $normalizar): array {
+        // 2. Coincidencia exacta: nombre+apellido o apellido+nombre
         $exactas = [];
         foreach ($instructores as $inst) {
             $nomCompleto1 = $normalizar($inst['nombre'] . ' ' . $inst['apellido']);
             $nomCompleto2 = $normalizar($inst['apellido'] . ' ' . $inst['nombre']);
+            if ($nomCompleto1 === $busqueda || $nomCompleto2 === $busqueda) {
+                $exactas[] = $inst;
+            }
+        }
+        if (!empty($exactas)) {
+            return $exactas;
+        }
 
+        // 3. Coincidencia por tokens (mínimo 3 letras por token)
+        $tokens = array_filter(explode(' ', $busqueda), fn($t) => mb_strlen($t, 'UTF-8') >= 3);
+        if (empty($tokens)) {
+            return [];
+        }
+
+        $coincidencias = [];
+        foreach ($instructores as $inst) {
+            $nombreFull = $normalizar($inst['nombre'] . ' ' . $inst['apellido']);
+            $todosCoinciden = true;
+            foreach ($tokens as $token) {
+                if (!str_contains($nombreFull, $token)) {
+                    $todosCoinciden = false;
+                    break;
+                }
+            }
+            if ($todosCoinciden) {
+                $coincidencias[] = $inst;
+            }
+        }
+
+        return $coincidencias;
+    }
+
+    /**
+     * Devuelve coincidencias exactas por nombre completo (sin coincidencia por subcadenas)
+     */
+    public function buscarInstructorExacto(string $nombreBusqueda): array {
+        $instructores = $this->getInstructores();
+        $normalizar = function($str) {
+            $str = mb_strtolower(trim($str), 'UTF-8');
+            $str = str_replace(
+                ['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ü', 'Ñ'],
+                ['a', 'e', 'i', 'o', 'u', 'u', 'n', 'a', 'e', 'i', 'o', 'u', 'u', 'n'],
+                $str
+            );
+            return preg_replace('/\s+/', ' ', $str);
+        };
+
+        $busqueda = $normalizar($nombreBusqueda);
+        if (empty($busqueda)) {
+            return [];
+        }
+
+        $exactas = [];
+        foreach ($instructores as $inst) {
+            $nomCompleto1 = $normalizar($inst['nombre'] . ' ' . $inst['apellido']);
+            $nomCompleto2 = $normalizar($inst['apellido'] . ' ' . $inst['nombre']);
             if ($nomCompleto1 === $busqueda || $nomCompleto2 === $busqueda) {
                 $exactas[] = $inst;
             }
@@ -228,9 +252,9 @@ class Usuario {
                        p.nombre AS nombre_programa,
                        r.nombre AS nombre_rol
                 FROM {$this->table} u
-                INNER JOIN Rol r ON u.Rol_id = r.id
-                LEFT JOIN Ficha f ON u.Ficha_id = f.id
-                LEFT JOIN Programa p ON f.Programa_id = p.id
+                INNER JOIN rol r ON u.Rol_id = r.id
+                LEFT JOIN ficha f ON u.Ficha_id = f.id
+                LEFT JOIN programa p ON f.Programa_id = p.id
                 WHERE u.Rol_id = 3
                 ORDER BY u.apellido, u.nombre";
         $stmt = $this->conn->prepare($sql);
@@ -258,8 +282,8 @@ class Usuario {
         $sql = "SELECT u.*, r.nombre AS nombre_rol,
                        f.codigo AS codigo_ficha
                 FROM {$this->table} u
-                INNER JOIN Rol r ON u.Rol_id = r.id
-                LEFT JOIN Ficha f ON u.Ficha_id = f.id
+                INNER JOIN rol r ON u.Rol_id = r.id
+                LEFT JOIN ficha f ON u.Ficha_id = f.id
                 WHERE u.codigo_llavero = :codigo AND u.estado = 'Activo'";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':codigo' => $codigo]);

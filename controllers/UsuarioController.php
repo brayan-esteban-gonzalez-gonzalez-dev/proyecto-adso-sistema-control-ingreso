@@ -1,25 +1,89 @@
 <?php
+declare(strict_types=1);
+
 /**
  * UsuarioController.php — Controlador de Usuarios
  *
- * CRUD de usuarios (solo accesible por administrador/instructor).
- * Nueva DB: tabla `Usuario`, campos renombrados: Rol_id, identificacion, email.
+ * Gestión de usuarios con control de acceso por roles (RBAC):
+ * - Administrador: CRUD global de usuarios y consulta agrupada por ficha.
+ * - Instructor: Directorio enfocado estrictamente en sus fichas asignadas (Aprendices e Instructores).
  */
 class UsuarioController {
     private PDO $db;
     private Usuario $model;
+    private Ficha $fichaModel;
 
     public function __construct(PDO $db) {
-        $this->db    = $db;
+        $this->db = $db;
         $this->model = new Usuario($db);
+        require_once ROOT_PATH . '/models/Ficha.php';
+        $this->fichaModel = new Ficha($db);
     }
 
     /**
-     * Lista todos los usuarios con opción de filtrado por rol
+     * Lista usuarios según el rol autenticado:
+     * - Instructor: Directorio por ficha (solo sus fichas asignadas con protección Anti-IDOR).
+     * - Administrador: Listado global filtrable o vista detallada por ficha seleccionada.
      */
     public function index(): void {
+        Auth::requireLogin();
+
+        // ── 1. ROL INSTRUCTOR (RF-RBAC) ──────────────────────────────────────
+        if (Auth::isInstructor()) {
+            $instructorId = (int) Auth::getUserId();
+            $fichas = $this->fichaModel->getFichasPorInstructor($instructorId);
+
+            $fichaSeleccionadaId = null;
+            $fichaActual = null;
+            $aprendices = [];
+            $instructores = [];
+
+            if (!empty($fichas)) {
+                if (isset($_GET['ficha_id']) && (int) $_GET['ficha_id'] > 0) {
+                    $solicitadaId = (int) $_GET['ficha_id'];
+                    // Validación estricta Anti-IDOR
+                    if ($this->fichaModel->instructorPerteneceAFicha($instructorId, $solicitadaId)) {
+                        $fichaSeleccionadaId = $solicitadaId;
+                    } else {
+                        Auth::setFlash('error', 'Acceso denegado: no estás asignado a esa ficha.');
+                        header('Location: ' . BASE_URL . '?action=usuarios');
+                        exit;
+                    }
+                } else {
+                    $fichaSeleccionadaId = (int) $fichas[0]['id'];
+                }
+
+                $fichaActual = $this->fichaModel->getById($fichaSeleccionadaId);
+                $aprendices = $this->fichaModel->getAprendicesPorFicha($fichaSeleccionadaId);
+                $instructores = $this->fichaModel->getInstructoresPorFicha($fichaSeleccionadaId);
+            }
+
+            $esVistaFicha = true;
+            $pageTitle = 'Directorio de Fichas Asignadas';
+            require_once ROOT_PATH . '/views/usuarios/index.php';
+            return;
+        }
+
+        // ── 2. ROL ADMINISTRADOR ─────────────────────────────────────────────
         Auth::requireAdmin();
 
+        // Si el administrador selecciona inspeccionar una ficha específica (?ficha_id=X)
+        if (isset($_GET['ficha_id']) && (int) $_GET['ficha_id'] > 0) {
+            $fichaSeleccionadaId = (int) $_GET['ficha_id'];
+            $fichaActual = $this->fichaModel->getById($fichaSeleccionadaId);
+
+            if ($fichaActual) {
+                $fichas = $this->fichaModel->getAll();
+                $aprendices = $this->fichaModel->getAprendicesPorFicha($fichaSeleccionadaId);
+                $instructores = $this->fichaModel->getInstructoresPorFicha($fichaSeleccionadaId);
+                $esVistaFicha = true;
+                $pageTitle = 'Integrantes Ficha ' . ($fichaActual['codigo'] ?? '');
+                require_once ROOT_PATH . '/views/usuarios/index.php';
+                return;
+            }
+        }
+
+        // Vista global estándar del administrador
         $rolFiltro = null;
         if (isset($_GET['rol']) && $_GET['rol'] !== '') {
             $rolId = (int) $_GET['rol'];
@@ -28,22 +92,22 @@ class UsuarioController {
             }
         }
 
-        $usuarios   = $this->model->getAll($rolFiltro);
-        $conteos    = $this->model->getCountsByRole();
-        $pageTitle  = 'Gestión de Usuarios';
+        $fichas = $this->fichaModel->getAll();
+        $usuarios = $this->model->getAll($rolFiltro);
+        $conteos = $this->model->getCountsByRole();
+        $esVistaFicha = false;
+        $pageTitle = 'Gestión de Usuarios';
         require_once ROOT_PATH . '/views/usuarios/index.php';
     }
 
     /**
-     * Muestra formulario de creación
+     * Muestra formulario de creación (Solo Administrador)
      */
     public function crear(): void {
-        Auth::requireAdmin();
-        require_once ROOT_PATH . '/models/Ficha.php';
+        Auth::requireAdminOnly('usuarios');
         $rolModel   = new Rol($this->db);
-        $fichaModel = new Ficha($this->db);
         $roles      = $rolModel->getAll();
-        $fichas     = $fichaModel->getAll();
+        $fichas     = $this->fichaModel->getAll();
         $usuario    = null;
         $csrf_token = Auth::generateCSRF();
         $pageTitle  = 'Nuevo Usuario';
@@ -51,10 +115,10 @@ class UsuarioController {
     }
 
     /**
-     * Muestra formulario de edición
+     * Muestra formulario de edición (Solo Administrador)
      */
     public function editar(): void {
-        Auth::requireAdmin();
+        Auth::requireAdminOnly('usuarios');
         $id      = (int) ($_GET['id'] ?? 0);
         $usuario = $this->model->getById($id);
 
@@ -64,49 +128,47 @@ class UsuarioController {
             exit;
         }
 
-        require_once ROOT_PATH . '/models/Ficha.php';
         $rolModel   = new Rol($this->db);
-        $fichaModel = new Ficha($this->db);
         $roles      = $rolModel->getAll();
-        $fichas     = $fichaModel->getAll();
+        $fichas     = $this->fichaModel->getAll();
         $csrf_token = Auth::generateCSRF();
         $pageTitle  = 'Editar Usuario';
         require_once ROOT_PATH . '/views/usuarios/form.php';
     }
 
     /**
-     * Guarda un usuario (crear o actualizar)
+     * Guarda un usuario (crear o actualizar) (Solo Administrador)
      */
     public function guardar(): void {
-        Auth::requireAdmin();
+        Auth::requireAdminOnly('usuarios');
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             header('Location: ' . BASE_URL . '?action=usuarios');
             exit;
         }
-        // Validar CSRF
+
         if (!Auth::validateCSRF($_POST['csrf_token'] ?? '')) {
             Auth::setFlash('error', 'Token de seguridad inválido.');
             header('Location: ' . BASE_URL . '?action=usuarios');
             exit;
         }
+
         $id = (int) ($_POST['id_usuario'] ?? 0);
         $rolId = (int) ($_POST['id_rol'] ?? $_POST['Rol_id'] ?? 3);
         $fichaId = ($rolId === Usuario::ROL_APRENDIZ && !empty($_POST['Ficha_id']))
             ? (int) $_POST['Ficha_id']
             : null;
 
-        // Recoger datos con los nuevos nombres de campo
         $data = [
             'Rol_id'         => $rolId,
-            'identificacion' => trim($_POST['num_documento'] ?? $_POST['identificacion'] ?? ''),
-            'nombre'         => trim($_POST['nombre']        ?? ''),
-            'apellido'       => trim($_POST['apellido']      ?? ''),
-            'email'          => trim($_POST['correo']        ?? $_POST['email'] ?? ''),
+            'identificacion' => trim((string) ($_POST['num_documento'] ?? $_POST['identificacion'] ?? '')),
+            'nombre'         => trim((string) ($_POST['nombre']        ?? '')),
+            'apellido'       => trim((string) ($_POST['apellido']      ?? '')),
+            'email'          => trim((string) ($_POST['correo']        ?? $_POST['email'] ?? '')),
             'Ficha_id'       => $fichaId,
-            'codigo_llavero' => trim($_POST['codigo_llavero'] ?? '') ?: null,
+            'codigo_llavero' => trim((string) ($_POST['codigo_llavero'] ?? '')) ?: null,
             'estado'         => $_POST['estado'] ?? 'Activo',
         ];
-        // Validaciones
+
         Validator::reset();
         Validator::required($data['identificacion'], 'número de documento');
         Validator::required($data['nombre'],         'nombre');
@@ -119,24 +181,24 @@ class UsuarioController {
         }
 
         if ($id === 0) {
-            // Nuevo usuario — contraseña obligatoria
-            $data['password'] = $_POST['password'] ?? '';
+            $data['password'] = (string) ($_POST['password'] ?? '');
             Validator::required($data['password'], 'contraseña');
             Validator::minLength($data['password'], 6, 'contraseña');
         } else {
-            // Edición — contraseña opcional
-            $password = $_POST['password'] ?? '';
+            $password = (string) ($_POST['password'] ?? '');
             if (!empty($password)) {
                 Validator::minLength($password, 6, 'contraseña');
                 $data['password'] = $password;
             }
         }
+
         if (!Validator::isValid()) {
             Auth::setFlash('error', implode('<br>', Validator::getErrors()));
             $redirect = $id > 0 ? "usuarios/editar&id={$id}" : 'usuarios/crear';
             header('Location: ' . BASE_URL . "?action={$redirect}");
             exit;
         }
+
         try {
             if ($id > 0) {
                 $this->model->update($id, $data);
@@ -159,23 +221,25 @@ class UsuarioController {
     }
 
     /**
-     * Elimina un usuario
+     * Elimina un usuario (Solo Administrador)
      */
     public function eliminar(): void {
-        Auth::requireAdmin();
+        Auth::requireAdminOnly('usuarios');
         $id = (int) ($_GET['id'] ?? 0);
 
         if ($id === Auth::getUserId()) {
-            Auth::setFlash('error', 'No puede eliminar su propio usuario.');
+            Auth::setFlash('error', 'No puedes eliminar tu propio usuario.');
             header('Location: ' . BASE_URL . '?action=usuarios');
             exit;
         }
+
         try {
             $this->model->delete($id);
             Auth::setFlash('success', 'Usuario eliminado correctamente.');
         } catch (\PDOException $e) {
             Auth::setFlash('error', 'No se puede eliminar el usuario porque tiene registros asociados.');
         }
+
         header('Location: ' . BASE_URL . '?action=usuarios');
         exit;
     }

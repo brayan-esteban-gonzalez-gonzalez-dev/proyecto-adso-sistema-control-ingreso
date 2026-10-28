@@ -1,14 +1,16 @@
 <?php
+declare(strict_types=1);
+
 /**
  * Ficha.php — Modelo de Fichas
  *
- * CRUD completo para la tabla `Ficha`.
- * Nueva DB: tabla `Ficha`, PK `id`, campos: codigo (INT), Programa_id, jornada_id, instructor_id, estado.
- * Relacionado con tabla `Programa` (id, nombre, descripcion) y `jornada`.
+ * CRUD completo para la tabla `ficha`.
+ * Nueva DB: tabla `ficha`, PK `id`, campos: codigo (INT), Programa_id, jornada_id, instructor_id, estado.
+ * Relacionado con tabla `programa` (id, nombre, descripcion) y `jornada`.
  */
 class Ficha {
     private PDO $conn;
-    private string $table = 'Ficha';
+    private string $table = 'ficha';
 
     public function __construct(PDO $db) {
         $this->conn = $db;
@@ -19,16 +21,29 @@ class Ficha {
      */
     public function getAll(): array {
         $sql = "SELECT f.*,
+                       f.codigo AS numero_ficha,
                        p.nombre AS nombre_programa,
+                       p.nombre AS programa_nombre,
                        p.descripcion AS descripcion_programa,
                        j.nombre AS nombre_jornada,
+                       j.nombre AS jornada_nombre,
                        CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor,
-                       (SELECT COUNT(*) FROM Usuario a WHERE a.Ficha_id = f.id AND a.Rol_id = 3) AS total_aprendices
+                       (SELECT COUNT(*) FROM usuario a WHERE a.Ficha_id = f.id AND a.Rol_id = 3 AND a.estado = 'Activo') AS total_aprendices,
+                       (
+                           SELECT COUNT(DISTINCT inst.id)
+                           FROM usuario inst
+                           WHERE inst.Rol_id IN (1, 2)
+                             AND (
+                                 inst.id = f.instructor_id
+                                 OR EXISTS (SELECT 1 FROM sesion s WHERE s.Ficha_id = f.id AND s.Instructor_id = inst.id)
+                                 OR EXISTS (SELECT 1 FROM asignacion_instructor ai WHERE ai.ficha_id = f.id AND ai.instructor_id = inst.id)
+                             )
+                       ) AS total_instructores
                 FROM {$this->table} f
-                INNER JOIN Programa p ON f.Programa_id = p.id
+                INNER JOIN programa p ON f.Programa_id = p.id
                 LEFT JOIN jornada j ON f.jornada_id = j.id
-                LEFT JOIN Usuario u ON f.instructor_id = u.id
-                ORDER BY f.codigo";
+                LEFT JOIN usuario u ON f.instructor_id = u.id
+                ORDER BY f.codigo ASC";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll();
@@ -39,14 +54,17 @@ class Ficha {
      */
     public function getById(int $id): ?array {
         $sql = "SELECT f.*,
+                       f.codigo AS numero_ficha,
                        p.nombre AS nombre_programa,
+                       p.nombre AS programa_nombre,
                        p.descripcion AS descripcion_programa,
                        j.nombre AS nombre_jornada,
+                       j.nombre AS jornada_nombre,
                        CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor
                 FROM {$this->table} f
-                INNER JOIN Programa p ON f.Programa_id = p.id
+                INNER JOIN programa p ON f.Programa_id = p.id
                 LEFT JOIN jornada j ON f.jornada_id = j.id
-                LEFT JOIN Usuario u ON f.instructor_id = u.id
+                LEFT JOIN usuario u ON f.instructor_id = u.id
                 WHERE f.id = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':id' => $id]);
@@ -59,14 +77,17 @@ class Ficha {
      */
     public function getByCodigo(int $codigo): ?array {
         $sql = "SELECT f.*,
+                       f.codigo AS numero_ficha,
                        p.nombre AS nombre_programa,
+                       p.nombre AS programa_nombre,
                        p.descripcion AS descripcion_programa,
                        j.nombre AS nombre_jornada,
+                       j.nombre AS jornada_nombre,
                        CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor
                 FROM {$this->table} f
-                INNER JOIN Programa p ON f.Programa_id = p.id
+                INNER JOIN programa p ON f.Programa_id = p.id
                 LEFT JOIN jornada j ON f.jornada_id = j.id
-                LEFT JOIN Usuario u ON f.instructor_id = u.id
+                LEFT JOIN usuario u ON f.instructor_id = u.id
                 WHERE f.codigo = :codigo";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':codigo' => $codigo]);
@@ -75,14 +96,14 @@ class Ficha {
     }
 
     /**
-     * Obtiene fichas por instructor
+     * Obtiene fichas por instructor líder
      */
     public function getByInstructor(int $instructorId): array {
-        $sql = "SELECT f.*, p.nombre AS nombre_programa
+        $sql = "SELECT f.*, p.nombre AS nombre_programa, p.nombre AS programa_nombre
                 FROM {$this->table} f
-                INNER JOIN Programa p ON f.Programa_id = p.id
+                INNER JOIN programa p ON f.Programa_id = p.id
                 WHERE f.instructor_id = :instructor_id
-                ORDER BY f.codigo";
+                ORDER BY f.codigo ASC";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':instructor_id' => $instructorId]);
         return $stmt->fetchAll();
@@ -152,14 +173,14 @@ class Ficha {
         static $hasEstado = null;
         if ($hasEstado === null) {
             try {
-                $stmt = $this->conn->query("SHOW COLUMNS FROM Programa LIKE 'estado'");
+                $stmt = $this->conn->query("SHOW COLUMNS FROM programa LIKE 'estado'");
                 $hasEstado = ($stmt && $stmt->rowCount() > 0);
             } catch (\Throwable $e) {
                 $hasEstado = false;
             }
         }
         $where = $hasEstado ? "WHERE estado = 'Activo'" : "";
-        $sql = "SELECT * FROM Programa {$where} ORDER BY nombre";
+        $sql = "SELECT * FROM programa {$where} ORDER BY nombre";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll();
@@ -176,98 +197,169 @@ class Ficha {
     }
 
     /**
-     * Obtiene las fichas asignadas a un instructor (líder o con sesiones asignadas)
+     * RF-RBAC: Obtiene únicamente las fichas activas donde el instructor tiene vinculación real
+     * (como instructor líder, en sesiones de clase o en asignaciones semestrales).
+     *
+     * Incluye datos enriquecidos: f.id, f.numero_ficha, programa_nombre, jornada_nombre,
+     * total de aprendices y total de instructores vinculados.
      */
-    public function getByInstructorAsignado(int $instructorId): array {
-        $sql = "SELECT f.*,
+    public function getFichasPorInstructor(int $instructorId): array {
+        $sql = "SELECT f.id,
+                       f.codigo,
+                       f.codigo AS numero_ficha,
+                       f.estado,
+                       p.nombre AS programa_nombre,
                        p.nombre AS nombre_programa,
                        p.descripcion AS descripcion_programa,
+                       j.nombre AS jornada_nombre,
                        j.nombre AS nombre_jornada,
                        CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor,
-                       (SELECT COUNT(*) FROM Usuario a WHERE a.Ficha_id = f.id AND a.Rol_id = 3) AS total_aprendices
+                       (SELECT COUNT(*) FROM usuario a WHERE a.Ficha_id = f.id AND a.Rol_id = 3 AND a.estado = 'Activo') AS total_aprendices,
+                       (
+                           SELECT COUNT(DISTINCT inst.id)
+                           FROM usuario inst
+                           WHERE inst.Rol_id IN (1, 2)
+                             AND (
+                                 inst.id = f.instructor_id
+                                 OR EXISTS (SELECT 1 FROM sesion s WHERE s.Ficha_id = f.id AND s.Instructor_id = inst.id)
+                                 OR EXISTS (SELECT 1 FROM asignacion_instructor ai WHERE ai.ficha_id = f.id AND ai.instructor_id = inst.id)
+                             )
+                       ) AS total_instructores
                 FROM {$this->table} f
-                INNER JOIN Programa p ON f.Programa_id = p.id
+                INNER JOIN programa p ON f.Programa_id = p.id
                 LEFT JOIN jornada j ON f.jornada_id = j.id
-                LEFT JOIN Usuario u ON f.instructor_id = u.id
-                WHERE f.instructor_id = :instructor_id
-                   OR EXISTS (SELECT 1 FROM sesion s WHERE s.Ficha_id = f.id AND s.Instructor_id = :instructor_id_sesion)
-                ORDER BY f.codigo";
+                LEFT JOIN usuario u ON f.instructor_id = u.id
+                WHERE f.estado = 'Activo'
+                  AND (
+                      f.instructor_id = :instructor_id1
+                      OR EXISTS (SELECT 1 FROM sesion s WHERE s.Ficha_id = f.id AND s.Instructor_id = :instructor_id2)
+                      OR EXISTS (SELECT 1 FROM asignacion_instructor ai WHERE ai.ficha_id = f.id AND ai.instructor_id = :instructor_id3)
+                  )
+                ORDER BY f.codigo ASC";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([
-            ':instructor_id'        => $instructorId,
-            ':instructor_id_sesion' => $instructorId,
+            ':instructor_id1' => $instructorId,
+            ':instructor_id2' => $instructorId,
+            ':instructor_id3' => $instructorId,
         ]);
         return $stmt->fetchAll();
     }
 
     /**
-     * Verifica si una ficha está asignada a un instructor (como líder o con sesiones)
+     * Alias compatible de getFichasPorInstructor
      */
-    public function perteneceAInstructor(int $fichaId, int $instructorId): bool {
+    public function getByInstructorAsignado(int $instructorId): array {
+        return $this->getFichasPorInstructor($instructorId);
+    }
+
+    /**
+     * Valida en servidor si un instructor está vinculado legítimamente a una ficha
+     * (evita vulnerabilidades IDOR por alteración de parámetros GET).
+     */
+    public function instructorPerteneceAFicha(int $instructorId, int $fichaId): bool {
         $sql = "SELECT 1 FROM {$this->table} f
-                WHERE f.id = :ficha_id 
-                  AND (f.instructor_id = :instructor_id 
-                       OR EXISTS (SELECT 1 FROM sesion s WHERE s.Ficha_id = f.id AND s.Instructor_id = :instructor_id_sesion))
+                WHERE f.id = :ficha_id
+                  AND (
+                      f.instructor_id = :instructor_id1
+                      OR EXISTS (SELECT 1 FROM sesion s WHERE s.Ficha_id = f.id AND s.Instructor_id = :instructor_id2)
+                      OR EXISTS (SELECT 1 FROM asignacion_instructor ai WHERE ai.ficha_id = f.id AND ai.instructor_id = :instructor_id3)
+                  )
                 LIMIT 1";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([
-            ':ficha_id'             => $fichaId,
-            ':instructor_id'        => $instructorId,
-            ':instructor_id_sesion' => $instructorId,
+            ':ficha_id'        => $fichaId,
+            ':instructor_id1'  => $instructorId,
+            ':instructor_id2'  => $instructorId,
+            ':instructor_id3'  => $instructorId,
         ]);
         return (bool) $stmt->fetchColumn();
     }
 
     /**
-     * Obtiene los aprendices vinculados a una ficha
+     * Alias compatible de instructorPerteneceAFicha
      */
-    public function getAprendices(int $fichaId): array {
-        $sql = "SELECT u.id, u.identificacion, u.nombre, u.apellido, u.email, u.codigo_llavero, u.estado
-                FROM Usuario u
+    public function perteneceAInstructor(int $fichaId, int $instructorId): bool {
+        return $this->instructorPerteneceAFicha($instructorId, $fichaId);
+    }
+
+    /**
+     * Obtiene todos los aprendices matriculados en una ficha ordenados alfabéticamente por nombre
+     */
+    public function getAprendicesPorFicha(int $fichaId): array {
+        $sql = "SELECT u.id,
+                       u.identificacion,
+                       u.identificacion AS documento,
+                       u.nombre,
+                       u.apellido,
+                       CONCAT(u.nombre, ' ', u.apellido) AS nombre_completo,
+                       u.email,
+                       u.email AS correo,
+                       u.codigo_llavero,
+                       u.codigo_llavero AS rfid_tag,
+                       u.estado
+                FROM usuario u
                 WHERE u.Rol_id = 3 AND u.Ficha_id = :ficha_id
-                ORDER BY u.apellido ASC, u.nombre ASC";
+                ORDER BY u.nombre ASC, u.apellido ASC";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':ficha_id' => $fichaId]);
         return $stmt->fetchAll();
     }
 
     /**
-     * Obtiene todos los instructores vinculados a la ficha (líder e instructores de sesiones)
+     * Alias compatible de getAprendicesPorFicha
+     */
+    public function getAprendices(int $fichaId): array {
+        return $this->getAprendicesPorFicha($fichaId);
+    }
+
+    /**
+     * Obtiene todos los instructores vinculados a la ficha (líder, sesiones de clase y asignaciones)
+     * con sus competencias o especialidades asignadas, sin duplicados.
+     */
+    public function getInstructoresPorFicha(int $fichaId): array {
+        $sql = "SELECT u.id,
+                       u.identificacion,
+                       u.identificacion AS documento,
+                       u.nombre,
+                       u.apellido,
+                       CONCAT(u.nombre, ' ', u.apellido) AS nombre_completo,
+                       u.email,
+                       u.email AS correo,
+                       u.estado,
+                       CASE WHEN f.instructor_id = u.id THEN 'Instructor Líder' ELSE 'Instructor de Formación' END AS rol_en_ficha,
+                       COALESCE(
+                           (
+                               SELECT GROUP_CONCAT(DISTINCT COALESCE(c.nombre, s.especialidad) ORDER BY COALESCE(c.nombre, s.especialidad) SEPARATOR ', ')
+                               FROM sesion s
+                               LEFT JOIN competencia c ON s.Competencia_id = c.id
+                               WHERE s.Ficha_id = :ficha_id1 AND s.Instructor_id = u.id
+                           ),
+                           'Formación Técnica General'
+                       ) AS competencias_asignadas
+                FROM usuario u
+                LEFT JOIN ficha f ON f.id = :ficha_id2 AND f.instructor_id = u.id
+                WHERE u.Rol_id IN (1, 2)
+                  AND (
+                      f.instructor_id = u.id
+                      OR EXISTS (SELECT 1 FROM sesion s WHERE s.Ficha_id = :ficha_id3 AND s.Instructor_id = u.id)
+                      OR EXISTS (SELECT 1 FROM asignacion_instructor ai WHERE ai.ficha_id = :ficha_id4 AND ai.instructor_id = u.id)
+                  )
+                GROUP BY u.id, u.identificacion, u.nombre, u.apellido, u.email, u.estado, f.instructor_id
+                ORDER BY (CASE WHEN f.instructor_id = u.id THEN 0 ELSE 1 END), u.nombre ASC";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':ficha_id1' => $fichaId,
+            ':ficha_id2' => $fichaId,
+            ':ficha_id3' => $fichaId,
+            ':ficha_id4' => $fichaId,
+        ]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Alias compatible de getInstructoresPorFicha
      */
     public function getInstructoresVinculados(int $fichaId): array {
-        $sqlLider = "SELECT u.id, u.identificacion, u.nombre, u.apellido, u.email, u.estado,
-                            'Instructor Líder' AS rol_en_ficha
-                     FROM {$this->table} f
-                     INNER JOIN Usuario u ON f.instructor_id = u.id
-                     WHERE f.id = :ficha_id";
-        $stmtLider = $this->conn->prepare($sqlLider);
-        $stmtLider->execute([':ficha_id' => $fichaId]);
-        $lider = $stmtLider->fetch();
-
-        $sqlSesiones = "SELECT DISTINCT u.id, u.identificacion, u.nombre, u.apellido, u.email, u.estado,
-                               'Instructor de Sesión' AS rol_en_ficha
-                        FROM sesion s
-                        INNER JOIN Usuario u ON s.Instructor_id = u.id
-                        WHERE s.Ficha_id = :ficha_id";
-        $stmtSesiones = $this->conn->prepare($sqlSesiones);
-        $stmtSesiones->execute([':ficha_id' => $fichaId]);
-        $instructoresSesion = $stmtSesiones->fetchAll();
-
-        $instructores = [];
-        $idsRegistrados = [];
-
-        if ($lider) {
-            $instructores[] = $lider;
-            $idsRegistrados[] = (int) $lider['id'];
-        }
-
-        foreach ($instructoresSesion as $inst) {
-            if (!in_array((int) $inst['id'], $idsRegistrados, true)) {
-                $instructores[] = $inst;
-                $idsRegistrados[] = (int) $inst['id'];
-            }
-        }
-
-        return $instructores;
+        return $this->getInstructoresPorFicha($fichaId);
     }
 }

@@ -1,9 +1,11 @@
 <?php
+declare(strict_types=1);
+
 /**
  * AprendizController.php — Controlador de Aprendices
  *
- * CRUD de aprendices. En la nueva DB los aprendices son Usuarios con Rol_id=3.
- * El modelo Aprendiz actúa como wrapper sobre la tabla Usuario.
+ * CRUD de aprendices (Usuarios con Rol_id = 3).
+ * Protegido para Administrador; los Instructores son redirigidos a su directorio por ficha.
  */
 class AprendizController {
     private PDO $db;
@@ -15,36 +17,45 @@ class AprendizController {
     }
 
     /**
-     * Lista todos los aprendices (Redirige al listado unificado de Usuarios filtrado por Aprendices)
+     * Lista todos los aprendices.
+     * Si es Instructor, lo redirige al módulo de Directorio de Fichas (?action=usuarios).
      */
     public function index(): void {
-        Auth::requireAdmin();
+        Auth::requireLogin();
+        if (Auth::isInstructor()) {
+            header('Location: ' . BASE_URL . '?action=usuarios');
+            exit;
+        }
+
+        Auth::requireAdminOnly('dashboard');
         header('Location: ' . BASE_URL . '?action=usuarios&rol=3');
         exit;
     }
 
     /**
-     * Formulario de creación (Redirige al formulario unificado de Usuarios)
+     * Formulario de creación (Solo Administrador)
      */
     public function crear(): void {
-        Auth::requireAdmin();
+        Auth::requireAdminOnly('usuarios');
         header('Location: ' . BASE_URL . '?action=usuarios/crear');
         exit;
     }
+
     /**
-     * Formulario de edición
+     * Formulario de edición (Solo Administrador)
      */
     public function editar(): void {
-        Auth::requireAdmin();
+        Auth::requireAdminOnly('usuarios');
         $id       = (int) ($_GET['id'] ?? 0);
         $aprendiz = $this->model->getById($id);
 
         if (!$aprendiz) {
             Auth::setFlash('error', 'Aprendiz no encontrado.');
-            header('Location: ' . BASE_URL . '?action=aprendices');
+            header('Location: ' . BASE_URL . '?action=usuarios&rol=3');
             exit;
         }
 
+        require_once ROOT_PATH . '/models/Ficha.php';
         $fichaModel = new Ficha($this->db);
         $fichas     = $fichaModel->getAll();
         $csrf_token = Auth::generateCSRF();
@@ -53,37 +64,34 @@ class AprendizController {
     }
 
     /**
-     * Guarda un aprendiz (crear o actualizar en tabla Usuario con Rol_id=3)
+     * Guarda un aprendiz (crear o actualizar) (Solo Administrador)
      */
     public function guardar(): void {
-        Auth::requireAdmin();
+        Auth::requireAdminOnly('usuarios');
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: ' . BASE_URL . '?action=aprendices');
+            header('Location: ' . BASE_URL . '?action=usuarios&rol=3');
             exit;
         }
 
         if (!Auth::validateCSRF($_POST['csrf_token'] ?? '')) {
             Auth::setFlash('error', 'Token de seguridad inválido.');
-            header('Location: ' . BASE_URL . '?action=aprendices');
+            header('Location: ' . BASE_URL . '?action=usuarios&rol=3');
             exit;
         }
 
-        // En la nueva DB, el ID del aprendiz es el mismo que el del usuario
         $idAprendiz = (int) ($_POST['id_aprendiz'] ?? 0);
-
         Validator::reset();
 
         if ($idAprendiz === 0) {
-            // Nuevo aprendiz — validar todos los campos de usuario
             $data = [
-                'identificacion'  => trim($_POST['num_documento'] ?? ''),
-                'nombre'          => trim($_POST['nombre']        ?? ''),
-                'apellido'        => trim($_POST['apellido']      ?? ''),
-                'email'           => trim($_POST['correo']        ?? ''),
-                'password'        => $_POST['password']           ?? '',
+                'identificacion'  => trim((string) ($_POST['num_documento'] ?? '')),
+                'nombre'          => trim((string) ($_POST['nombre']        ?? '')),
+                'apellido'        => trim((string) ($_POST['apellido']      ?? '')),
+                'email'           => trim((string) ($_POST['correo']        ?? '')),
+                'password'        => (string) ($_POST['password']           ?? ''),
                 'Ficha_id'        => (int) ($_POST['id_ficha']   ?? 0) ?: null,
-                'codigo_llavero'  => trim($_POST['codigo_rfid']   ?? '') ?: null,
+                'codigo_llavero'  => trim((string) ($_POST['codigo_rfid']   ?? '')) ?: null,
                 'estado'          => 'Activo',
             ];
 
@@ -101,7 +109,7 @@ class AprendizController {
 
             if (!Validator::isValid()) {
                 Auth::setFlash('error', implode('<br>', Validator::getErrors()));
-                header('Location: ' . BASE_URL . '?action=aprendices/crear');
+                header('Location: ' . BASE_URL . '?action=usuarios/crear');
                 exit;
             }
 
@@ -117,10 +125,9 @@ class AprendizController {
                 }
             }
         } else {
-            // Actualizar aprendiz existente
             $dataAprendiz = [
                 'Ficha_id'       => (int) ($_POST['id_ficha'] ?? 0) ?: null,
-                'codigo_llavero' => trim($_POST['codigo_rfid'] ?? '') ?: null,
+                'codigo_llavero' => trim((string) ($_POST['codigo_rfid'] ?? '')) ?: null,
             ];
 
             if (!Validator::isValid()) {
@@ -132,13 +139,13 @@ class AprendizController {
             try {
                 $this->model->update($idAprendiz, $dataAprendiz);
 
-                // Actualizar datos básicos del usuario si se proporcionaron
+                // Actualizar datos básicos de usuario si se proporcionaron
                 $usuarioModel = new Usuario($this->db);
                 $dataUsuario  = [];
-                if (!empty($_POST['nombre']))   $dataUsuario['nombre']   = trim($_POST['nombre']);
-                if (!empty($_POST['apellido']))  $dataUsuario['apellido'] = trim($_POST['apellido']);
-                if (!empty($_POST['correo']))    $dataUsuario['email']    = trim($_POST['correo']);
-                if (!empty($_POST['password']))  $dataUsuario['password'] = $_POST['password'];
+                if (!empty($_POST['nombre']))   $dataUsuario['nombre']   = trim((string) $_POST['nombre']);
+                if (!empty($_POST['apellido']))  $dataUsuario['apellido'] = trim((string) $_POST['apellido']);
+                if (!empty($_POST['correo']))    $dataUsuario['email']    = trim((string) $_POST['correo']);
+                if (!empty($_POST['password']))  $dataUsuario['password'] = (string) $_POST['password'];
                 if (!empty($_POST['estado']))    $dataUsuario['estado']   = $_POST['estado'];
 
                 if (!empty($dataUsuario)) {
@@ -156,15 +163,15 @@ class AprendizController {
             }
         }
 
-        header('Location: ' . BASE_URL . '?action=aprendices');
+        header('Location: ' . BASE_URL . '?action=usuarios&rol=3');
         exit;
     }
 
     /**
-     * Elimina un aprendiz (elimina el registro Usuario con Rol_id=3)
+     * Elimina un aprendiz (Solo Administrador)
      */
     public function eliminar(): void {
-        Auth::requireAdmin();
+        Auth::requireAdminOnly('usuarios');
         $id = (int) ($_GET['id'] ?? 0);
 
         try {
@@ -174,7 +181,7 @@ class AprendizController {
             Auth::setFlash('error', 'No se puede eliminar el aprendiz porque tiene registros asociados.');
         }
 
-        header('Location: ' . BASE_URL . '?action=aprendices');
+        header('Location: ' . BASE_URL . '?action=usuarios&rol=3');
         exit;
     }
 }

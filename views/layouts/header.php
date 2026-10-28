@@ -47,9 +47,9 @@ $flash = Auth::getFlash();
             <?php if (Auth::isAdminOrInstructor()): ?>
             <div class="nav-section">
                 <span class="nav-section-title">Gestión</span>
-                <a href="<?= BASE_URL ?>?action=usuarios" class="nav-link <?= str_starts_with($currentAction, 'usuarios') ? 'active' : '' ?>">
-                    <i class="fas fa-users-cog"></i>
-                    <span>Usuarios</span>
+                <a href="<?= BASE_URL ?>?action=usuarios" class="nav-link <?= str_starts_with($currentAction, 'usuarios') ? 'active' : '' ?>" title="<?= Auth::isInstructor() ? 'Directorio de Fichas y Aprendices' : 'Gestión de Usuarios' ?>">
+                    <i class="fas <?= Auth::isInstructor() ? 'fa-id-card-clip' : 'fa-users-cog' ?>"></i>
+                    <span><?= Auth::isInstructor() ? 'Fichas / Usuarios' : 'Usuarios' ?></span>
                 </a>
                 <a href="<?= BASE_URL ?>?action=fichas" class="nav-link <?= str_starts_with($currentAction, 'fichas') ? 'active' : '' ?>">
                     <i class="fas fa-folder-open"></i>

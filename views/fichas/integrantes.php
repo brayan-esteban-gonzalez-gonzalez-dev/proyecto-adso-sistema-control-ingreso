@@ -52,21 +52,37 @@
                     <th>Instructor</th>
                     <th>Correo Electrónico</th>
                     <th>Rol en la Ficha</th>
+                    <th>Competencias / Especialidad</th>
                     <th>Estado</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($instructores as $inst): ?>
+                <?php 
+                    $idInst = (int) ($inst['id'] ?? 0);
+                    $esElMismo = ($idInst === (int) Auth::getUserId());
+                    $comps = $inst['competencias_asignadas'] ?? 'Formación Técnica General';
+                ?>
                 <tr>
                     <td><strong><?= htmlspecialchars((string) ($inst['identificacion'] ?? '')) ?></strong></td>
-                    <td><?= htmlspecialchars(trim(($inst['nombre'] ?? '') . ' ' . ($inst['apellido'] ?? ''))) ?></td>
+                    <td>
+                        <?= htmlspecialchars(trim(($inst['nombre'] ?? '') . ' ' . ($inst['apellido'] ?? ''))) ?>
+                        <?php if ($esElMismo): ?>
+                            <span class="badge badge-purple" style="margin-left: 6px; font-size: 0.75rem;"><i class="fas fa-user-check"></i> Tú</span>
+                        <?php endif; ?>
+                    </td>
                     <td><?= htmlspecialchars($inst['email'] ?? '-') ?></td>
                     <td>
                         <?php if (($inst['rol_en_ficha'] ?? '') === 'Instructor Líder'): ?>
                             <span class="badge badge-purple"><i class="fas fa-star"></i> Instructor Líder</span>
                         <?php else: ?>
-                            <span class="badge badge-blue"><i class="fas fa-book-reader"></i> Instructor de Sesión</span>
+                            <span class="badge badge-blue"><i class="fas fa-book-reader"></i> Formador</span>
                         <?php endif; ?>
+                    </td>
+                    <td>
+                        <span class="meta-chip" title="<?= htmlspecialchars($comps) ?>">
+                            <i class="fas fa-book-open"></i> <?= htmlspecialchars($comps) ?>
+                        </span>
                     </td>
                     <td>
                         <?php if (($inst['estado'] ?? 'Activo') === 'Activo'): ?>

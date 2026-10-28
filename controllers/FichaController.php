@@ -1,9 +1,11 @@
 <?php
+declare(strict_types=1);
+
 /**
  * FichaController.php — Controlador de Fichas
  *
  * CRUD de fichas de formación.
- * Nueva DB: tabla `Ficha`, campos: codigo (INT), Programa_id, jornada_id, instructor_id, estado.
+ * Nueva DB: tabla `ficha`, campos: codigo (INT), Programa_id, jornada_id, instructor_id, estado.
  */
 class FichaController {
     private PDO $db;
@@ -156,18 +158,18 @@ class FichaController {
             exit;
         }
 
-        // Si es instructor, validar que la ficha le esté asignada
+        // Si es instructor, validar que la ficha le esté asignada (Anti-IDOR)
         if (Auth::isInstructor()) {
             $instructorId = (int) Auth::getUserId();
-            if (!$this->model->perteneceAInstructor($id, $instructorId)) {
+            if (!$this->model->instructorPerteneceAFicha($instructorId, $id)) {
                 Auth::setFlash('error', 'No tienes permisos para consultar los integrantes de esta ficha.');
                 header('Location: ' . BASE_URL . '?action=fichas');
                 exit;
             }
         }
 
-        $aprendices   = $this->model->getAprendices($id);
-        $instructores = $this->model->getInstructoresVinculados($id);
+        $aprendices   = $this->model->getAprendicesPorFicha($id);
+        $instructores = $this->model->getInstructoresPorFicha($id);
         $pageTitle    = 'Integrantes de la Ficha ' . ($ficha['codigo'] ?? '');
         require_once ROOT_PATH . '/views/fichas/integrantes.php';
     }
