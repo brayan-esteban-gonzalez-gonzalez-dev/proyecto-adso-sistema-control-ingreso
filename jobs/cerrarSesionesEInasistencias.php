@@ -26,6 +26,16 @@ date_default_timezone_set('America/Bogota');
 
 $rootPath = dirname(__DIR__);
 
+// Cargar autoload de Composer (necesario para phpdotenv)
+if (file_exists($rootPath . '/librerias/autoload.php')) {
+    require_once $rootPath . '/librerias/autoload.php';
+} elseif (file_exists($rootPath . '/vendor/autoload.php')) {
+    require_once $rootPath . '/vendor/autoload.php';
+}
+
+// Cargar variables de entorno desde .env
+require_once $rootPath . '/config/env.php';
+
 require_once $rootPath . '/config/Database.php';
 require_once $rootPath . '/models/Sesion.php';
 require_once $rootPath . '/models/IngresoAsistencia.php';

@@ -1,0 +1,40 @@
+# ============================================
+# SCIA — Sistema de Control de Ingreso (SENA)
+# Archivos sensibles y de entorno local
+# ============================================
+
+# Credenciales y configuración sensible (NUNCA subir)
+.env
+.env.local
+.env.*.local
+
+# Composer (dependencias instaladas)
+librerias/
+!librerias/fpdf/
+
+# Sistema de uploads (evidencias de excusas)
+assets/uploads/
+
+# IDE y editores
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Logs y temporales
+*.log
+tmp/
+cache/
+
+# Backups y archivos grandes
+*.bak
+*.zip
+sistema-control-ingreso.mwb.bak.zip
+
+# Node (si en algún momento se usa)
+node_modules/

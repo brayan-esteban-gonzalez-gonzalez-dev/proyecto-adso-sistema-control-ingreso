@@ -8,11 +8,49 @@ declare(strict_types=1);
  * Si la base de datos o las tablas no existen en phpMyAdmin, las crea automáticamente.
  */
 class Database {
-    private $host     = "localhost";
-    private $db_name  = "db_ingreso_aprendices";
-    private $username = "root";
-    private $password = "";
-    private $charset  = "utf8mb4";
+    /** @var string */
+    private $host;
+    /** @var string */
+    private $db_name;
+    /** @var string */
+    private $username;
+    /** @var string */
+    private $password;
+    /** @var string */
+    private $charset;
+
+    public function __construct()
+    {
+        // Leer credenciales desde variables de entorno (.env) con fallback a XAMPP por defecto
+        $this->host     = $_ENV['DB_HOST']     ?? getenv('DB_HOST')     ?: 'localhost';
+        $this->db_name  = $_ENV['DB_NAME']     ?? getenv('DB_NAME')     ?: 'db_ingreso_aprendices';
+        $this->username = $_ENV['DB_USER']     ?? getenv('DB_USER')     ?: 'root';
+        $this->password = $_ENV['DB_PASSWORD'] ?? getenv('DB_PASSWORD') ?: '';
+        $this->charset  = $_ENV['DB_CHARSET']  ?? getenv('DB_CHARSET')  ?: 'utf8mb4';
+
+        // Validación básica de seguridad (evitar caracteres raros en el .env)
+        $this->validateEnvValues();
+    }
+
+    /**
+     * Valida que las variables de entorno solo contengan caracteres permitidos.
+     */
+    private function validateEnvValues(): void
+    {
+        $allowed = '/^[a-zA-Z0-9_.\-]+$/';
+
+        foreach ([
+            'host'     => $this->host,
+            'db_name'  => $this->db_name,
+            'username' => $this->username,
+            'charset'  => $this->charset,
+        ] as $name => $value) {
+            if (!preg_match($allowed, (string)$value)) {
+                error_log("[SCIA][Database] Valor inválido para {$name} en variables de entorno.");
+                die('Error de configuración de base de datos. Contacte al administrador.');
+            }
+        }
+    }
 
     /** @var PDO|null */
     private $conn = null;

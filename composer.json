@@ -3,6 +3,7 @@
         "vendor-dir": "librerias"
     },
     "require": {
-        "phpoffice/phpspreadsheet": "^5.10"
+        "phpoffice/phpspreadsheet": "^5.10",
+        "vlucas/phpdotenv": "^5.6"
     }
 }
