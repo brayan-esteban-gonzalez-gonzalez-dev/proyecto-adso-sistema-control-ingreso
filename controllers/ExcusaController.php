@@ -214,7 +214,8 @@ class ExcusaController
                 Auth::setFlash('error', 'No se pudo guardar la excusa médica.');
             }
         } catch (\PDOException $e) {
-            Auth::setFlash('error', 'Error al registrar la excusa: ' . $e->getMessage());
+            error_log('[SCIA][ExcusaController] Error al registrar excusa: ' . $e->getFile() . ':' . $e->getLine() . ' - ' . $e->getMessage());
+            Auth::setFlash('error', 'Ocurrió un error al registrar la excusa médica. Por favor, inténtalo de nuevo.');
         }
 
         header('Location: ' . BASE_URL . '?action=excusas');
@@ -305,7 +306,8 @@ class ExcusaController
                 Auth::setFlash('error', 'Acción de revisión no válida.');
             }
         } catch (\PDOException $e) {
-            Auth::setFlash('error', 'Error al procesar la excusa: ' . $e->getMessage());
+            error_log('[SCIA][ExcusaController] Error al procesar revisión: ' . $e->getFile() . ':' . $e->getLine() . ' - ' . $e->getMessage());
+            Auth::setFlash('error', 'Ocurrió un error al procesar la excusa. Por favor, inténtalo de nuevo.');
         }
 
         header('Location: ' . BASE_URL . '?action=excusas');

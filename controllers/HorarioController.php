@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * HorarioController.php — Controlador de Horarios y Sesiones
@@ -334,6 +335,37 @@ class HorarioController
             exit;
         }
 
+        // 2.2 — Verificación is_uploaded_file
+        if (!is_uploaded_file($fileTmp)) {
+            Auth::setFlash('error', 'La subida del archivo no fue legítima. Por favor inténtalo de nuevo.');
+            header('Location: ' . BASE_URL . '?action=horarios/importar');
+            exit;
+        }
+
+        // 2.2 — Restricción de tamaño: máximo 10 MB
+        if ($_FILES['archivo']['size'] > 10 * 1024 * 1024) {
+            Auth::setFlash('error', 'El archivo supera el tamaño máximo permitido de 10 MB.');
+            header('Location: ' . BASE_URL . '?action=horarios/importar');
+            exit;
+        }
+
+        // 2.2 — Validación de tipo MIME real (firma binaria) con finfo
+        $finfo    = new \finfo(FILEINFO_MIME_TYPE);
+        $mimeReal = $finfo->file($fileTmp);
+        $mimesPermitidos = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+            'application/vnd.ms-excel',                                          // .xls antiguo
+            'application/zip',   // xlsx es ZIP internamente; algunos PHP lo detectan así
+        ];
+        if (!in_array($mimeReal, $mimesPermitidos, true)) {
+            Auth::setFlash('error', 'El tipo de archivo no es válido. Sube un documento Excel (.xlsx o .xls).');
+            header('Location: ' . BASE_URL . '?action=horarios/importar');
+            exit;
+        }
+
+        // 2.2 — Sanitizar nombre de archivo para prevenir inyección de ruta
+        $fileName = basename($fileName);
+
         try {
             $tipoHorario = ($_POST['tipo_horario'] ?? 'ficha') === 'instructor' ? 'instructor' : 'ficha';
             $anio = (int) ($_POST['anio'] ?? date('Y'));
@@ -408,7 +440,8 @@ class HorarioController
             require_once ROOT_PATH . '/views/horarios/resultado.php';
 
         } catch (Exception $e) {
-            Auth::setFlash('error', 'Error al procesar el archivo Excel: ' . $e->getMessage());
+            error_log('[SCIA][HorarioController] Error al procesar Excel: ' . $e->getFile() . ':' . $e->getLine() . ' - ' . $e->getMessage());
+            Auth::setFlash('error', 'Ocurrió un error al procesar el archivo Excel. Por favor, inténtalo de nuevo.');
             header('Location: ' . BASE_URL . '?action=horarios/importar');
             exit;
         }

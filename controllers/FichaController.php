@@ -115,7 +115,8 @@ class FichaController {
             if (str_contains($e->getMessage(), 'Duplicate')) {
                 Auth::setFlash('error', 'Ya existe una ficha con ese código.');
             } else {
-                Auth::setFlash('error', 'Error al guardar: ' . $e->getMessage());
+                error_log('[SCIA][FichaController] Error al guardar ficha: ' . $e->getFile() . ':' . $e->getLine() . ' - ' . $e->getMessage());
+                Auth::setFlash('error', 'Ocurrió un error al guardar la ficha. Por favor, inténtalo de nuevo.');
             }
         }
 

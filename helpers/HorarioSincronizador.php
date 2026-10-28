@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * HorarioSincronizador.php
@@ -46,93 +47,107 @@ class HorarioSincronizador
             return $reporte;
         }
 
-        // 1. Obtener sesiones existentes de la ficha en el rango del Excel
-        $fechas = array_column($bloques, 'fecha');
-        $minFecha = min($fechas);
-        $maxFecha = max($fechas);
+        // 2.3 — Transacción atómica: cualquier fallo a mitad del Excel revierte todo
+        try {
+            $this->db->beginTransaction();
 
-        $sesionesExistentes = $this->obtenerSesionesExistentes($fichaId, $minFecha, $maxFecha);
+            // 1. Obtener sesiones existentes de la ficha en el rango del Excel
+            $fechas = array_column($bloques, 'fecha');
+            $minFecha = min($fechas);
+            $maxFecha = max($fechas);
 
-        // 2. Indexar bloques del Excel por clave única (fecha + hora_inicio)
-        $bloquesExcel = [];
-        foreach ($bloques as $bloque) {
-            $key = $bloque['fecha'] . '|' . $bloque['hora_inicio'];
-            $bloquesExcel[$key] = $bloque;
-        }
+            $sesionesExistentes = $this->obtenerSesionesExistentes($fichaId, $minFecha, $maxFecha);
 
-        // 3. Procesar cada bloque del Excel
-        foreach ($bloquesExcel as $key => $bloqueExcel) {
-            if (isset($sesionesExistentes[$key])) {
-                $sesionBD = $sesionesExistentes[$key];
+            // 2. Indexar bloques del Excel por clave única (fecha + hora_inicio)
+            $bloquesExcel = [];
+            foreach ($bloques as $bloque) {
+                $key = $bloque['fecha'] . '|' . $bloque['hora_inicio'];
+                $bloquesExcel[$key] = $bloque;
+            }
 
-                // RF-HOR-14: si el bloque estaba cancelado y reaparece, vuelve a Activo.
-                if (($sesionBD['estado'] ?? '') === 'Cancelado') {
-                    $reactivado = $this->sesionModel->update((int) $sesionBD['id'], ['estado' => 'Activo']);
-                    if ($reactivado) {
-                        $reporte['actualizadas']++;
-                    } else {
-                        $reporte['errores'][] = "Error al reactivar la sesión {$key}";
+            // 3. Procesar cada bloque del Excel
+            foreach ($bloquesExcel as $key => $bloqueExcel) {
+                if (isset($sesionesExistentes[$key])) {
+                    $sesionBD = $sesionesExistentes[$key];
+
+                    // RF-HOR-14: si el bloque estaba cancelado y reaparece, vuelve a Activo.
+                    if (($sesionBD['estado'] ?? '') === 'Cancelado') {
+                        $reactivado = $this->sesionModel->update((int) $sesionBD['id'], ['estado' => 'Activo']);
+                        if ($reactivado) {
+                            $reporte['actualizadas']++;
+                        } else {
+                            $reporte['errores'][] = "Error al reactivar la sesión {$key}";
+                        }
+                        continue;
                     }
-                    continue;
-                }
 
-                // Verificar si está protegida
-                if ($this->estaProtegida($sesionBD)) {
-                    $reporte['protegidas']++;
-                    continue;
-                }
-
-                // Comparar y actualizar si es necesario
-                $camposDiferentes = $this->calcularDiferencias($sesionBD, $bloqueExcel);
-
-                if (empty($camposDiferentes)) {
-                    $reporte['omitidas']++;
-                } else {
-                    $actualizado = $this->sesionModel->update((int)$sesionBD['id'], $camposDiferentes);
-                    if ($actualizado) {
-                        $reporte['actualizadas']++;
-                    } else {
-                        $reporte['errores'][] = "Error al actualizar sesión {$key}";
+                    // Verificar si está protegida
+                    if ($this->estaProtegida($sesionBD)) {
+                        $reporte['protegidas']++;
+                        continue;
                     }
-                }
-            } else {
-                // Crear nueva sesión: resolver instructor por nombre normalizado
-                $instructorId = $this->resolverInstructorId($bloqueExcel['instructor'] ?? '');
-                if ($instructorId === null) {
-                    $reporte['errores'][] = 'No se pudo resolver el instructor "' . ($bloqueExcel['instructor'] ?? '') . '" para la sesión ' . $key;
-                    continue;
-                }
 
-                $insertado = $this->sesionModel->create([
-                    'Ficha_id'          => $fichaId,
-                    'Competencia_id'    => null,
-                    'Instructor_id'     => $instructorId,
-                    'fecha'             => $bloqueExcel['fecha'],
-                    'hora_inicio'       => $bloqueExcel['hora_inicio'],
-                    'hora_fin'          => $bloqueExcel['hora_fin'],
-                    'estado'            => 'Activo',
-                    'tipo_instructor'   => $bloqueExcel['tipo'] ?? null,
-                    'especialidad'      => $bloqueExcel['especialidad'] ?? null,
-                    'nivel'             => $bloqueExcel['nivel'] ?? null,
-                    'grupo_convergente' => $bloqueExcel['grupo_convergente'] ?? null,
-                ]);
+                    // Comparar y actualizar si es necesario
+                    $camposDiferentes = $this->calcularDiferencias($sesionBD, $bloqueExcel);
 
-                if ($insertado) {
-                    $reporte['creadas']++;
+                    if (empty($camposDiferentes)) {
+                        $reporte['omitidas']++;
+                    } else {
+                        $actualizado = $this->sesionModel->update((int)$sesionBD['id'], $camposDiferentes);
+                        if ($actualizado) {
+                            $reporte['actualizadas']++;
+                        } else {
+                            $reporte['errores'][] = "Error al actualizar sesión {$key}";
+                        }
+                    }
                 } else {
-                    $reporte['errores'][] = "Error al crear sesión {$key}";
+                    // Crear nueva sesión: resolver instructor por nombre normalizado
+                    $instructorId = $this->resolverInstructorId($bloqueExcel['instructor'] ?? '');
+                    if ($instructorId === null) {
+                        $reporte['errores'][] = 'No se pudo resolver el instructor "' . ($bloqueExcel['instructor'] ?? '') . '" para la sesión ' . $key;
+                        continue;
+                    }
+
+                    $insertado = $this->sesionModel->create([
+                        'Ficha_id'          => $fichaId,
+                        'Competencia_id'    => null,
+                        'Instructor_id'     => $instructorId,
+                        'fecha'             => $bloqueExcel['fecha'],
+                        'hora_inicio'       => $bloqueExcel['hora_inicio'],
+                        'hora_fin'          => $bloqueExcel['hora_fin'],
+                        'estado'            => 'Activo',
+                        'tipo_instructor'   => $bloqueExcel['tipo'] ?? null,
+                        'especialidad'      => $bloqueExcel['especialidad'] ?? null,
+                        'nivel'             => $bloqueExcel['nivel'] ?? null,
+                        'grupo_convergente' => $bloqueExcel['grupo_convergente'] ?? null,
+                    ]);
+
+                    if ($insertado) {
+                        $reporte['creadas']++;
+                    } else {
+                        $reporte['errores'][] = "Error al crear sesión {$key}";
+                    }
                 }
             }
-        }
 
-        // 4. Cancelar sesiones de la ficha en el rango que ya no vienen (RF-HOR-12)
-        $reporte['canceladas'] = $this->cancelarSesionesAusentes(
-            $fichaId,
-            $minFecha,
-            $maxFecha,
-            $bloquesExcel,
-            $sesionesExistentes
-        );
+            // 4. Cancelar sesiones de la ficha en el rango que ya no vienen (RF-HOR-12)
+            $reporte['canceladas'] = $this->cancelarSesionesAusentes(
+                $fichaId,
+                $minFecha,
+                $maxFecha,
+                $bloquesExcel,
+                $sesionesExistentes
+            );
+
+            $this->db->commit();
+
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('[SCIA][HorarioSincronizador] Error en sincronizar(): ' . $e->getMessage());
+            throw new \RuntimeException('Error crítico al sincronizar el horario. Se han revertido todos los cambios.');
+        }
 
         return $reporte;
     }
@@ -197,78 +212,92 @@ class HorarioSincronizador
             return $reporte;
         }
 
-        $fechas = array_column($bloques, 'fecha');
-        $minFecha = min($fechas);
-        $maxFecha = max($fechas);
+        // 2.3 — Transacción atómica para asignaciones de instructor
+        try {
+            $this->db->beginTransaction();
 
-        $sql = "SELECT * FROM asignacion_instructor
-                WHERE instructor_id = :instructor_id
-                  AND fecha BETWEEN :desde AND :hasta";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([
-            ':instructor_id' => $instructorId,
-            ':desde' => $minFecha,
-            ':hasta' => $maxFecha,
-        ]);
+            $fechas = array_column($bloques, 'fecha');
+            $minFecha = min($fechas);
+            $maxFecha = max($fechas);
 
-        $existentes = [];
-        foreach ($stmt->fetchAll() as $a) {
-            $key = $a['fecha'] . '|' . $a['hora_inicio'] . '|' . $a['ficha_id'];
-            if (isset($existentes[$key]) && ($existentes[$key]['estado'] ?? '') !== 'Cancelado') {
-                continue;
-            }
-            $existentes[$key] = $a;
-        }
+            $sql = "SELECT * FROM asignacion_instructor
+                    WHERE instructor_id = :instructor_id
+                      AND fecha BETWEEN :desde AND :hasta";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
+                ':instructor_id' => $instructorId,
+                ':desde' => $minFecha,
+                ':hasta' => $maxFecha,
+            ]);
 
-        $clavesExcel = [];
-        foreach ($bloques as $bloque) {
-            $codigo = (string) ($bloque['codigo_ficha'] ?? '');
-            $fichaId = $mapaFichas[$codigo] ?? null;
-            if ($fichaId === null) {
-                $reporte['errores'][] = "La ficha {$codigo} no está registrada.";
-                continue;
+            $existentes = [];
+            foreach ($stmt->fetchAll() as $a) {
+                $key = $a['fecha'] . '|' . $a['hora_inicio'] . '|' . $a['ficha_id'];
+                if (isset($existentes[$key]) && ($existentes[$key]['estado'] ?? '') !== 'Cancelado') {
+                    continue;
+                }
+                $existentes[$key] = $a;
             }
 
-            $key = $bloque['fecha'] . '|' . $bloque['hora_inicio'] . '|' . $fichaId;
-            $clavesExcel[$key] = true;
+            $clavesExcel = [];
+            foreach ($bloques as $bloque) {
+                $codigo = (string) ($bloque['codigo_ficha'] ?? '');
+                $fichaId = $mapaFichas[$codigo] ?? null;
+                if ($fichaId === null) {
+                    $reporte['errores'][] = "La ficha {$codigo} no está registrada.";
+                    continue;
+                }
 
-            $datos = [
-                'instructor_id' => $instructorId,
-                'ficha_id'      => $fichaId,
-                'fecha'         => $bloque['fecha'],
-                'hora_inicio'   => $bloque['hora_inicio'],
-                'hora_fin'      => $bloque['hora_fin'],
-                'estado'        => 'Activo',
-            ];
+                $key = $bloque['fecha'] . '|' . $bloque['hora_inicio'] . '|' . $fichaId;
+                $clavesExcel[$key] = true;
 
-            if (!isset($existentes[$key])) {
-                $ok = $this->asignacionModel->create($datos);
-                $ok ? $reporte['creadas']++ : $reporte['errores'][] = "Error al crear asignación {$key}";
-                continue;
-            }
+                $datos = [
+                    'instructor_id' => $instructorId,
+                    'ficha_id'      => $fichaId,
+                    'fecha'         => $bloque['fecha'],
+                    'hora_inicio'   => $bloque['hora_inicio'],
+                    'hora_fin'      => $bloque['hora_fin'],
+                    'estado'        => 'Activo',
+                ];
 
-            $actual = $existentes[$key];
-            if (($actual['estado'] ?? '') === 'Cancelado') {
+                if (!isset($existentes[$key])) {
+                    $ok = $this->asignacionModel->create($datos);
+                    $ok ? $reporte['creadas']++ : $reporte['errores'][] = "Error al crear asignación {$key}";
+                    continue;
+                }
+
+                $actual = $existentes[$key];
+                if (($actual['estado'] ?? '') === 'Cancelado') {
+                    $ok = $this->asignacionModel->update((int) $actual['id'], $datos);
+                    $ok ? $reporte['actualizadas']++ : $reporte['errores'][] = "Error al reactivar asignación {$key}";
+                    continue;
+                }
+
+                if (($actual['hora_fin'] ?? '') === $datos['hora_fin']) {
+                    $reporte['omitidas']++;
+                    continue;
+                }
+
                 $ok = $this->asignacionModel->update((int) $actual['id'], $datos);
-                $ok ? $reporte['actualizadas']++ : $reporte['errores'][] = "Error al reactivar asignación {$key}";
-                continue;
+                $ok ? $reporte['actualizadas']++ : $reporte['errores'][] = "Error al actualizar asignación {$key}";
             }
 
-            if (($actual['hora_fin'] ?? '') === $datos['hora_fin']) {
-                $reporte['omitidas']++;
-                continue;
+            foreach ($existentes as $key => $actual) {
+                if (isset($clavesExcel[$key]) || ($actual['estado'] ?? '') === 'Cancelado') {
+                    continue;
+                }
+                $this->asignacionModel->cancelar((int) $actual['id']);
+                $reporte['canceladas']++;
             }
 
-            $ok = $this->asignacionModel->update((int) $actual['id'], $datos);
-            $ok ? $reporte['actualizadas']++ : $reporte['errores'][] = "Error al actualizar asignación {$key}";
-        }
+            $this->db->commit();
 
-        foreach ($existentes as $key => $actual) {
-            if (isset($clavesExcel[$key]) || ($actual['estado'] ?? '') === 'Cancelado') {
-                continue;
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
             }
-            $this->asignacionModel->cancelar((int) $actual['id']);
-            $reporte['canceladas']++;
+            error_log('[SCIA][HorarioSincronizador] Error en sincronizarAsignaciones(): ' . $e->getMessage());
+            throw new \RuntimeException('Error crítico al sincronizar asignaciones. Se han revertido todos los cambios.');
         }
 
         return $reporte;

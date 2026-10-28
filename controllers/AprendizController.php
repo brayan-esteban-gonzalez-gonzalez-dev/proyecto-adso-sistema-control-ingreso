@@ -112,7 +112,8 @@ class AprendizController {
                 if (str_contains($e->getMessage(), 'Duplicate')) {
                     Auth::setFlash('error', 'El documento, correo o código de llavero ya existe.');
                 } else {
-                    Auth::setFlash('error', 'Error al guardar: ' . $e->getMessage());
+                    error_log('[SCIA][AprendizController] Error al crear aprendiz: ' . $e->getFile() . ':' . $e->getLine() . ' - ' . $e->getMessage());
+                    Auth::setFlash('error', 'Ocurrió un error al crear el aprendiz. Por favor, inténtalo de nuevo.');
                 }
             }
         } else {
@@ -149,7 +150,8 @@ class AprendizController {
                 if (str_contains($e->getMessage(), 'Duplicate')) {
                     Auth::setFlash('error', 'El documento, correo o código de llavero ya existe.');
                 } else {
-                    Auth::setFlash('error', 'Error al guardar: ' . $e->getMessage());
+                    error_log('[SCIA][AprendizController] Error al actualizar aprendiz: ' . $e->getFile() . ':' . $e->getLine() . ' - ' . $e->getMessage());
+                    Auth::setFlash('error', 'Ocurrió un error al actualizar el aprendiz. Por favor, inténtalo de nuevo.');
                 }
             }
         }

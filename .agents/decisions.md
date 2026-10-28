@@ -49,4 +49,36 @@ Formato sugerido por entrada:
   - Se incluyó la carga de Chart.js v4 UMD vía CDN en `views/layouts/header.php`.
   - Se integró el partial `views/dashboard/_graficos.php` en `views/dashboard/index.php` para todos los roles, conectando con la carga condicional de `assets/js/dashboard.js` en `views/layouts/footer.php`.
   - Se incorporaron las reglas de estilo en `assets/css/style.css` (`.charts-grid`, `.chart-box`, `.chart-title`, `.chart-wide` y diseño responsive).
+- **2026-10-27 — Corrección de arranque en Linux — Tarea 1.1 (CRÍTICO/BLOQUEANTE):**
+  - Se añadió `declare(strict_types=1);` en `config/Database.php` (cumplimiento PHP 8.2+ strict).
+  - Se corrigió `SHOW TABLES LIKE 'Usuario'` → `'usuario'` (minúscula) en `ensureTablesExist()`: en Linux con `lower_case_table_names=0` la consulta devolvía vacío aunque la tabla existía, provocando que `runMigrationScript()` se ejecutara en cada petición y fallara con `1050 Table already exists` desde el segundo request.
+  - Se reemplazaron los tres `die("... " . $e->getMessage())` en `getConnection()`, `autoInitDatabase()` y `runMigrationScript()` por `error_log('[SCIA][Database] ...')` + mensaje genérico al usuario (OWASP: no exponer detalles internos).
+- **2026-10-27 — Tarea 1.2: Método Auth::requireAdminOrInstructor() (CRÍTICO/BLOQUEANTE):**
+  - Se añadió `declare(strict_types=1)` en `helpers/Auth.php`.
+  - Se implementó el método estático `requireAdminOrInstructor(): void` siguiendo el patrón de `requireAdminOnly()`: llama a `requireLogin()`, verifica `isAdmin() || isInstructor()`, usa `setFlash('error', ...)` y redirige a `dashboard`. Resuelve el `Fatal Error: Call to undefined method` en los 7 endpoints de `HorarioController`.
+  - `isInstructor()` ya existía en el archivo (línea 68); no fue necesario implementarlo de nuevo.
+- **2026-10-27 — Tarea 1.3A: Integración migraciones 005-008 en DDL consolidado:**
+  - En `migrations/db_ingreso_aprendices_27_08.sql`: `sesion.hora_fin` pasó a `TIME NULL DEFAULT NULL`, se añadieron columnas `apertura_real`, `cierre_real`, `tipo_instructor`, `especialidad`, `nivel`, `grupo_convergente`, el ENUM `estado` amplió con `'Permutado'` y se añadió `CHECK (hora_fin IS NULL OR hora_inicio < hora_fin)`. La tabla `inasistencia` recibió la columna `estado ENUM`. Se crearon desde cero las tablas `asignacion_instructor`, `permuta_sesion` e `importacion_horario` con sus PKs, índices y FKs apuntando a tablas en minúscula (`usuario`, `ficha`, `sesion`).
+  - En `config/Database.php`: se añadió `ensureMigrationsApplied()` invocado desde `ensureTablesExist()` solo cuando la BD ya existe. El método verifica y aplica idempotentemente cada cambio de las migraciones 005-008 usando `SHOW COLUMNS`, `information_schema.COLUMNS` y `SHOW TABLES`. Los errores se loguean sin detener el sistema.
+- **2026-10-27 — Tarea 1.3B: Blindaje de Sesion::abrirSesion() contra Error 1452/1364:**
+  - Se añadió el método privado `resolverCompetenciaParaSesion(int $fichaId, int $instructorId): ?int` que busca `Competencia_id` con tres niveles de fallback: (1) sesiones previas del instructor en esa ficha, (2) `instructor_competencia`, (3) primera competencia del sistema. Si retorna `null` (BD sin competencias) `abrirSesion()` retorna `false` en lugar de violar la FK.
+  - Ambas ramas del INSERT espontáneo (con/sin `apertura_real`) ahora incluyen siempre `:competencia_id`.
+- **2026-10-27 — Tarea 1.4: Job CLI cerrarSesionesEInasistencias.php:**
+  - Creado `jobs/cerrarSesionesEInasistencias.php` con protección `PHP_SAPI !== 'cli'`, zona horaria `America/Bogota`, carga de dependencias por ruta absoluta desde `__DIR__`.
+  - Cierra sesiones `estado = 'Activo'` con `fecha <= CURDATE()`, registra `hora_fin = COALESCE(hora_fin, CURTIME())` y `cierre_real` (si existe). Genera inasistencias con doble `NOT EXISTS` (idempotente). Transaccional por sesión: error en una no cancela las demás. Salida estructurada `[YYYY-MM-DD HH:MM:SS]` en STDOUT; errores a STDERR + `error_log`. `exit(0)` sin errores, `exit(1)` con fallos.
+  - Verificación: lint OK en todos los archivos; ejecución real cerró 2 sesiones y generó 5 inasistencias (exit 0).
+- **2026-10-27 — Tarea 2.1: Ocultar mensajes crudos de excepciones SQL al usuario (OWASP):**
+  - Modificados `controllers/HorarioController.php`, `controllers/ExcusaController.php`, `controllers/UsuarioController.php`, `controllers/FichaController.php` y `controllers/AprendizController.php`.
+  - Se eliminaron todas las exposiciones directas de `$e->getMessage()` hacia `Auth::setFlash('error', ...)` y respuestas para mitigar revelación de esquema y rutas internas.
+  - Se implementó logging seguro en servidor mediante `error_log('[SCIA][<Controlador>] ...')` incluyendo archivo, línea y mensaje técnico, devolviendo mensajes genéricos seguros y amigables al usuario final.
+- **2026-10-27 — Tarea 2.2: Blindaje de subida de archivos Excel (OWASP):**
+  - En `controllers/HorarioController.php::procesar()`: se añadió `declare(strict_types=1);`.
+  - Se implementó validación de subida HTTP legítima mediante `is_uploaded_file()`.
+  - Restricción estricta de tamaño máximo de archivo a 10 MB (`$_FILES['archivo']['size'] > 10 * 1024 * 1024`).
+  - Validación binaria estricta de tipo MIME real inspeccionando los magic bytes del archivo temporal con `finfo` (`FILEINFO_MIME_TYPE`), permitiendo únicamente `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `application/vnd.ms-excel` y `application/zip`.
+  - Sanitización del nombre de archivo original utilizando `basename()` para neutralizar inyecciones de ruta o path traversal.
+- **2026-10-27 — Tarea 2.3: Transacciones atómicas en HorarioSincronizador:**
+  - En `helpers/HorarioSincronizador.php`: se añadió `declare(strict_types=1);`.
+  - Se envolvieron los métodos masivos `sincronizar()` y `sincronizarAsignaciones()` en bloques transaccionales atómicos PDO (`$this->db->beginTransaction()`, `$this->db->commit()`, `$this->db->rollBack()`).
+  - Si ocurre cualquier error o excepción (`\Throwable`) durante el procesamiento o cancelación de bloques, se revierten automáticamente todos los cambios en base de datos para evitar estados corruptos o inserciones a medias, y se emite `error_log` detallado.
 

@@ -149,7 +149,8 @@ class UsuarioController {
             if (str_contains($e->getMessage(), 'Duplicate')) {
                 Auth::setFlash('error', 'El documento, correo o código de llavero ya existe en el sistema.');
             } else {
-                Auth::setFlash('error', 'Error al guardar: ' . $e->getMessage());
+                error_log('[SCIA][UsuarioController] Error al guardar usuario: ' . $e->getFile() . ':' . $e->getLine() . ' - ' . $e->getMessage());
+                Auth::setFlash('error', 'Ocurrió un error al guardar el usuario. Por favor, inténtalo de nuevo.');
             }
         }
 

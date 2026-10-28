@@ -464,25 +464,83 @@ class Sesion {
             return (int) $programada['id'];
         }
 
-        // Si no hay programada o no tiene apertura_real, crear una nueva
+        // Si no hay programada o no tiene apertura_real, crear una nueva.
+        // CRÍTICO: Competencia_id es NOT NULL con FK fk_sesion_competencia.
+        // Resolver dinámicamente antes del INSERT para evitar Error 1452/1364.
+        $competenciaId = $this->resolverCompetenciaParaSesion($fichaId, $instructorId);
+        if ($competenciaId === null) {
+            // Sin ninguna competencia en el sistema: no es posible abrir la sesión
+            return false;
+        }
+
         if ($tieneAperturaReal) {
             $sql = "INSERT INTO {$this->table}
-                        (Ficha_id, Instructor_id, fecha, hora_inicio, hora_fin, apertura_real, estado)
+                        (Ficha_id, Competencia_id, Instructor_id, fecha, hora_inicio, hora_fin, apertura_real, estado)
                     VALUES
-                        (:ficha_id, :instructor_id, CURDATE(), CURTIME(), NULL, CURTIME(), 'Activo')";
+                        (:ficha_id, :competencia_id, :instructor_id, CURDATE(), CURTIME(), NULL, CURTIME(), 'Activo')";
         } else {
             $sql = "INSERT INTO {$this->table}
-                        (Ficha_id, Instructor_id, fecha, hora_inicio, hora_fin, estado)
+                        (Ficha_id, Competencia_id, Instructor_id, fecha, hora_inicio, hora_fin, estado)
                     VALUES
-                        (:ficha_id, :instructor_id, CURDATE(), CURTIME(), NULL, 'Activo')";
+                        (:ficha_id, :competencia_id, :instructor_id, CURDATE(), CURTIME(), NULL, 'Activo')";
         }
         $stmt = $this->conn->prepare($sql);
         $ok = $stmt->execute([
-            ':ficha_id'      => $fichaId,
-            ':instructor_id' => $instructorId,
+            ':ficha_id'       => $fichaId,
+            ':competencia_id' => $competenciaId,
+            ':instructor_id'  => $instructorId,
         ]);
 
         return $ok ? (int) $this->conn->lastInsertId() : false;
+    }
+
+    /**
+     * Resuelve un Competencia_id válido para una sesión espontánea.
+     *
+     * Estrategia:
+     *  1. Busca la competencia asignada al instructor para esa ficha en `instructor_competencia`.
+     *  2. Si no existe, toma la primera competencia activa de `competencia`.
+     *
+     * @return int|null ID de competencia encontrado, o null si la tabla está vacía.
+     */
+    private function resolverCompetenciaParaSesion(int $fichaId, int $instructorId): ?int
+    {
+        // 1. Buscar competencia asignada al instructor para esta ficha (vía sesiones previas)
+        $sqlAsignada = "SELECT s.Competencia_id
+                        FROM {$this->table} s
+                        WHERE s.Ficha_id      = :ficha_id
+                          AND s.Instructor_id = :instructor_id
+                          AND s.Competencia_id IS NOT NULL
+                        ORDER BY s.fecha DESC
+                        LIMIT 1";
+        $stmtA = $this->conn->prepare($sqlAsignada);
+        $stmtA->execute([':ficha_id' => $fichaId, ':instructor_id' => $instructorId]);
+        $row = $stmtA->fetch();
+        if ($row && !empty($row['Competencia_id'])) {
+            return (int) $row['Competencia_id'];
+        }
+
+        // 2. Buscar en instructor_competencia (si la tabla existe)
+        try {
+            $sqlIC = "SELECT ic.Competencia_id
+                      FROM instructor_competencia ic
+                      WHERE ic.Instructor_id = :instructor_id
+                      LIMIT 1";
+            $stmtIC = $this->conn->prepare($sqlIC);
+            $stmtIC->execute([':instructor_id' => $instructorId]);
+            $rowIC = $stmtIC->fetch();
+            if ($rowIC && !empty($rowIC['Competencia_id'])) {
+                return (int) $rowIC['Competencia_id'];
+            }
+        } catch (\Throwable) {
+            // La tabla instructor_competencia podría no existir en esquemas antiguos
+        }
+
+        // 3. Fallback: primera competencia activa del sistema
+        $stmtFb = $this->conn->prepare("SELECT id FROM competencia ORDER BY id ASC LIMIT 1");
+        $stmtFb->execute();
+        $rowFb = $stmtFb->fetch();
+        return $rowFb ? (int) $rowFb['id'] : null;
     }
 
     /**

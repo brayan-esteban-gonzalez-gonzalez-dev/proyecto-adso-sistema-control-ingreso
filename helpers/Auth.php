@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * Auth.php — Helper de autenticación y sesiones
  * Gestionar el inicio/cierre de sesion, verificación de roles
@@ -141,6 +142,20 @@ class Auth {
             self::setFlash('error', 'Acceso denegado: solo el Administrador tiene permisos para realizar esta acción.');
             $destination = self::isAdminOrInstructor() ? $redirectTo : 'dashboard';
             header('Location: ' . BASE_URL . '?action=' . $destination);
+            exit;
+        }
+    }
+
+    /**
+     * Redirige al dashboard si el usuario no es Administrador ni Instructor.
+     * Requerido por HorarioController y otros endpoints de gestión académica.
+     */
+    public static function requireAdminOrInstructor(): void
+    {
+        self::requireLogin();
+        if (!self::isAdmin() && !self::isInstructor()) {
+            self::setFlash('error', 'Acceso denegado. No tienes permisos para realizar esta acción.');
+            header('Location: ' . BASE_URL . '?action=dashboard');
             exit;
         }
     }

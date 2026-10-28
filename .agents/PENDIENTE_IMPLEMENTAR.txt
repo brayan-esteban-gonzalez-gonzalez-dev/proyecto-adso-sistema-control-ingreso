@@ -260,12 +260,15 @@ TOTAL HORAS PENDIENTES DE IMPLEMENTACION:                          0 horas (func
 --------------------------------------------------------------------------------
 Detalle en .agents/reporssecuriti.md. No se corrigio codigo en ese reporte.
 
-[SEG-01] Subida de Excel solo por extension, sin tope de tamano ni
-         is_uploaded_file(). Prioridad alta.
-[SEG-02] procesar() muestra $e->getMessage() al usuario. Prioridad alta.
+~~[SEG-01] Subida de Excel solo por extension, sin tope de tamano ni
+         is_uploaded_file(). Prioridad alta.~~
+         -> [IMPLEMENTADO 2026-10-27 Nivel 2]: is_uploaded_file(), límite 10MB, MIME real con finfo y basename().
+~~[SEG-02] procesar() muestra $e->getMessage() al usuario. Prioridad alta.~~
+         -> [IMPLEMENTADO 2026-10-27 Nivel 2]: getMessage() reemplazado por error_log() interno y mensajes genéricos en todos los controladores.
 [SEG-03] confirmar_permutas en el POST salta la pantalla de confirmacion.
          confirmarPermutas() no revalida la carga guardada en sesion.
-[SEG-04] Sincronizacion sin transaccion. Auditoria que traga excepciones.
+~~[SEG-04] Sincronizacion sin transaccion. Auditoria que traga excepciones.~~
+         -> [IMPLEMENTADO 2026-10-27 Nivel 2]: Transacciones PDO atómicas en HorarioSincronizador::sincronizar() y sincronizarAsignaciones().
 [SEG-05] El importador no usa Sesion::validarSolapamiento() ni
          Sesion::tieneAsistencias(). Las reglas quedan duplicadas y distintas.
 [SEG-06] Borrar o aislar HorarioController::parsearExcelHorarios(). Sigue en

@@ -138,7 +138,8 @@ CREATE TABLE `inasistencia` (
   `Ficha_id` int(11) NOT NULL,
   `Sesion_id` int(11) NOT NULL,
   `fecha` date NOT NULL,
-  `generado_por` varchar(50) NOT NULL
+  `generado_por` varchar(50) NOT NULL,
+  `estado` enum('Injustificada','En revisión','Justificada') NOT NULL DEFAULT 'Injustificada'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -229,17 +230,107 @@ CREATE TABLE `sesion` (
   `Instructor_id` int(11) NOT NULL,
   `fecha` date NOT NULL,
   `hora_inicio` time NOT NULL,
-  `hora_fin` time NOT NULL,
-  `estado` enum('Activo','Cancelado','Finalizada') NOT NULL DEFAULT 'Activo'
-) ;
+  `hora_fin` time NULL DEFAULT NULL,
+  `apertura_real` time NULL DEFAULT NULL,
+  `cierre_real` time NULL DEFAULT NULL,
+  `estado` enum('Activo','Cancelado','Finalizada','Permutado') NOT NULL DEFAULT 'Activo',
+  `tipo_instructor` varchar(50) DEFAULT NULL,
+  `especialidad` varchar(100) DEFAULT NULL,
+  `nivel` varchar(50) DEFAULT NULL,
+  `grupo_convergente` varchar(50) DEFAULT NULL,
+  CONSTRAINT `chk_sesion_rango` CHECK (`hora_fin` IS NULL OR `hora_inicio` < `hora_fin`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Volcado de datos para la tabla `sesion`
 --
 
 INSERT INTO `sesion` (`id`, `Ficha_id`, `Competencia_id`, `Instructor_id`, `fecha`, `hora_inicio`, `hora_fin`, `estado`) VALUES
-(1, 2, 1, 4, '2026-10-07', '06:00:00', '12:00:00', 'Activo'),
-(2, 3, 1, 7, '2026-10-07', '06:00:00', '12:00:00', 'Activo');
+(1, 2, 1, 4, '2026-10-07', '06:00:00', '12:00:00', 'Finalizada'),
+(2, 3, 1, 7, '2026-10-07', '06:00:00', '12:00:00', 'Finalizada');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `asignacion_instructor`
+-- (Migración 007: horario semestral del instructor)
+--
+
+CREATE TABLE IF NOT EXISTS `asignacion_instructor` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `instructor_id` int(11) NOT NULL,
+  `ficha_id` int(11) NOT NULL,
+  `fecha` date NOT NULL,
+  `hora_inicio` time NOT NULL,
+  `hora_fin` time NOT NULL,
+  `estado` enum('Activo','Cancelado') NOT NULL DEFAULT 'Activo',
+  `creado_en` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `actualizado_en` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_asignacion_unica` (`instructor_id`,`ficha_id`,`fecha`,`hora_inicio`),
+  KEY `fk_asignacion_ficha_idx` (`ficha_id`),
+  CONSTRAINT `fk_asignacion_instructor_usuario` FOREIGN KEY (`instructor_id`) REFERENCES `usuario` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT `fk_asignacion_instructor_ficha` FOREIGN KEY (`ficha_id`) REFERENCES `ficha` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `permuta_sesion`
+-- (Migración 007: solicitudes e intercambios de sesiones)
+--
+
+CREATE TABLE IF NOT EXISTS `permuta_sesion` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `sesion_origen_id` int(11) NOT NULL,
+  `sesion_destino_id` int(11) NOT NULL,
+  `instructor_solicitante_id` int(11) NOT NULL,
+  `instructor_receptor_id` int(11) NOT NULL,
+  `estado` enum('Pendiente','Aprobada','Rechazada') NOT NULL DEFAULT 'Pendiente',
+  `motivo` text DEFAULT NULL,
+  `fecha_solicitud` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `fecha_resolucion` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `fk_permuta_sesion_origen_idx` (`sesion_origen_id`),
+  KEY `fk_permuta_sesion_destino_idx` (`sesion_destino_id`),
+  KEY `fk_permuta_solicitante_idx` (`instructor_solicitante_id`),
+  KEY `fk_permuta_receptor_idx` (`instructor_receptor_id`),
+  CONSTRAINT `fk_permuta_sesion_origen` FOREIGN KEY (`sesion_origen_id`) REFERENCES `sesion` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT `fk_permuta_sesion_destino` FOREIGN KEY (`sesion_destino_id`) REFERENCES `sesion` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT `fk_permuta_solicitante` FOREIGN KEY (`instructor_solicitante_id`) REFERENCES `usuario` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT `fk_permuta_receptor` FOREIGN KEY (`instructor_receptor_id`) REFERENCES `usuario` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `importacion_horario`
+-- (Migración 008: auditoría de importaciones de horario)
+--
+
+CREATE TABLE IF NOT EXISTS `importacion_horario` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `usuario_id` int(11) NOT NULL,
+  `tipo` enum('ficha','instructor') NOT NULL,
+  `archivo` varchar(255) NOT NULL,
+  `anio` smallint(6) NOT NULL,
+  `codigo_ficha` varchar(20) DEFAULT NULL,
+  `instructor_id` int(11) DEFAULT NULL,
+  `creadas` int(11) NOT NULL DEFAULT 0,
+  `actualizadas` int(11) NOT NULL DEFAULT 0,
+  `omitidas` int(11) NOT NULL DEFAULT 0,
+  `canceladas` int(11) NOT NULL DEFAULT 0,
+  `protegidas` int(11) NOT NULL DEFAULT 0,
+  `errores` text DEFAULT NULL,
+  `permutas_confirmadas` tinyint(1) NOT NULL DEFAULT 0,
+  `fecha_importacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_importacion_fecha` (`fecha_importacion`),
+  KEY `idx_importacion_tipo` (`tipo`),
+  KEY `fk_importacion_instructor_idx` (`instructor_id`),
+  CONSTRAINT `fk_importacion_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuario` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT `fk_importacion_instructor` FOREIGN KEY (`instructor_id`) REFERENCES `usuario` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
