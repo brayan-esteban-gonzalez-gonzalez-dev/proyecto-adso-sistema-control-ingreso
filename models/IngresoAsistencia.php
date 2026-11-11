@@ -32,10 +32,10 @@ class IngresoAsistencia
                        s.hora_inicio    AS sesion_hora_inicio,
                        s.hora_fin       AS sesion_hora_fin
                 FROM {$this->table} a
-                INNER JOIN Usuario u  ON a.Usuario_id = u.id
+                INNER JOIN usuario u  ON a.Usuario_id = u.id
                 INNER JOIN sesion  s  ON a.Sesion_id  = s.id
-                LEFT  JOIN Ficha   f  ON u.Ficha_id   = f.id
-                LEFT  JOIN Programa p ON f.Programa_id = p.id
+                LEFT  JOIN ficha   f  ON u.Ficha_id   = f.id
+                LEFT  JOIN programa p ON f.Programa_id = p.id
                 WHERE a.fecha = :fecha
                 ORDER BY a.fecha DESC, a.hora_entrada DESC";
 
@@ -253,8 +253,8 @@ class IngresoAsistencia
                        u.nombre, u.apellido, u.identificacion,
                        f.codigo AS codigo_ficha
                 FROM {$this->table} a
-                INNER JOIN Usuario u ON a.Usuario_id = u.id
-                LEFT  JOIN Ficha f   ON u.Ficha_id   = f.id
+                INNER JOIN usuario u ON a.Usuario_id = u.id
+                LEFT  JOIN ficha f   ON u.Ficha_id   = f.id
                 WHERE a.Sesion_id = :sesion_id
                 ORDER BY a.hora_entrada DESC";
         $stmt = $this->conn->prepare($sql);
@@ -292,8 +292,8 @@ class IngresoAsistencia
                        s.hora_fin       AS sesion_hora_fin,
                        COALESCE(c.nombre, 'Sesión formativa') AS nombre_competencia
                 FROM inasistencia i
-                INNER JOIN Ficha f ON i.Ficha_id = f.id
-                LEFT JOIN Programa p ON f.Programa_id = p.id
+                INNER JOIN ficha f ON i.Ficha_id = f.id
+                LEFT JOIN programa p ON f.Programa_id = p.id
                 LEFT JOIN sesion s ON i.Sesion_id = s.id
                 LEFT JOIN competencia c ON s.Competencia_id = c.id
                 WHERE i.Usuario_id = :usuarioId
@@ -326,8 +326,8 @@ class IngresoAsistencia
                        s.hora_fin       AS sesion_hora_fin,
                        COALESCE(c.nombre, 'Sesión formativa') AS nombre_competencia
                 FROM inasistencia i
-                INNER JOIN Ficha f ON i.Ficha_id = f.id
-                LEFT JOIN Programa p ON f.Programa_id = p.id
+                INNER JOIN ficha f ON i.Ficha_id = f.id
+                LEFT JOIN programa p ON f.Programa_id = p.id
                 LEFT JOIN sesion s ON i.Sesion_id = s.id
                 LEFT JOIN competencia c ON s.Competencia_id = c.id
                 WHERE i.id = :id AND i.Usuario_id = :usuarioId";

@@ -29,8 +29,8 @@ class Sesion {
                        CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor,
                        c.nombre AS nombre_competencia
                 FROM {$this->table} s
-                INNER JOIN Ficha f ON s.Ficha_id = f.id
-                INNER JOIN Usuario u ON s.Instructor_id = u.id
+                INNER JOIN ficha f ON s.Ficha_id = f.id
+                INNER JOIN usuario u ON s.Instructor_id = u.id
                 LEFT JOIN competencia c ON s.Competencia_id = c.id
                 WHERE 1=1";
         $params = [];
@@ -54,8 +54,8 @@ class Sesion {
                        CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor,
                        c.nombre AS nombre_competencia
                 FROM {$this->table} s
-                INNER JOIN Ficha f ON s.Ficha_id = f.id
-                INNER JOIN Usuario u ON s.Instructor_id = u.id
+                INNER JOIN ficha f ON s.Ficha_id = f.id
+                INNER JOIN usuario u ON s.Instructor_id = u.id
                 LEFT JOIN competencia c ON s.Competencia_id = c.id
                 ORDER BY s.fecha DESC, s.hora_inicio ASC";
         $stmt = $this->conn->prepare($sql);
@@ -72,8 +72,8 @@ class Sesion {
                        CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor,
                        c.nombre AS nombre_competencia
                 FROM {$this->table} s
-                INNER JOIN Ficha f ON s.Ficha_id = f.id
-                INNER JOIN Usuario u ON s.Instructor_id = u.id
+                INNER JOIN ficha f ON s.Ficha_id = f.id
+                INNER JOIN usuario u ON s.Instructor_id = u.id
                 LEFT JOIN competencia c ON s.Competencia_id = c.id
                 WHERE s.Ficha_id = :ficha_id
                 ORDER BY s.fecha ASC, s.hora_inicio ASC";
@@ -92,8 +92,8 @@ class Sesion {
                        j.nombre AS nombre_jornada,
                        c.nombre AS nombre_competencia
                 FROM {$this->table} s
-                INNER JOIN Ficha f ON s.Ficha_id = f.id
-                LEFT JOIN Programa p ON f.Programa_id = p.id
+                INNER JOIN ficha f ON s.Ficha_id = f.id
+                LEFT JOIN programa p ON f.Programa_id = p.id
                 LEFT JOIN jornada j ON f.jornada_id = j.id
                 LEFT JOIN competencia c ON s.Competencia_id = c.id
                 WHERE s.Instructor_id = :instructor_id
@@ -125,8 +125,8 @@ class Sesion {
     public function getFichasDeInstructor(int $instructorId): array {
         $sql = "SELECT DISTINCT f.id, f.codigo, p.nombre AS nombre_programa
                 FROM {$this->table} s
-                INNER JOIN Ficha f ON s.Ficha_id = f.id
-                LEFT JOIN Programa p ON f.Programa_id = p.id
+                INNER JOIN ficha f ON s.Ficha_id = f.id
+                LEFT JOIN programa p ON f.Programa_id = p.id
                 WHERE s.Instructor_id = :instructor_id
                 ORDER BY f.codigo";
         $stmt = $this->conn->prepare($sql);
@@ -143,8 +143,8 @@ class Sesion {
                        CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor,
                        c.nombre AS nombre_competencia
                 FROM {$this->table} s
-                INNER JOIN Ficha f ON s.Ficha_id = f.id
-                INNER JOIN Usuario u ON s.Instructor_id = u.id
+                INNER JOIN ficha f ON s.Ficha_id = f.id
+                INNER JOIN usuario u ON s.Instructor_id = u.id
                 LEFT JOIN competencia c ON s.Competencia_id = c.id
                 WHERE s.id = :id";
         $stmt = $this->conn->prepare($sql);
@@ -259,8 +259,8 @@ class Sesion {
                        f.codigo AS codigo_ficha,
                        CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor
                 FROM {$this->table} s
-                INNER JOIN Ficha f ON s.Ficha_id = f.id
-                INNER JOIN Usuario u ON s.Instructor_id = u.id
+                INNER JOIN ficha f ON s.Ficha_id = f.id
+                INNER JOIN usuario u ON s.Instructor_id = u.id
                 WHERE s.Ficha_id = :ficha_id
                   AND s.fecha = CURDATE()
                   AND s.estado = 'Activo'
@@ -283,8 +283,8 @@ class Sesion {
                        f.codigo   AS codigo_ficha,
                        p.nombre   AS nombre_programa
                 FROM {$this->table} s
-                INNER JOIN Ficha f   ON s.Ficha_id    = f.id
-                LEFT  JOIN Programa p ON f.Programa_id = p.id
+                INNER JOIN ficha f   ON s.Ficha_id    = f.id
+                LEFT  JOIN programa p ON f.Programa_id = p.id
                 WHERE s.Instructor_id = :instructor_id
                   AND s.fecha  = CURDATE()
                   AND s.estado = 'Activo'
@@ -344,7 +344,7 @@ class Sesion {
         // 1. Validar que la ficha no tenga otro bloque solapado
         $sqlFicha = "SELECT s.*, CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor
                      FROM {$this->table} s
-                     INNER JOIN Usuario u ON s.Instructor_id = u.id
+                     INNER JOIN usuario u ON s.Instructor_id = u.id
                      WHERE s.Ficha_id = :ficha_id
                        AND s.fecha = :fecha
                        AND s.estado != 'Cancelado'
@@ -375,7 +375,7 @@ class Sesion {
         // 2. Validar que el instructor no esté en otra ficha a la misma hora
         $sqlInst = "SELECT s.*, f.codigo AS codigo_ficha
                     FROM {$this->table} s
-                    INNER JOIN Ficha f ON s.Ficha_id = f.id
+                    INNER JOIN ficha f ON s.Ficha_id = f.id
                     WHERE s.Instructor_id = :instructor_id
                       AND s.fecha = :fecha
                       AND s.estado != 'Cancelado'
@@ -443,7 +443,7 @@ class Sesion {
             // en false, PDO/MySQL rechaza el mismo nombre repetido (HY093).
             $sqlFicha = "SELECT s.*, CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor
                          FROM {$this->table} s
-                         INNER JOIN Usuario u ON s.Instructor_id = u.id
+                         INNER JOIN usuario u ON s.Instructor_id = u.id
                          WHERE s.Ficha_id = :ficha_id
                            AND s.fecha = :fecha
                            AND s.estado != 'Cancelado'
@@ -472,7 +472,7 @@ class Sesion {
             if ($instructorId > 0) {
                 $sqlInst = "SELECT s.*, f.codigo AS codigo_ficha
                             FROM {$this->table} s
-                            INNER JOIN Ficha f ON s.Ficha_id = f.id
+                            INNER JOIN ficha f ON s.Ficha_id = f.id
                             WHERE s.Instructor_id = :instructor_id
                               AND s.fecha = :fecha
                               AND s.estado != 'Cancelado'
@@ -511,9 +511,9 @@ class Sesion {
                        c.nombre AS nombre_competencia,
                        CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor
                 FROM {$this->table} s
-                INNER JOIN Ficha f ON s.Ficha_id = f.id
-                INNER JOIN Usuario u ON s.Instructor_id = u.id
-                LEFT JOIN Programa p ON f.Programa_id = p.id
+                INNER JOIN ficha f ON s.Ficha_id = f.id
+                INNER JOIN usuario u ON s.Instructor_id = u.id
+                LEFT JOIN programa p ON f.Programa_id = p.id
                 LEFT JOIN jornada j ON f.jornada_id = j.id
                 LEFT JOIN competencia c ON s.Competencia_id = c.id
                 WHERE s.Ficha_id = :ficha_id

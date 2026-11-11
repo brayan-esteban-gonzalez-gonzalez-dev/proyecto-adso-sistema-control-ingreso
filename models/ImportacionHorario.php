@@ -58,7 +58,7 @@ class ImportacionHorario {
         $sql = "SELECT i.*,
                        CONCAT(u.nombre, ' ', u.apellido) AS nombre_usuario
                 FROM {$this->table} i
-                INNER JOIN Usuario u ON i.usuario_id = u.id
+                INNER JOIN usuario u ON i.usuario_id = u.id
                 ORDER BY i.fecha_importacion DESC
                 LIMIT {$limite}";
         $stmt = $this->conn->prepare($sql);

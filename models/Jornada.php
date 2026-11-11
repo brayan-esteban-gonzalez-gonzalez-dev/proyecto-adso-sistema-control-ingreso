@@ -15,7 +15,7 @@ class Jornada {
 
     public function getAll(): array {
         $sql = "SELECT j.*,
-                       (SELECT COUNT(*) FROM Ficha f WHERE f.jornada_id = j.id) AS total_fichas
+                       (SELECT COUNT(*) FROM ficha f WHERE f.jornada_id = j.id) AS total_fichas
                 FROM {$this->table} j
                 ORDER BY j.hora_inicio, j.nombre";
         $stmt = $this->conn->prepare($sql);
@@ -72,7 +72,7 @@ class Jornada {
     }
 
     public function countFichas(int $id): int {
-        $sql = "SELECT COUNT(*) AS total FROM Ficha WHERE jornada_id = :id";
+        $sql = "SELECT COUNT(*) AS total FROM ficha WHERE jornada_id = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':id' => $id]);
         return (int) $stmt->fetch()['total'];

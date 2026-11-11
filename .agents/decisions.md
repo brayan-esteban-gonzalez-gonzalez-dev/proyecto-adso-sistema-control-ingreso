@@ -123,3 +123,5 @@ Formato sugerido por entrada:
 - **2026-11-10 — Credenciales de BD desde .env:**
   - Se añadió `helpers/Env.php` (cargador propio, sin paquete nuevo) y se llama desde `index.php` y desde el job `cerrarSesionesEInasistencias.php`.
   - `config/Database.php` deja de traer usuario y clave escritos en el código: lee `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` (o `DB_PASS`) y `DB_CHARSET`. El archivo `.env` sigue fuera de git. No se usó `vlucas/phpdotenv` porque no está instalado y agregar una dependencia exige confirmación.
+- **2026-11-10 — Nombres de tabla en minúsculas en el SQL:**
+  - En MySQL de Linux (la base `u137387537_duna`) `Usuario` no es la misma tabla que `usuario`. El esquema de `migrations/db_ingreso_aprendices_27_08.sql` usa minúsculas. Se alinearon los identificadores de tabla en los modelos (`usuario`, `ficha`, `programa`, `rol`) sin cambiar columnas (`Usuario_id`, `Ficha_id`, `Rol_id`) ni nombres de clases PHP.

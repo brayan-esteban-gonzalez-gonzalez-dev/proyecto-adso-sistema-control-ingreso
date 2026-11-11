@@ -2,11 +2,11 @@
 /**
  * Programa.php — Modelo de Programas de Formación
  *
- * Tabla `Programa`: id, codigo, nombre, descripcion.
+ * Tabla `programa`: id, codigo, nombre, descripcion.
  */
 class Programa {
     private PDO $conn;
-    private string $table = 'Programa';
+    private string $table = 'programa';
 
     public function __construct(PDO $db) {
         $this->conn = $db;
@@ -14,7 +14,7 @@ class Programa {
 
     public function getAll(): array {
         $sql = "SELECT p.*,
-                       (SELECT COUNT(*) FROM Ficha f WHERE f.Programa_id = p.id) AS total_fichas,
+                       (SELECT COUNT(*) FROM ficha f WHERE f.Programa_id = p.id) AS total_fichas,
                        (SELECT COUNT(*) FROM competencia c WHERE c.Programa_id = p.id) AS total_competencias
                 FROM {$this->table} p
                 ORDER BY p.nombre";
@@ -111,7 +111,7 @@ class Programa {
     }
 
     public function countFichas(int $id): int {
-        $sql = "SELECT COUNT(*) AS total FROM Ficha WHERE Programa_id = :id";
+        $sql = "SELECT COUNT(*) AS total FROM ficha WHERE Programa_id = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':id' => $id]);
         return (int) $stmt->fetch()['total'];

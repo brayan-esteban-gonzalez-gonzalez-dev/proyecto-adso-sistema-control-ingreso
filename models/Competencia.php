@@ -17,7 +17,7 @@ class Competencia {
         static $hasCodigo = null;
         if ($hasCodigo === null) {
             try {
-                $stmt = $this->conn->query("SHOW COLUMNS FROM Programa LIKE 'codigo'");
+                $stmt = $this->conn->query("SHOW COLUMNS FROM programa LIKE 'codigo'");
                 $hasCodigo = ($stmt && $stmt->rowCount() > 0);
             } catch (\Throwable $e) {
                 $hasCodigo = false;
@@ -33,7 +33,7 @@ class Competencia {
                        {$codigoSql},
                        (SELECT COUNT(*) FROM sesion s WHERE s.Competencia_id = c.id) AS total_sesiones
                 FROM {$this->table} c
-                INNER JOIN Programa p ON c.Programa_id = p.id";
+                INNER JOIN programa p ON c.Programa_id = p.id";
         $params = [];
         if ($programaId) {
             $sql .= " WHERE c.Programa_id = :programa_id";
@@ -54,7 +54,7 @@ class Competencia {
         $codigoSql = $this->getCodigoColumnaSql();
         $sql = "SELECT c.*, p.nombre AS nombre_programa, {$codigoSql}
                 FROM {$this->table} c
-                INNER JOIN Programa p ON c.Programa_id = p.id
+                INNER JOIN programa p ON c.Programa_id = p.id
                 WHERE c.id = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':id' => $id]);
@@ -69,7 +69,7 @@ class Competencia {
     public function getInstructores(int $competenciaId): array {
         $sql = "SELECT u.id, u.nombre, u.apellido
                 FROM instructor_competencia ic
-                INNER JOIN Usuario u ON u.id = ic.Instructor_id
+                INNER JOIN usuario u ON u.id = ic.Instructor_id
                 WHERE ic.Competencia_id = :id
                 ORDER BY u.nombre, u.apellido";
         $stmt = $this->conn->prepare($sql);

@@ -26,7 +26,7 @@ class Reporte {
                            ELSE NULL 
                        END) AS inasistencias_justificadas,
                        COUNT(DISTINCT CASE WHEN a.minutos_retardo > 0 THEN a.id END) AS retardos
-                FROM Usuario u
+                FROM usuario u
                 LEFT JOIN sesion s
                        ON s.Ficha_id = u.Ficha_id
                       AND s.fecha BETWEEN :inicio AND :fin
@@ -140,8 +140,8 @@ class Reporte {
                            ELSE 'Pendiente'
                        END AS estado
                 FROM excusa e
-                INNER JOIN Usuario u ON u.id = e.Usuario_id
-                LEFT JOIN Ficha f ON f.id = u.Ficha_id
+                INNER JOIN usuario u ON u.id = e.Usuario_id
+                LEFT JOIN ficha f ON f.id = u.Ficha_id
                 WHERE e.fecha BETWEEN :inicio AND :fin
                   AND (:filtrar = 0 OR u.Ficha_id = :ficha)
                 ORDER BY e.fecha DESC, u.apellido, u.nombre";
