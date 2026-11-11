@@ -1,0 +1,46 @@
+# ============================================
+# SCIA — Sistema de Control de Ingreso (SENA)
+# Archivos sensibles y de entorno local
+# ============================================
+
+# Credenciales y configuración sensible (NUNCA subir)
+.env
+.env.local
+.env.*.local
+.env.*
+*.env
+!.env.example
+
+# NOTA: librerias/ NO se ignora — está versionada en git
+# (PhpSpreadsheet + phpdotenv + FPDF forman parte del deploy)
+
+# Sistema de uploads generados en runtime (evidencias de excusas)
+assets/uploads/
+
+# IDE y editores
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Logs y temporales
+*.log
+tmp/
+cache/
+
+# Backups y archivos grandes
+*.bak
+*.zip
+sistema-control-ingreso.mwb.bak.zip
+
+# Empaquetado
+*.tar.gz
+*.tar
+
+# Node (si en algún momento se usa)
+node_modules/

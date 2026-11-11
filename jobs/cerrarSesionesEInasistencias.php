@@ -26,6 +26,8 @@ date_default_timezone_set('America/Bogota');
 
 $rootPath = dirname(__DIR__);
 
+require_once $rootPath . '/helpers/Env.php';
+Env::load($rootPath . DIRECTORY_SEPARATOR . '.env');
 require_once $rootPath . '/config/Database.php';
 require_once $rootPath . '/models/Sesion.php';
 require_once $rootPath . '/models/IngresoAsistencia.php';

@@ -18,6 +18,9 @@ if (file_exists(ROOT_PATH . '/librerias/autoload.php')) {
 }
 
 // Cargar Helpers 
+require_once ROOT_PATH . '/helpers/Env.php';
+Env::load(ROOT_PATH . DIRECTORY_SEPARATOR . '.env');
+
 require_once ROOT_PATH . '/config/Database.php';
 require_once ROOT_PATH . '/helpers/Auth.php';
 require_once ROOT_PATH . '/helpers/Validator.php';

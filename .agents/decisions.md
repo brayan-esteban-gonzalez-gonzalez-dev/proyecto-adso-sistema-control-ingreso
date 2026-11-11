@@ -120,3 +120,6 @@ Formato sugerido por entrada:
     2. Se acondicionó `assets/js/app.js` para registrar el listener como respaldo exclusivamente si `onclick` no existe, previniendo rebotes de eventos.
     3. Se agregó cache-busting dinámico con `filemtime` a `app.js` en [views/layouts/footer.php](file:///c:/xampp/htdocs/proyects/segundoCrud/git/proyecto-adso-sistema-control-ingreso-main/views/layouts/footer.php) (`?v=...`), forzando al navegador a obtener la última versión.
     4. Se reforzó en [assets/css/style.css](file:///c:/xampp/htdocs/proyects/segundoCrud/git/proyecto-adso-sistema-control-ingreso-main/assets/css/style.css) la especificidad de `:root[data-bs-theme="light"], html[data-bs-theme="light"], body[data-bs-theme="light"]` asegurando la aplicación visual instantánea de los fondos `#f4f6f8` y `#ffffff`.
+- **2026-11-10 — Credenciales de BD desde .env:**
+  - Se añadió `helpers/Env.php` (cargador propio, sin paquete nuevo) y se llama desde `index.php` y desde el job `cerrarSesionesEInasistencias.php`.
+  - `config/Database.php` deja de traer usuario y clave escritos en el código: lee `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` (o `DB_PASS`) y `DB_CHARSET`. El archivo `.env` sigue fuera de git. No se usó `vlucas/phpdotenv` porque no está instalado y agregar una dependencia exige confirmación.
