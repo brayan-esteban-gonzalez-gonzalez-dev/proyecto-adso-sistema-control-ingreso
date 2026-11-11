@@ -8,63 +8,55 @@ declare(strict_types=1);
  * Si la base de datos o las tablas no existen en phpMyAdmin, las crea automáticamente.
  */
 class Database {
-    private string $host;
-    private int $port;
-    private string $db_name;
-    private string $username;
-    private string $password;
-    private string $charset;
+    /** @var string */
+    private $host;
+    /** @var string */
+    private $db_name;
+    /** @var string */
+    private $username;
+    /** @var string */
+    private $password;
+    /** @var string */
+    private $charset;
+
+    public function __construct()
+    {
+        // Leer credenciales desde variables de entorno (.env) con fallback a XAMPP por defecto
+        $this->host     = $_ENV['DB_HOST']     ?? getenv('DB_HOST')     ?: 'localhost';
+        $this->db_name  = $_ENV['DB_NAME']     ?? getenv('DB_NAME')     ?: 'db_ingreso_aprendices';
+        $this->username = $_ENV['DB_USER']     ?? getenv('DB_USER')     ?: 'root';
+        $this->password = $_ENV['DB_PASSWORD'] ?? getenv('DB_PASSWORD') ?: '';
+        $this->charset  = $_ENV['DB_CHARSET']  ?? getenv('DB_CHARSET')  ?: 'utf8mb4';
+
+        // Validación básica de seguridad (evitar caracteres raros en el .env)
+        $this->validateEnvValues();
+    }
+
+    /**
+     * Valida que las variables de entorno solo contengan caracteres permitidos.
+     */
+    private function validateEnvValues(): void
+    {
+        $allowed = '/^[a-zA-Z0-9_.\-]+$/';
+
+        foreach ([
+            'host'     => $this->host,
+            'db_name'  => $this->db_name,
+            'username' => $this->username,
+            'charset'  => $this->charset,
+        ] as $name => $value) {
+            if (!preg_match($allowed, (string)$value)) {
+                error_log("[SCIA][Database] Valor inválido para {$name} en variables de entorno.");
+                die('Error de configuración de base de datos. Contacte al administrador.');
+            }
+        }
+    }
 
     /** @var PDO|null */
     private $conn = null;
 
     /** @var Database|null */
     private static $instance = null;
-
-    private function __construct()
-    {
-        if (!class_exists('Env')) {
-            $envFile = dirname(__DIR__) . '/helpers/Env.php';
-            if (is_file($envFile)) {
-                require_once $envFile;
-            }
-        }
-        if (class_exists('Env')) {
-            Env::load();
-        }
-
-        $this->host     = $this->envOr('DB_HOST', 'localhost');
-        $this->port     = (int) $this->envOr('DB_PORT', '3306');
-        if ($this->port < 1 || $this->port > 65535) {
-            $this->port = 3306;
-        }
-        $this->db_name  = $this->envOr('DB_NAME', 'db_ingreso_aprendices');
-        $this->username = $this->envOr('DB_USER', 'root');
-        $password = getenv('DB_PASSWORD');
-        if ($password === false) {
-            $password = getenv('DB_PASS');
-        }
-        $this->password = $password === false ? '' : $password;
-        $this->charset  = $this->envOr('DB_CHARSET', 'utf8mb4');
-    }
-
-    private function envOr(string $key, string $default): string
-    {
-        $value = getenv($key);
-        if ($value === false || $value === '') {
-            return $default;
-        }
-        return $value;
-    }
-
-    private function buildDsn(bool $withDatabase): string
-    {
-        $dsn = "mysql:host={$this->host};port={$this->port};charset={$this->charset}";
-        if ($withDatabase) {
-            $dsn .= ";dbname={$this->db_name}";
-        }
-        return $dsn;
-    }
 
     /**
      * Obtiene la instancia singleton de Database
@@ -82,7 +74,7 @@ class Database {
     public function getConnection(): ?PDO {
         if ($this->conn === null) {
             try {
-                $dsn = $this->buildDsn(true);
+                $dsn = "mysql:host={$this->host};dbname={$this->db_name};charset={$this->charset}";
                 $options = [
                     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -290,7 +282,7 @@ class Database {
     private function autoInitDatabase(): void {
         try {
             // Conectar al servidor MySQL sin especificar base de datos
-            $dsn = $this->buildDsn(false);
+            $dsn = "mysql:host={$this->host};charset={$this->charset}";
             $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             ];
@@ -304,7 +296,7 @@ class Database {
             $this->runMigrationScript($serverConn);
 
             // Establecer la conexión PDO principal a la BD recién creada
-            $mainDsn = $this->buildDsn(true);
+            $mainDsn = "mysql:host={$this->host};dbname={$this->db_name};charset={$this->charset}";
             $mainOptions = [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

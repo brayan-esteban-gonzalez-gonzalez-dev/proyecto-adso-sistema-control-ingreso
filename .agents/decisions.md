@@ -120,8 +120,18 @@ Formato sugerido por entrada:
     2. Se acondicionó `assets/js/app.js` para registrar el listener como respaldo exclusivamente si `onclick` no existe, previniendo rebotes de eventos.
     3. Se agregó cache-busting dinámico con `filemtime` a `app.js` en [views/layouts/footer.php](file:///c:/xampp/htdocs/proyects/segundoCrud/git/proyecto-adso-sistema-control-ingreso-main/views/layouts/footer.php) (`?v=...`), forzando al navegador a obtener la última versión.
     4. Se reforzó en [assets/css/style.css](file:///c:/xampp/htdocs/proyects/segundoCrud/git/proyecto-adso-sistema-control-ingreso-main/assets/css/style.css) la especificidad de `:root[data-bs-theme="light"], html[data-bs-theme="light"], body[data-bs-theme="light"]` asegurando la aplicación visual instantánea de los fondos `#f4f6f8` y `#ffffff`.
+- **2026-10-28 — RF-ENV-01: Gestión segura de credenciales con .env y phpdotenv:**
+  - Se instaló `vlucas/phpdotenv ^5.8` (respetando `vendor-dir = librerias`).
+  - Se creó `.gitignore` (incluyendo `.env`, `.env.local` y `.env.*.local`).
+  - Se creó `.env.example` (solo claves y comentarios, sin secretos).
+  - Se creó `.env` local con `DB_PASSWORD=123` (no versionado).
+  - Se creó `config/env.php` que carga el `.env` de forma segura con `Dotenv::createImmutable()->safeLoad()`.
+  - Se modificó `index.php` y `jobs/cerrarSesionesEInasistencias.php` para cargar el entorno antes de cualquier conexión.
+  - Se refactorizó `config/Database.php`: las credenciales ahora se leen de `$_ENV`/`getenv()` con fallback a valores XAMPP; se añadió validación de caracteres permitidos; se eliminaron las credenciales hardcodeadas.
+  - El flujo ahora es: `.env` → `config/env.php` → `$_ENV` → `Database` → PDO.
 - **2026-11-10 — Credenciales de BD desde .env:**
-  - Se añadió `helpers/Env.php` (cargador propio, sin paquete nuevo) y se llama desde `index.php` y desde el job `cerrarSesionesEInasistencias.php`.
-  - `config/Database.php` deja de traer usuario y clave escritos en el código: lee `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` (o `DB_PASS`) y `DB_CHARSET`. El archivo `.env` sigue fuera de git. No se usó `vlucas/phpdotenv` porque no está instalado y agregar una dependencia exige confirmación.
+  - ~~Se añadió `helpers/Env.php` (cargador propio, sin paquete nuevo) y se llama desde `index.php` y desde el job `cerrarSesionesEInasistencias.php`.~~
+  - ~~`config/Database.php` deja de traer usuario y clave escritos en el código: lee `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` (o `DB_PASS`) y `DB_CHARSET`. El archivo `.env` sigue fuera de git. No se usó `vlucas/phpdotenv` porque no está instalado y agregar una dependencia exige confirmación.~~
+  - Quedó sustituido por RF-ENV-01 (`config/env.php` y phpdotenv) al integrar `origin/main`.
 - **2026-11-10 — Nombres de tabla en minúsculas en el SQL:**
   - En MySQL de Linux (la base `u137387537_duna`) `Usuario` no es la misma tabla que `usuario`. El esquema de `migrations/db_ingreso_aprendices_27_08.sql` usa minúsculas. Se alinearon los identificadores de tabla en los modelos (`usuario`, `ficha`, `programa`, `rol`) sin cambiar columnas (`Usuario_id`, `Ficha_id`, `Rol_id`) ni nombres de clases PHP.

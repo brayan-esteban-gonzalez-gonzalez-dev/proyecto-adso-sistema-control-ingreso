@@ -17,10 +17,10 @@ if (file_exists(ROOT_PATH . '/librerias/autoload.php')) {
     require_once ROOT_PATH . '/vendor/autoload.php';
 }
 
-// Cargar Helpers 
-require_once ROOT_PATH . '/helpers/Env.php';
-Env::load(ROOT_PATH . DIRECTORY_SEPARATOR . '.env');
+// Cargar variables de entorno desde .env (antes de cualquier conexión a BD)
+require_once ROOT_PATH . '/config/env.php';
 
+// Cargar Helpers 
 require_once ROOT_PATH . '/config/Database.php';
 require_once ROOT_PATH . '/helpers/Auth.php';
 require_once ROOT_PATH . '/helpers/Validator.php';
