@@ -1,0 +1,24 @@
+<?php
+/**
+ * footer.php — Layout principal (pie de página)
+ * 
+ * Cierra la estructura HTML y carga los scripts JS.
+ */
+?>
+<?php if (Auth::isLoggedIn()): ?>
+        </div><!-- /.content-wrapper -->
+    </main><!-- /.main-content -->
+<?php else: ?>
+    </div><!-- /.auth-layout -->
+<?php endif; ?>
+
+
+    <script src="<?= BASE_URL ?>assets/js/app.js?v=<?= file_exists(APP_PATH . '/public/assets/js/app.js') ? filemtime(APP_PATH . '/public/assets/js/app.js') : '1.0' ?>"></script>
+<?php if (isset($loadRfidJs) && $loadRfidJs): ?>
+    <script src="<?= BASE_URL ?>assets/js/rfid.js?v=<?= file_exists(APP_PATH . '/public/assets/js/rfid.js') ? filemtime(APP_PATH . '/public/assets/js/rfid.js') : '1.0' ?>"></script>
+<?php endif; ?>
+<?php if (isset($loadDashboardJs) && $loadDashboardJs): ?>
+    <script src="<?= BASE_URL ?>assets/js/dashboard.js?v=<?= file_exists(APP_PATH . '/public/assets/js/dashboard.js') ? filemtime(APP_PATH . '/public/assets/js/dashboard.js') : '1.0' ?>"></script>
+<?php endif; ?>
+</body>
+</html>

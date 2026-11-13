@@ -142,5 +142,12 @@ Formato sugerido por entrada:
   - Los controladores no devuelven un valor y terminan con `exit()`. Cada acción corre en un PHP aparte (`tests/Support/ejecutar_accion.php`) con SQLite en memoria, sin abrir MySQL. Se comprueba redirección, mensaje flash y el SQL que sí se ejecuta.
   - Un caso por rol en `UsuarioController::index()` y `guardar()`. Quien no es administrador no escribe en la base.
   - La vista de integrantes de una ficha queda fuera: `Ficha::getInstructoresPorFicha()` usa `GROUP_CONCAT ... SEPARATOR`, que es SQL de MySQL.
+- **2026-11-13 — Código de la aplicación dentro de `app/`:**
+  - Se dejó en `app/` lo que ya se había movido: `config`, `controllers`, `helpers`, `models`, `views`, `jobs`, `migrations` y `public/assets`.
+  - `index.php` permanece en la raíz porque XAMPP sirve esa carpeta. Define `ROOT_PATH` (raíz del repo) y `APP_PATH` (`app/`) y carga `app/bootstrap.php`.
+  - Los `require` de vistas, modelos, helpers y controladores usan `APP_PATH`. FPDF y el autoload siguen en `ROOT_PATH . '/librerias'`.
+  - `.env` sigue en la raíz. `app/config/env.php`, si no hay `ROOT_PATH`, sube dos niveles (`app/config` → raíz).
+  - La URL pública `assets/...` no cambia. El `.htaccess` de la raíz la reescribe a `app/public/assets/` y niega el acceso HTTP al resto de `app/`, a `librerias/` y a `tests/`.
+  - Quedaron fuera de `app/`: `librerias/`, `.agents/`, `tests/`, Composer (`.json`, `.lock`, `.phar`), `.env`, `.env.example`, `phpunit.xml`, `README.md` y `AGENTS.md`.
 - **2026-11-10 — Nombres de tabla en minúsculas en el SQL:**
   - En MySQL de Linux (la base `u137387537_duna`) `Usuario` no es la misma tabla que `usuario`. El esquema de `migrations/db_ingreso_aprendices_27_08.sql` usa minúsculas. Se alinearon los identificadores de tabla en los modelos (`usuario`, `ficha`, `programa`, `rol`) sin cambiar columnas (`Usuario_id`, `Ficha_id`, `Rol_id`) ni nombres de clases PHP.
