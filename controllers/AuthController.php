@@ -1,7 +1,10 @@
 <?php
+declare(strict_types=1);
+
 /**
  * AuthController.php — Controlador de Autenticación
- * Gestionar login, logout y validacion de credenciales.
+ * Gestionar login, logout y validación de credenciales.
+ * Compatible con PHP 8.2, 8.3, 8.4 y 8.5.
  */
 class AuthController {
     private PDO $db;
@@ -16,7 +19,6 @@ class AuthController {
      * Muestra el formulario de login
      */
     public function login(): void {
-        // Si ya está logueado, redirigir al dashboard
         if (Auth::isLoggedIn()) {
             header('Location: ' . BASE_URL . '?action=dashboard');
             exit;
@@ -28,7 +30,7 @@ class AuthController {
     }
 
     /**
-     * Procesa el formulario de login
+     * Procesa el formulario de login con rigor de tipos
      */
     public function doLogin(): void {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -36,8 +38,19 @@ class AuthController {
             exit;
         }
 
+        // Blindaje contra payloads no-string en POST (previene TypeError fatal en PHP 8.x)
+        $rawToken     = $_POST['csrf_token'] ?? '';
+        $rawDocumento = $_POST['documento']  ?? '';
+        $rawPassword  = $_POST['password']   ?? '';
+
+        $token     = is_string($rawToken)     ? $rawToken           : '';
+        $documento = is_string($rawDocumento) ? trim($rawDocumento) : '';
+        $password  = is_string($rawPassword)  ? $rawPassword        : '';
+
+        // Normalizar $_POST['documento'] para evitar advertencias de tipado en la vista
+        $_POST['documento'] = $documento;
+
         // Validar CSRF
-        $token = $_POST['csrf_token'] ?? '';
         if (!Auth::validateCSRF($token)) {
             $error = 'Token de seguridad inválido. Intente nuevamente.';
             $csrf_token = Auth::generateCSRF();
@@ -45,29 +58,26 @@ class AuthController {
             return;
         }
 
-        $documento = trim($_POST['documento'] ?? '');
-        $password  = $_POST['password'] ?? '';
-
         // Validaciones básicas
-        if (empty($documento) || empty($password)) {
+        if ($documento === '' || $password === '') {
             $error = 'Por favor ingrese su documento y contraseña.';
             $csrf_token = Auth::generateCSRF();
             require_once ROOT_PATH . '/views/auth/login.php';
             return;
         }
 
-        // Autenticación
+        // Autenticación segura
         $usuario = $this->usuarioModel->authenticate($documento, $password);
 
-        if ($usuario) {
+        if ($usuario !== null) {
             Auth::login($usuario);
             header('Location: ' . BASE_URL . '?action=dashboard');
             exit;
-        } else {
-            $error = 'Credenciales incorrectas o usuario inactivo.';
-            $csrf_token = Auth::generateCSRF();
-            require_once ROOT_PATH . '/views/auth/login.php';
         }
+
+        $error = 'Credenciales incorrectas o usuario inactivo.';
+        $csrf_token = Auth::generateCSRF();
+        require_once ROOT_PATH . '/views/auth/login.php';
     }
 
     /**
