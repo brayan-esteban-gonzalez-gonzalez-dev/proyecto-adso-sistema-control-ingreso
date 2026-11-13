@@ -156,3 +156,9 @@ Formato sugerido por entrada:
 - **2026-11-13 — Suite de Pruebas de Integración con PHPUnit 13:**
   - Se implementó la clase base abstracta `Tests\Integration\IntegrationTestCase` con conexión PDO a la base local, aislamiento total mediante transacciones atómicas (rollback automático en tearDown) y helpers de creación de fixtures.
   - Se desarrollaron y verificaron 37 pruebas de integración con 228 aserciones cubriendo los 5 modelos solicitados: `UsuarioIntegrationTest` (14 tests), `AprendizIntegrationTest` (8 tests), `SesionIntegrationTest` (4 tests), `IngresoAsistenciaIntegrationTest` (7 tests) y `ReporteIntegrationTest` (4 tests), validando casos de éxito, reglas de negocio por rol (Admin, Instructor, Aprendiz), manejo de errores y limpieza controlada.
+- **2026-11-13 — Ampliación a 60 Pruebas de Integración (Excusas, Fichas y Competencias):**
+  - Se agregaron 23 pruebas adicionales para alcanzar un total consolidado de 60 pruebas de integración (314 aserciones) con 100% de éxito.
+  - Nuevos archivos añadidos en `tests/Integration/`:
+    - `ExcusaMedicaIntegrationTest.php` (9 tests): radicación de excusas, regla de negocio de doble validación por co-docencia (RF-HOR-34 / AGENTS.md), aprobación simple y por admin, rechazos y bandeja de pendientes.
+    - `FichaIntegrationTest.php` (8 tests): validación de integridad referencial, búsqueda con joins, asignación por instructor, protección IDOR (`instructorPerteneceAFicha`), nómina de aprendices y actualización.
+    - `CompetenciaIntegrationTest.php` (6 tests): creación ligada a programa, regla de no duplicidad de nombres en el mismo programa (`existeNombre`), sincronización de múltiples instructores (`syncInstructores`) y conteo de sesiones asociadas.

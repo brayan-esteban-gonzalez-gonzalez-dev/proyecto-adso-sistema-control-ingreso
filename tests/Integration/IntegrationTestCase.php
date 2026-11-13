@@ -211,4 +211,51 @@ abstract class IntegrationTestCase extends TestCase
 
         return (int) $this->db->lastInsertId();
     }
+
+    protected function crearInasistencia(int $usuarioId, int $fichaId, int $sesionId, string|array $fechaOrOverrides = [], array $extraOverrides = []): int
+    {
+        if (is_string($fechaOrOverrides)) {
+            $overrides = array_merge(['fecha' => $fechaOrOverrides], $extraOverrides);
+        } else {
+            $overrides = array_merge($fechaOrOverrides, $extraOverrides);
+        }
+
+        $fecha = $overrides['fecha'] ?? date('Y-m-d');
+        $generadoPor = $overrides['generado_por'] ?? 'Sistema';
+        $estado = $overrides['estado'] ?? 'Injustificada';
+
+        $stmt = $this->db->prepare("INSERT INTO inasistencia (Usuario_id, Ficha_id, Sesion_id, fecha, generado_por, estado)
+                                    VALUES (:usuario_id, :ficha_id, :sesion_id, :fecha, :generado_por, :estado)");
+        $stmt->execute([
+            ':usuario_id'   => $usuarioId,
+            ':ficha_id'     => $fichaId,
+            ':sesion_id'    => $sesionId,
+            ':fecha'        => $fecha,
+            ':generado_por' => $generadoPor,
+            ':estado'       => $estado,
+        ]);
+
+        return (int) $this->db->lastInsertId();
+    }
+
+    protected function crearExcusa(int $usuarioId, ?int $inasistenciaId = null, array $overrides = []): int
+    {
+        $fecha = $overrides['fecha'] ?? date('Y-m-d');
+        $motivo = $overrides['motivo'] ?? 'Incapacidad médica';
+        $evidencia = $overrides['evidencia'] ?? 'evidencia_test.pdf';
+        $asistenciaId = $overrides['Asistencia_id'] ?? null;
+
+        $stmt = $this->db->prepare("INSERT INTO excusa (fecha, motivo, evidencia, Usuario_id, Asistencia_id, Inasistencia_id)
+                                    VALUES (:fecha, :motivo, :evidencia, :usuario_id, :asistencia_id, :inasistencia_id)");
+        $stmt->execute([
+            ':fecha'           => $fecha,
+            ':motivo'          => $motivo,
+            ':evidencia'       => $evidencia,
+            ':usuario_id'      => $usuarioId,
+            ':asistencia_id'   => $asistenciaId,
+            ':inasistencia_id' => $inasistenciaId,
+        ]);
+
+        return (int) $this->db->lastInsertId();
+    }
 }
