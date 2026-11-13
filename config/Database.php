@@ -156,7 +156,7 @@ class Database {
             // --- Migración 007B: ampliar ENUM estado en sesion con 'Permutado' ---
             $enumStmt = $this->conn->query(
                 "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
-                 WHERE TABLE_SCHEMA = DATABASE()
+                   WHERE TABLE_SCHEMA = DATABASE()
                    AND TABLE_NAME   = 'sesion'
                    AND COLUMN_NAME  = 'estado'"
             );
