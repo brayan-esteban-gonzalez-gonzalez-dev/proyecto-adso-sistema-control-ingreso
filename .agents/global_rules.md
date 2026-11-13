@@ -7,7 +7,8 @@ Actualización: solo agregar entradas o tachar (`~~texto~~`). No borrar ni reesc
 
 ## Base de datos
 - **No modificar la base de datos directamente** (INSERT/UPDATE/DELETE/DDL, importar `.sql`, ejecutar migraciones) sin pedir permiso antes.
-- No ejecutar ni forzar la auto-creación de la BD que hace `config/Database.php`.
+- No ejecutar ni forzar la auto-creación de la BD que hace `config/Database.php` (desde 2026-11-13: `app/config/Database.php`).
+- Desde 2026-11-13 el código de la aplicación vive en `app/`. `assets/img/` pasó a `app/public/assets/img/`. Sigue sin editarse salvo que sea necesario.
 - Cambios de esquema: se proponen como nuevo archivo en `migrations/` y se muestran en el plan.
 
 ## Carpetas y archivos a ignorar (salvo que sea estrictamente necesario)

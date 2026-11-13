@@ -1,46 +1,16 @@
 <?php
 
-//  Constantes globales 
+// Raíz del repositorio (librerias, .env, index.php). Apache sirve esta carpeta.
 define('ROOT_PATH', __DIR__);
+
+// Código de la aplicación.
+define('APP_PATH', ROOT_PATH . '/app');
 
 // Detectar la URL base del proyecto automaticamente
 $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME']));
 define('BASE_URL', rtrim($scriptDir, '/') . '/');
 
-// Ruta de uploads
-define('UPLOAD_PATH', ROOT_PATH . '/assets/uploads/');
+// Evidencias públicas. La URL sigue siendo assets/uploads/ (ver .htaccess).
+define('UPLOAD_PATH', APP_PATH . '/public/assets/uploads/');
 
-// Autoload de librerías (Composer en /librerias)
-if (file_exists(ROOT_PATH . '/librerias/autoload.php')) {
-    require_once ROOT_PATH . '/librerias/autoload.php';
-} elseif (file_exists(ROOT_PATH . '/vendor/autoload.php')) {
-    require_once ROOT_PATH . '/vendor/autoload.php';
-}
-
-// Cargar variables de entorno desde .env (antes de cualquier conexión a BD)
-require_once ROOT_PATH . '/config/env.php';
-
-// Cargar Helpers 
-require_once ROOT_PATH . '/config/Database.php';
-require_once ROOT_PATH . '/helpers/Auth.php';
-require_once ROOT_PATH . '/helpers/Validator.php';
-require_once ROOT_PATH . '/helpers/Router.php';
-
-// Iniciar sesion
-Auth::init();
-
-// Cargar modelos dinamicamente (incluye maestros y reportes)
-$modelsDir = ROOT_PATH . '/models/';
-if (is_dir($modelsDir)) {
-    foreach (glob($modelsDir . '*.php') as $modelFile) {
-        require_once $modelFile;
-    }
-}
-
-//Conexion a la base de datos 
-$database = Database::getInstance();
-$db = $database->getConnection();
-
-//Despachar la peticion 
-$router = new Router($db);
-$router->dispatch();
+require APP_PATH . '/bootstrap.php';

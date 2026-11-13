@@ -21,10 +21,10 @@
     </php>
     <source>
         <include>
-            <directory>models</directory>
-            <directory>helpers</directory>
-            <directory>controllers</directory>
-            <directory>config</directory>
+            <directory>app/models</directory>
+            <directory>app/helpers</directory>
+            <directory>app/controllers</directory>
+            <directory>app/config</directory>
         </include>
     </source>
 </phpunit>

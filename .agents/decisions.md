@@ -136,6 +136,29 @@ Formato sugerido por entrada:
 - **2026-11-13 — PHPUnit 13 (dependencia de desarrollo):**
   - Se instaló `phpunit/phpunit ^13.0` (resuelto en 13.4.7) con Composer, en `require-dev`, sin mover PhpSpreadsheet ni phpdotenv. El `vendor-dir` sigue siendo `librerias/`.
   - PHPUnit 13 exige PHP >= 8.4. En esta máquina el CLI de XAMPP es 8.2.12; las pruebas se ejecutan con PHP 8.4.27 (instalación de usuario). El `platform_check.php` de Composer quedó en `>= 8.2.0`, así que la aplicación en Apache/XAMPP no sube su requisito de PHP.
-  - La suite queda en `tests/Unit` (sin base de datos) y `tests/Integration` (MySQL de pruebas). Aún no hay casos de prueba.
+  - La suite queda en `tests/Unit` (sin base de datos) y `tests/Integration` (MySQL de pruebas). ~~Aún no hay casos de prueba.~~
+- **2026-11-13 — Pruebas de AprendizController, UsuarioController y HorarioReporte:**
+  - `HorarioReporte::generarReporte()` se prueba en el mismo proceso: arreglos vacíos, nulos y un conteo que no es número. Si `bloques` no es un arreglo, la función lanza `TypeError` (es lo que hace hoy `count()`).
+  - Los controladores no devuelven un valor y terminan con `exit()`. Cada acción corre en un PHP aparte (`tests/Support/ejecutar_accion.php`) con SQLite en memoria, sin abrir MySQL. Se comprueba redirección, mensaje flash y el SQL que sí se ejecuta.
+  - Un caso por rol en `UsuarioController::index()` y `guardar()`. Quien no es administrador no escribe en la base.
+  - La vista de integrantes de una ficha queda fuera: `Ficha::getInstructoresPorFicha()` usa `GROUP_CONCAT ... SEPARATOR`, que es SQL de MySQL.
+- **2026-11-13 — Código de la aplicación dentro de `app/`:**
+  - Se dejó en `app/` lo que ya se había movido: `config`, `controllers`, `helpers`, `models`, `views`, `jobs`, `migrations` y `public/assets`.
+  - `index.php` permanece en la raíz porque XAMPP sirve esa carpeta. Define `ROOT_PATH` (raíz del repo) y `APP_PATH` (`app/`) y carga `app/bootstrap.php`.
+  - Los `require` de vistas, modelos, helpers y controladores usan `APP_PATH`. FPDF y el autoload siguen en `ROOT_PATH . '/librerias'`.
+  - `.env` sigue en la raíz. `app/config/env.php`, si no hay `ROOT_PATH`, sube dos niveles (`app/config` → raíz).
+  - La URL pública `assets/...` no cambia. El `.htaccess` de la raíz la reescribe a `app/public/assets/` y niega el acceso HTTP al resto de `app/`, a `librerias/` y a `tests/`.
+  - Quedaron fuera de `app/`: `librerias/`, `.agents/`, `tests/`, Composer (`.json`, `.lock`, `.phar`), `.env`, `.env.example`, `phpunit.xml`, `README.md` y `AGENTS.md`.
 - **2026-11-10 — Nombres de tabla en minúsculas en el SQL:**
   - En MySQL de Linux (la base `u137387537_duna`) `Usuario` no es la misma tabla que `usuario`. El esquema de `migrations/db_ingreso_aprendices_27_08.sql` usa minúsculas. Se alinearon los identificadores de tabla en los modelos (`usuario`, `ficha`, `programa`, `rol`) sin cambiar columnas (`Usuario_id`, `Ficha_id`, `Rol_id`) ni nombres de clases PHP.
+- **2026-11-13 — Compatibilidad PHP 8.4/8.5 en parámetro opcional nullable:**
+  - En `models/IngresoAsistencia.php::registrarEntrada()` se cambió `string $codigoLlavero = null` por `?string $codigoLlavero = null` para cumplir con el tipado estricto de PHP 8.4/8.5 y eliminar la advertencia de obsolescencia (`E_DEPRECATED: Implicitly marking parameter as nullable is deprecated`).
+- **2026-11-13 — Suite de Pruebas de Integración con PHPUnit 13:**
+  - Se implementó la clase base abstracta `Tests\Integration\IntegrationTestCase` con conexión PDO a la base local, aislamiento total mediante transacciones atómicas (rollback automático en tearDown) y helpers de creación de fixtures.
+  - Se desarrollaron y verificaron 37 pruebas de integración con 228 aserciones cubriendo los 5 modelos solicitados: `UsuarioIntegrationTest` (14 tests), `AprendizIntegrationTest` (8 tests), `SesionIntegrationTest` (4 tests), `IngresoAsistenciaIntegrationTest` (7 tests) y `ReporteIntegrationTest` (4 tests), validando casos de éxito, reglas de negocio por rol (Admin, Instructor, Aprendiz), manejo de errores y limpieza controlada.
+- **2026-11-13 — Ampliación a 60 Pruebas de Integración (Excusas, Fichas y Competencias):**
+  - Se agregaron 23 pruebas adicionales para alcanzar un total consolidado de 60 pruebas de integración (314 aserciones) con 100% de éxito.
+  - Nuevos archivos añadidos en `tests/Integration/`:
+    - `ExcusaMedicaIntegrationTest.php` (9 tests): radicación de excusas, regla de negocio de doble validación por co-docencia (RF-HOR-34 / AGENTS.md), aprobación simple y por admin, rechazos y bandeja de pendientes.
+    - `FichaIntegrationTest.php` (8 tests): validación de integridad referencial, búsqueda con joins, asignación por instructor, protección IDOR (`instructorPerteneceAFicha`), nómina de aprendices y actualización.
+    - `CompetenciaIntegrationTest.php` (6 tests): creación ligada a programa, regla de no duplicidad de nombres en el mismo programa (`existeNombre`), sincronización de múltiples instructores (`syncInstructores`) y conteo de sesiones asociadas.
