@@ -133,5 +133,9 @@ Formato sugerido por entrada:
   - ~~Se añadió `helpers/Env.php` (cargador propio, sin paquete nuevo) y se llama desde `index.php` y desde el job `cerrarSesionesEInasistencias.php`.~~
   - ~~`config/Database.php` deja de traer usuario y clave escritos en el código: lee `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` (o `DB_PASS`) y `DB_CHARSET`. El archivo `.env` sigue fuera de git. No se usó `vlucas/phpdotenv` porque no está instalado y agregar una dependencia exige confirmación.~~
   - Quedó sustituido por RF-ENV-01 (`config/env.php` y phpdotenv) al integrar `origin/main`.
+- **2026-11-13 — PHPUnit 13 (dependencia de desarrollo):**
+  - Se instaló `phpunit/phpunit ^13.0` (resuelto en 13.4.7) con Composer, en `require-dev`, sin mover PhpSpreadsheet ni phpdotenv. El `vendor-dir` sigue siendo `librerias/`.
+  - PHPUnit 13 exige PHP >= 8.4. En esta máquina el CLI de XAMPP es 8.2.12; las pruebas se ejecutan con PHP 8.4.27 (instalación de usuario). El `platform_check.php` de Composer quedó en `>= 8.2.0`, así que la aplicación en Apache/XAMPP no sube su requisito de PHP.
+  - La suite queda en `tests/Unit` (sin base de datos) y `tests/Integration` (MySQL de pruebas). Aún no hay casos de prueba.
 - **2026-11-10 — Nombres de tabla en minúsculas en el SQL:**
   - En MySQL de Linux (la base `u137387537_duna`) `Usuario` no es la misma tabla que `usuario`. El esquema de `migrations/db_ingreso_aprendices_27_08.sql` usa minúsculas. Se alinearon los identificadores de tabla en los modelos (`usuario`, `ficha`, `programa`, `rol`) sin cambiar columnas (`Usuario_id`, `Ficha_id`, `Rol_id`) ni nombres de clases PHP.

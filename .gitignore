@@ -44,3 +44,6 @@ sistema-control-ingreso.mwb.bak.zip
 
 # Node (si en algún momento se usa)
 node_modules/
+
+# PHPUnit
+.phpunit.cache/
