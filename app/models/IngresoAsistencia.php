@@ -125,7 +125,7 @@ class IngresoAsistencia
     /**
      * Registra una asistencia (entrada)
      */
-    public function registrarEntrada(int $usuarioId, int $sesionId, int $registradoPor, string $codigoLlavero = null): bool
+    public function registrarEntrada(int $usuarioId, int $sesionId, int $registradoPor, ?string $codigoLlavero = null): bool
     {
         $sql = "INSERT INTO {$this->table}
                     (fecha, hora_entrada, Usuario_id, Sesion_id, registrado_por, codigo_llavero, estado)

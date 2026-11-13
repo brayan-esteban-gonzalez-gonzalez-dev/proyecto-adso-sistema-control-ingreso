@@ -27,3 +27,7 @@ foreach (['helpers', 'models', 'controllers'] as $carpeta) {
         require_once $archivo;
     }
 }
+
+if (file_exists(__DIR__ . '/Integration/IntegrationTestCase.php')) {
+    require_once __DIR__ . '/Integration/IntegrationTestCase.php';
+}

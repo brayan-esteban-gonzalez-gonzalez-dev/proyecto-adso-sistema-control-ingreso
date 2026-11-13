@@ -151,3 +151,8 @@ Formato sugerido por entrada:
   - Quedaron fuera de `app/`: `librerias/`, `.agents/`, `tests/`, Composer (`.json`, `.lock`, `.phar`), `.env`, `.env.example`, `phpunit.xml`, `README.md` y `AGENTS.md`.
 - **2026-11-10 — Nombres de tabla en minúsculas en el SQL:**
   - En MySQL de Linux (la base `u137387537_duna`) `Usuario` no es la misma tabla que `usuario`. El esquema de `migrations/db_ingreso_aprendices_27_08.sql` usa minúsculas. Se alinearon los identificadores de tabla en los modelos (`usuario`, `ficha`, `programa`, `rol`) sin cambiar columnas (`Usuario_id`, `Ficha_id`, `Rol_id`) ni nombres de clases PHP.
+- **2026-11-13 — Compatibilidad PHP 8.4/8.5 en parámetro opcional nullable:**
+  - En `models/IngresoAsistencia.php::registrarEntrada()` se cambió `string $codigoLlavero = null` por `?string $codigoLlavero = null` para cumplir con el tipado estricto de PHP 8.4/8.5 y eliminar la advertencia de obsolescencia (`E_DEPRECATED: Implicitly marking parameter as nullable is deprecated`).
+- **2026-11-13 — Suite de Pruebas de Integración con PHPUnit 13:**
+  - Se implementó la clase base abstracta `Tests\Integration\IntegrationTestCase` con conexión PDO a la base local, aislamiento total mediante transacciones atómicas (rollback automático en tearDown) y helpers de creación de fixtures.
+  - Se desarrollaron y verificaron 37 pruebas de integración con 228 aserciones cubriendo los 5 modelos solicitados: `UsuarioIntegrationTest` (14 tests), `AprendizIntegrationTest` (8 tests), `SesionIntegrationTest` (4 tests), `IngresoAsistenciaIntegrationTest` (7 tests) y `ReporteIntegrationTest` (4 tests), validando casos de éxito, reglas de negocio por rol (Admin, Instructor, Aprendiz), manejo de errores y limpieza controlada.
