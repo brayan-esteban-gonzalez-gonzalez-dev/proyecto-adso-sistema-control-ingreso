@@ -49,7 +49,7 @@ class AsignacionInstructor {
     public function getByInstructor(int $instructorId, string $desde, string $hasta): array {
         $sql = "SELECT a.*, f.codigo AS codigo_ficha
                 FROM {$this->table} a
-                INNER JOIN Ficha f ON a.ficha_id = f.id
+                INNER JOIN ficha f ON a.ficha_id = f.id
                 WHERE a.instructor_id = :instructor_id
                   AND a.fecha BETWEEN :desde AND :hasta
                 ORDER BY a.fecha, a.hora_inicio";
@@ -68,7 +68,7 @@ class AsignacionInstructor {
     public function getByFicha(int $fichaId, string $desde, string $hasta): array {
         $sql = "SELECT a.*, CONCAT(u.nombre, ' ', u.apellido) AS nombre_instructor
                 FROM {$this->table} a
-                INNER JOIN Usuario u ON a.instructor_id = u.id
+                INNER JOIN usuario u ON a.instructor_id = u.id
                 WHERE a.ficha_id = :ficha_id
                   AND a.fecha BETWEEN :desde AND :hasta
                 ORDER BY a.fecha, a.hora_inicio";

@@ -1,50 +1,35 @@
 <?php
 declare(strict_types=1);
-
 /**
  * Database.php — Clase de conexión PDO (Singleton)
  * 
  * Proporciona una única instancia de conexión a la base de datos MySQL
  * usando PDO con charset utf8mb4 y manejo de errores por excepciones.
- * Compatible con PHP 8.2, 8.3, 8.4 y 8.5.
+ * Si la base de datos o las tablas no existen en phpMyAdmin, las crea automáticamente.
  */
 class Database {
-    private string $host;
-    private string $db_name;
-    private string $username;
-    private string $password;
-    private string $charset;
+    /** @var string */
+    private $host;
+    /** @var string */
+    private $db_name;
+    /** @var string */
+    private $username;
+    /** @var string */
+    private $password;
+    /** @var string */
+    private $charset;
 
-    /** @var PDO|null */
-    private ?PDO $conn = null;
-
-    /** @var self|null */
-    private static ?self $instance = null;
-
-    /**
-     * Constructor privado para forzar el patrón Singleton
-     */
-    private function __construct()
+    public function __construct()
     {
-        $rawHost     = $_ENV['DB_HOST']     ?? getenv('DB_HOST');
-        $rawDbName   = $_ENV['DB_NAME']     ?? getenv('DB_NAME');
-        $rawUsername = $_ENV['DB_USER']     ?? getenv('DB_USER');
-        $rawPassword = $_ENV['DB_PASSWORD'] ?? getenv('DB_PASSWORD');
-        $rawCharset  = $_ENV['DB_CHARSET']  ?? getenv('DB_CHARSET');
+        // Leer credenciales desde variables de entorno (.env) con fallback a XAMPP por defecto
+        $this->host     = $_ENV['DB_HOST']     ?? getenv('DB_HOST')     ?: 'localhost';
+        $this->db_name  = $_ENV['DB_NAME']     ?? getenv('DB_NAME')     ?: 'db_ingreso_aprendices';
+        $this->username = $_ENV['DB_USER']     ?? getenv('DB_USER')     ?: 'root';
+        $this->password = $_ENV['DB_PASSWORD'] ?? getenv('DB_PASSWORD') ?: '';
+        $this->charset  = $_ENV['DB_CHARSET']  ?? getenv('DB_CHARSET')  ?: 'utf8mb4';
 
-        $this->host     = is_string($rawHost)     && $rawHost !== ''     ? $rawHost     : 'localhost';
-        $this->db_name  = is_string($rawDbName)   && $rawDbName !== ''   ? $rawDbName   : 'db_ingreso_aprendices';
-        $this->username = is_string($rawUsername) && $rawUsername !== '' ? $rawUsername : 'root';
-        $this->password = is_string($rawPassword)                        ? $rawPassword : '';
-        $this->charset  = is_string($rawCharset)  && $rawCharset !== ''  ? $rawCharset  : 'utf8mb4';
-
+        // Validación básica de seguridad (evitar caracteres raros en el .env)
         $this->validateEnvValues();
-    }
-
-    // Evitar clonación y deserialización de la instancia Singleton
-    private function __clone() {}
-    public function __wakeup() {
-        throw new \Exception("No se permite deserializar una instancia de Database.");
     }
 
     /**
@@ -60,12 +45,18 @@ class Database {
             'username' => $this->username,
             'charset'  => $this->charset,
         ] as $name => $value) {
-            if (!preg_match($allowed, $value)) {
+            if (!preg_match($allowed, (string)$value)) {
                 error_log("[SCIA][Database] Valor inválido para {$name} en variables de entorno.");
                 die('Error de configuración de base de datos. Contacte al administrador.');
             }
         }
     }
+
+    /** @var PDO|null */
+    private $conn = null;
+
+    /** @var Database|null */
+    private static $instance = null;
 
     /**
      * Obtiene la instancia singleton de Database
@@ -91,16 +82,16 @@ class Database {
                 ];
                 $this->conn = new PDO($dsn, $this->username, $this->password, $options);
 
+                // Verificar si existen las tablas principales
                 $this->ensureTablesExist();
 
             } catch (PDOException $e) {
-                // MySQL 1049 = Unknown database
-                $driverCode = $e->errorInfo[1] ?? (int)$e->getCode();
-                if ($driverCode === 1049 || str_contains(strtolower($e->getMessage()), 'unknown database')) {
+                // Si la base de datos no existe (Código 1049 / Unknown database)
+                if ($e->getCode() == 1049 || str_contains(strtolower($e->getMessage()), "unknown database")) {
                     $this->autoInitDatabase();
                 } else {
                     error_log('[SCIA][Database] Error de conexión: ' . $e->getMessage());
-                    die('Error de conexión a la base de datos. Contacte al administrador.');
+                    die("Error de conexión a la base de datos. Contacte al administrador.");
                 }
             }
         }
@@ -112,30 +103,27 @@ class Database {
      */
     private function ensureTablesExist(): void {
         try {
-            $stmt = $this->conn?->query("SHOW TABLES LIKE 'usuario'");
+            $stmt = $this->conn->query("SHOW TABLES LIKE 'usuario'");
             if ($stmt === false || $stmt->rowCount() === 0) {
                 $this->runMigrationScript($this->conn);
             } else {
+                // La BD ya existe: aplicar migraciones incrementales si faltan
                 $this->ensureMigrationsApplied();
             }
-        } catch (PDOException) {
-            if ($this->conn !== null) {
-                $this->runMigrationScript($this->conn);
-            }
+        } catch (PDOException $e) {
+            $this->runMigrationScript($this->conn);
         }
     }
 
     /**
-     * Verifica de forma idempotente que las migraciones incrementales estén aplicadas.
+     * Verifica idempotentemente que las migraciones 005-008 estén aplicadas.
+     * Se ejecuta solo cuando la BD ya existía (instalación previa).
+     * Usa SHOW TABLES / SHOW COLUMNS para no romper esquemas correctos.
      */
     private function ensureMigrationsApplied(): void
     {
-        if ($this->conn === null) {
-            return;
-        }
-
         try {
-            // Migración 005: hora_fin NULL en sesion
+            // --- Migración 005: hora_fin NULL en sesion ---
             $colHoraFin = $this->conn->query(
                 "SELECT IS_NULLABLE FROM information_schema.COLUMNS
                  WHERE TABLE_SCHEMA = DATABASE()
@@ -144,12 +132,8 @@ class Database {
             );
             $rowHF = $colHoraFin ? $colHoraFin->fetch() : null;
             if ($rowHF && $rowHF['IS_NULLABLE'] === 'NO') {
-                // En PHP 8+, las excepciones de PDO no se silencian con @: usamos try-catch explícito
-                try {
-                    $this->conn->exec("ALTER TABLE `sesion` DROP CHECK `chk_sesion_rango`");
-                } catch (PDOException) {
-                    // Restricción no existía; se ignora con seguridad
-                }
+                // Eliminar CHECK antiguo si existe, luego hacer nullable
+                @$this->conn->exec("ALTER TABLE `sesion` DROP CHECK `chk_sesion_rango`");
                 $this->conn->exec("ALTER TABLE `sesion` MODIFY `hora_fin` TIME NULL DEFAULT NULL");
                 $this->conn->exec(
                     "ALTER TABLE `sesion` ADD CONSTRAINT `chk_sesion_rango`
@@ -157,23 +141,27 @@ class Database {
                 );
             }
 
-            // Migración 007A: columnas apertura_real y cierre_real en sesion
+            // --- Migración 007A: columnas apertura_real y cierre_real en sesion ---
             foreach (['apertura_real', 'cierre_real'] as $col) {
-                $check = $this->conn->query("SHOW COLUMNS FROM `sesion` LIKE '{$col}'");
+                $check = $this->conn->query(
+                    "SHOW COLUMNS FROM `sesion` LIKE '{$col}'"
+                );
                 if ($check && $check->rowCount() === 0) {
-                    $this->conn->exec("ALTER TABLE `sesion` ADD COLUMN `{$col}` TIME NULL DEFAULT NULL");
+                    $this->conn->exec(
+                        "ALTER TABLE `sesion` ADD COLUMN `{$col}` TIME NULL DEFAULT NULL"
+                    );
                 }
             }
 
-            // Migración 007B: ampliar ENUM estado en sesion con 'Permutado'
+            // --- Migración 007B: ampliar ENUM estado en sesion con 'Permutado' ---
             $enumStmt = $this->conn->query(
                 "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
-                 WHERE TABLE_SCHEMA = DATABASE()
+                   WHERE TABLE_SCHEMA = DATABASE()
                    AND TABLE_NAME   = 'sesion'
                    AND COLUMN_NAME  = 'estado'"
             );
             $enumRow = $enumStmt ? $enumStmt->fetch() : null;
-            if ($enumRow && !str_contains((string)$enumRow['COLUMN_TYPE'], 'Permutado')) {
+            if ($enumRow && strpos($enumRow['COLUMN_TYPE'], 'Permutado') === false) {
                 $this->conn->exec(
                     "ALTER TABLE `sesion`
                      MODIFY COLUMN `estado`
@@ -181,8 +169,10 @@ class Database {
                 );
             }
 
-            // Migración 006: columna estado en inasistencia
-            $chkEstado = $this->conn->query("SHOW COLUMNS FROM `inasistencia` LIKE 'estado'");
+            // --- Migración 006: columna estado en inasistencia ---
+            $chkEstado = $this->conn->query(
+                "SHOW COLUMNS FROM `inasistencia` LIKE 'estado'"
+            );
             if ($chkEstado && $chkEstado->rowCount() === 0) {
                 $this->conn->exec(
                     "ALTER TABLE `inasistencia`
@@ -192,7 +182,7 @@ class Database {
                 );
             }
 
-            // Migración 007C: tabla asignacion_instructor
+            // --- Migración 007C: tabla asignacion_instructor ---
             $chkAI = $this->conn->query("SHOW TABLES LIKE 'asignacion_instructor'");
             if ($chkAI && $chkAI->rowCount() === 0) {
                 $this->conn->exec(
@@ -217,7 +207,7 @@ class Database {
                 );
             }
 
-            // Migración 007D: tabla permuta_sesion
+            // --- Migración 007D: tabla permuta_sesion ---
             $chkPS = $this->conn->query("SHOW TABLES LIKE 'permuta_sesion'");
             if ($chkPS && $chkPS->rowCount() === 0) {
                 $this->conn->exec(
@@ -248,7 +238,7 @@ class Database {
                 );
             }
 
-            // Migración 008: tabla importacion_horario
+            // --- Migración 008: tabla importacion_horario ---
             $chkIH = $this->conn->query("SHOW TABLES LIKE 'importacion_horario'");
             if ($chkIH && $chkIH->rowCount() === 0) {
                 $this->conn->exec(
@@ -282,6 +272,7 @@ class Database {
 
         } catch (PDOException $e) {
             error_log('[SCIA][Database] Error en ensureMigrationsApplied: ' . $e->getMessage());
+            // No detiene el sistema: las migraciones fallidas se loguean y continúan
         }
     }
 
@@ -290,17 +281,21 @@ class Database {
      */
     private function autoInitDatabase(): void {
         try {
+            // Conectar al servidor MySQL sin especificar base de datos
             $dsn = "mysql:host={$this->host};charset={$this->charset}";
             $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             ];
             $serverConn = new PDO($dsn, $this->username, $this->password, $options);
 
+            // Crear la base de datos si no existe
             $serverConn->exec("CREATE DATABASE IF NOT EXISTS `{$this->db_name}` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
             $serverConn->exec("USE `{$this->db_name}`;");
 
+            // Ejecutar el script SQL de migración
             $this->runMigrationScript($serverConn);
 
+            // Establecer la conexión PDO principal a la BD recién creada
             $mainDsn = "mysql:host={$this->host};dbname={$this->db_name};charset={$this->charset}";
             $mainOptions = [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
@@ -311,7 +306,7 @@ class Database {
 
         } catch (PDOException $e) {
             error_log('[SCIA][Database] Error en autoInitDatabase: ' . $e->getMessage());
-            die('Error al inicializar la base de datos. Contacte al administrador.');
+            die("Error al inicializar la base de datos. Contacte al administrador.");
         }
     }
 
@@ -328,8 +323,8 @@ class Database {
         }
 
         $sql = file_get_contents($sqlPath);
-        if ($sql === false || trim($sql) === '') {
-            die("Error: El archivo de migración SQL está vacío o inaccesible.");
+        if (empty($sql)) {
+            die("Error: El archivo de migración SQL está vacío.");
         }
 
         try {
@@ -338,7 +333,8 @@ class Database {
             $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
         } catch (PDOException $e) {
             error_log('[SCIA][Database] Error ejecutando migración SQL: ' . $e->getMessage());
-            die('Error al aplicar la migración inicial. Contacte al administrador.');
+            die("Error al aplicar la migración inicial. Contacte al administrador.");
         }
     }
 }
+

@@ -4,7 +4,7 @@
  *
  * En la nueva DB no existe tabla `aprendices` separada.
  * Los aprendices son Usuarios con Rol_id = 3.
- * Este modelo actúa como wrapper sobre la tabla `Usuario` filtrando por Rol_id = 3,
+ * Este modelo actúa como wrapper sobre la tabla `usuario` filtrando por Rol_id = 3,
  * manteniendo la interfaz que esperan los controladores existentes.
  *
  * Campos relevantes de Usuario para aprendices:
@@ -13,7 +13,7 @@
  */
 class Aprendiz {
     private PDO $conn;
-    private string $table = 'Usuario';
+    private string $table = 'usuario';
     private int $rolAprendiz = 3;
 
     public function __construct(PDO $db) {
@@ -30,8 +30,8 @@ class Aprendiz {
                        f.codigo         AS codigo_ficha,
                        p.nombre         AS nombre_programa
                 FROM {$this->table} u
-                LEFT JOIN Ficha f   ON u.Ficha_id    = f.id
-                LEFT JOIN Programa p ON f.Programa_id = p.id
+                LEFT JOIN ficha f   ON u.Ficha_id    = f.id
+                LEFT JOIN programa p ON f.Programa_id = p.id
                 WHERE u.Rol_id = :rol
                 ORDER BY u.apellido, u.nombre";
         $stmt = $this->conn->prepare($sql);
@@ -51,8 +51,8 @@ class Aprendiz {
                        f.codigo         AS codigo_ficha,
                        p.nombre         AS nombre_programa
                 FROM {$this->table} u
-                LEFT JOIN Ficha f   ON u.Ficha_id    = f.id
-                LEFT JOIN Programa p ON f.Programa_id = p.id
+                LEFT JOIN ficha f   ON u.Ficha_id    = f.id
+                LEFT JOIN programa p ON f.Programa_id = p.id
                 WHERE u.id = :id AND u.Rol_id = :rol";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':id' => $id, ':rol' => $this->rolAprendiz]);
@@ -79,8 +79,8 @@ class Aprendiz {
                        p.nombre         AS nombre_programa,
                        f.id             AS id_ficha
                 FROM {$this->table} u
-                LEFT JOIN Ficha f   ON u.Ficha_id    = f.id
-                LEFT JOIN Programa p ON f.Programa_id = p.id
+                LEFT JOIN ficha f   ON u.Ficha_id    = f.id
+                LEFT JOIN programa p ON f.Programa_id = p.id
                 WHERE u.codigo_llavero = :llavero AND u.estado = 'Activo' AND u.Rol_id = :rol";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':llavero' => $codigoLlavero, ':rol' => $this->rolAprendiz]);
@@ -104,7 +104,7 @@ class Aprendiz {
     }
 
     /**
-     * Crea un nuevo aprendiz (inserta en tabla Usuario con Rol_id=3)
+     * Crea un nuevo aprendiz (inserta en tabla usuario con Rol_id=3)
      */
     public function create(array $data): bool {
         $sql = "INSERT INTO {$this->table} (Rol_id, identificacion, nombre, apellido, email, password, Ficha_id, codigo_llavero, estado)

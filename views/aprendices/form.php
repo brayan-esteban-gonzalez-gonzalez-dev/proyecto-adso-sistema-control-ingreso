@@ -21,13 +21,13 @@ $codigoRfid = $aprendiz['codigo_llavero'] ?? $aprendiz['codigo_rfid'] ?? '';
             <div class="form-group">
                 <label class="form-label" for="num_documento">Número de Documento *</label>
                 <input type="text" id="num_documento" name="num_documento" class="form-control" 
-                       value="<?= htmlspecialchars($numDocumento) ?>" 
-                       <?= $aprendiz ? 'readonly' : 'required' ?>>
+                    value="<?= htmlspecialchars($numDocumento) ?>" 
+                    <?= $aprendiz ? 'readonly' : 'required' ?>>
             </div>
             <div class="form-group">
                 <label class="form-label" for="correo">Correo Electrónico *</label>
                 <input type="email" id="correo" name="correo" class="form-control" 
-                       value="<?= htmlspecialchars($correo) ?>" required>
+                    value="<?= htmlspecialchars($correo) ?>" required>
             </div>
         </div>
 

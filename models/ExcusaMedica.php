@@ -38,11 +38,11 @@ class ExcusaMedica
                        s.hora_fin       AS sesion_hora_fin,
                        COALESCE(c.nombre, 'Sesión formativa') AS nombre_competencia
                 FROM {$this->table} e
-                INNER JOIN Usuario u   ON e.Usuario_id     = u.id
-                LEFT JOIN Ficha   f    ON u.Ficha_id        = f.id
-                LEFT JOIN Programa p   ON f.Programa_id     = p.id
+                INNER JOIN usuario u   ON e.Usuario_id     = u.id
+                LEFT JOIN ficha   f    ON u.Ficha_id        = f.id
+                LEFT JOIN programa p   ON f.Programa_id     = p.id
                 LEFT JOIN {$this->tableEstado} ee ON ee.Excusa_id = e.id
-                LEFT JOIN Usuario rev  ON ee.Instructor_id  = rev.id
+                LEFT JOIN usuario rev  ON ee.Instructor_id  = rev.id
                 LEFT JOIN inasistencia i ON e.Inasistencia_id = i.id
                 LEFT JOIN sesion s     ON i.Sesion_id       = s.id
                 LEFT JOIN competencia c ON s.Competencia_id = c.id
@@ -71,11 +71,11 @@ class ExcusaMedica
                        s.hora_fin       AS sesion_hora_fin,
                        COALESCE(c.nombre, 'Sesión formativa') AS nombre_competencia
                 FROM {$this->table} e
-                INNER JOIN Usuario u   ON e.Usuario_id     = u.id
-                LEFT JOIN Ficha   f    ON u.Ficha_id        = f.id
-                LEFT JOIN Programa p   ON f.Programa_id     = p.id
+                INNER JOIN usuario u   ON e.Usuario_id     = u.id
+                LEFT JOIN ficha   f    ON u.Ficha_id        = f.id
+                LEFT JOIN programa p   ON f.Programa_id     = p.id
                 LEFT JOIN {$this->tableEstado} ee ON ee.Excusa_id = e.id
-                LEFT JOIN Usuario rev  ON ee.Instructor_id  = rev.id
+                LEFT JOIN usuario rev  ON ee.Instructor_id  = rev.id
                 LEFT JOIN inasistencia i ON e.Inasistencia_id = i.id
                 LEFT JOIN sesion s     ON i.Sesion_id       = s.id
                 LEFT JOIN competencia c ON s.Competencia_id = c.id
@@ -102,7 +102,7 @@ class ExcusaMedica
                        COALESCE(c.nombre, 'Sesión formativa') AS nombre_competencia
                 FROM {$this->table} e
                 LEFT JOIN {$this->tableEstado} ee ON ee.Excusa_id = e.id
-                LEFT JOIN Usuario rev  ON ee.Instructor_id  = rev.id
+                LEFT JOIN usuario rev  ON ee.Instructor_id  = rev.id
                 LEFT JOIN inasistencia i ON e.Inasistencia_id = i.id
                 LEFT JOIN sesion s     ON i.Sesion_id       = s.id
                 LEFT JOIN competencia c ON s.Competencia_id = c.id
@@ -127,9 +127,9 @@ class ExcusaMedica
                        s.hora_fin       AS sesion_hora_fin,
                        COALESCE(c.nombre, 'Sesión formativa') AS nombre_competencia
                 FROM {$this->table} e
-                INNER JOIN Usuario u   ON e.Usuario_id      = u.id
-                LEFT JOIN Ficha   f    ON u.Ficha_id        = f.id
-                LEFT JOIN Programa p   ON f.Programa_id     = p.id
+                INNER JOIN usuario u   ON e.Usuario_id      = u.id
+                LEFT JOIN ficha   f    ON u.Ficha_id        = f.id
+                LEFT JOIN programa p   ON f.Programa_id     = p.id
                 LEFT JOIN inasistencia i ON e.Inasistencia_id = i.id
                 LEFT JOIN sesion s     ON i.Sesion_id       = s.id
                 LEFT JOIN competencia c ON s.Competencia_id = c.id

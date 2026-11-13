@@ -36,8 +36,8 @@ class PermutaSesion
             `fecha_resolucion` TIMESTAMP NULL,
             CONSTRAINT `fk_permuta_sesion_origen` FOREIGN KEY (`sesion_origen_id`) REFERENCES `sesion`(`id`),
             CONSTRAINT `fk_permuta_sesion_destino` FOREIGN KEY (`sesion_destino_id`) REFERENCES `sesion`(`id`),
-            CONSTRAINT `fk_permuta_solicitante` FOREIGN KEY (`instructor_solicitante_id`) REFERENCES `Usuario`(`id`),
-            CONSTRAINT `fk_permuta_receptor` FOREIGN KEY (`instructor_receptor_id`) REFERENCES `Usuario`(`id`)
+            CONSTRAINT `fk_permuta_solicitante` FOREIGN KEY (`instructor_solicitante_id`) REFERENCES `usuario`(`id`),
+            CONSTRAINT `fk_permuta_receptor` FOREIGN KEY (`instructor_receptor_id`) REFERENCES `usuario`(`id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
         try {
@@ -61,11 +61,11 @@ class PermutaSesion
                        CONCAT(ur.nombre, ' ', ur.apellido) AS nombre_receptor
                 FROM {$this->table} p
                 INNER JOIN sesion so ON p.sesion_origen_id = so.id
-                INNER JOIN Ficha fo ON so.Ficha_id = fo.id
+                INNER JOIN ficha fo ON so.Ficha_id = fo.id
                 INNER JOIN sesion sd ON p.sesion_destino_id = sd.id
-                INNER JOIN Ficha fd ON sd.Ficha_id = fd.id
-                INNER JOIN Usuario us ON p.instructor_solicitante_id = us.id
-                INNER JOIN Usuario ur ON p.instructor_receptor_id = ur.id
+                INNER JOIN ficha fd ON sd.Ficha_id = fd.id
+                INNER JOIN usuario us ON p.instructor_solicitante_id = us.id
+                INNER JOIN usuario ur ON p.instructor_receptor_id = ur.id
                 WHERE p.id = :id
                 LIMIT 1";
 
@@ -88,10 +88,10 @@ class PermutaSesion
                        CONCAT(us.nombre, ' ', us.apellido) AS nombre_solicitante
                 FROM {$this->table} p
                 INNER JOIN sesion so ON p.sesion_origen_id = so.id
-                INNER JOIN Ficha fo ON so.Ficha_id = fo.id
+                INNER JOIN ficha fo ON so.Ficha_id = fo.id
                 INNER JOIN sesion sd ON p.sesion_destino_id = sd.id
-                INNER JOIN Ficha fd ON sd.Ficha_id = fd.id
-                INNER JOIN Usuario us ON p.instructor_solicitante_id = us.id
+                INNER JOIN ficha fd ON sd.Ficha_id = fd.id
+                INNER JOIN usuario us ON p.instructor_solicitante_id = us.id
                 WHERE p.instructor_receptor_id = :instructor_id
                   AND p.estado = 'Pendiente'
                 ORDER BY p.fecha_solicitud DESC";
@@ -114,10 +114,10 @@ class PermutaSesion
                        CONCAT(ur.nombre, ' ', ur.apellido) AS nombre_receptor
                 FROM {$this->table} p
                 INNER JOIN sesion so ON p.sesion_origen_id = so.id
-                INNER JOIN Ficha fo ON so.Ficha_id = fo.id
+                INNER JOIN ficha fo ON so.Ficha_id = fo.id
                 INNER JOIN sesion sd ON p.sesion_destino_id = sd.id
-                INNER JOIN Ficha fd ON sd.Ficha_id = fd.id
-                INNER JOIN Usuario ur ON p.instructor_receptor_id = ur.id
+                INNER JOIN ficha fd ON sd.Ficha_id = fd.id
+                INNER JOIN usuario ur ON p.instructor_receptor_id = ur.id
                 WHERE p.instructor_solicitante_id = :instructor_id
                 ORDER BY p.fecha_solicitud DESC";
 
@@ -140,11 +140,11 @@ class PermutaSesion
                        CONCAT(ur.nombre, ' ', ur.apellido) AS nombre_receptor
                 FROM {$this->table} p
                 INNER JOIN sesion so ON p.sesion_origen_id = so.id
-                INNER JOIN Ficha fo ON so.Ficha_id = fo.id
+                INNER JOIN ficha fo ON so.Ficha_id = fo.id
                 INNER JOIN sesion sd ON p.sesion_destino_id = sd.id
-                INNER JOIN Ficha fd ON sd.Ficha_id = fd.id
-                INNER JOIN Usuario us ON p.instructor_solicitante_id = us.id
-                INNER JOIN Usuario ur ON p.instructor_receptor_id = ur.id
+                INNER JOIN ficha fd ON sd.Ficha_id = fd.id
+                INNER JOIN usuario us ON p.instructor_solicitante_id = us.id
+                INNER JOIN usuario ur ON p.instructor_receptor_id = ur.id
                 ORDER BY p.fecha_solicitud DESC";
 
         $stmt = $this->conn->prepare($sql);
@@ -385,11 +385,11 @@ class PermutaSesion
                        CONCAT(ur.nombre, ' ', ur.apellido) AS nombre_receptor
                 FROM {$this->table} p
                 INNER JOIN sesion so ON p.sesion_origen_id = so.id
-                INNER JOIN Ficha fo ON so.Ficha_id = fo.id
+                INNER JOIN ficha fo ON so.Ficha_id = fo.id
                 INNER JOIN sesion sd ON p.sesion_destino_id = sd.id
-                INNER JOIN Ficha fd ON sd.Ficha_id = fd.id
-                INNER JOIN Usuario us ON p.instructor_solicitante_id = us.id
-                INNER JOIN Usuario ur ON p.instructor_receptor_id = ur.id
+                INNER JOIN ficha fd ON sd.Ficha_id = fd.id
+                INNER JOIN usuario us ON p.instructor_solicitante_id = us.id
+                INNER JOIN usuario ur ON p.instructor_receptor_id = ur.id
                 WHERE p.estado = 'Aprobada'
                   AND (
                         (so.Ficha_id = :ficha_origen AND so.fecha BETWEEN :desde_origen AND :hasta_origen)

@@ -2,12 +2,12 @@
 /**
  * Rol.php — Modelo de Roles
  *
- * Acceso a la tabla `Rol` del sistema.
- * Nueva DB: tabla `Rol`, PK `id`.
+ * Acceso a la tabla `rol` del sistema.
+ * Nueva DB: tabla `rol`, PK `id`.
  */
 class Rol {
     private PDO $conn;
-    private string $table = 'Rol';
+    private string $table = 'rol';
 
     public function __construct(PDO $db) {
         $this->conn = $db;
