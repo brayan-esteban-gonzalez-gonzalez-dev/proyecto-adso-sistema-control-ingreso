@@ -3,9 +3,8 @@
  * Aprendiz.php — Modelo de Aprendices
  *
  * En la nueva DB no existe tabla `aprendices` separada.
- * Los aprendices son Usuarios con Rol_id = 3.
+ * aprendices son Usuarios con Rol_id = 3.
  * Este modelo actúa como wrapper sobre la tabla `usuario` filtrando por Rol_id = 3,
- * manteniendo la interfaz que esperan los controladores existentes.
  *
  * Campos relevantes de Usuario para aprendices:
  *   id, nombre, apellido, identificacion, email, password,

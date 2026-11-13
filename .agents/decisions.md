@@ -136,6 +136,11 @@ Formato sugerido por entrada:
 - **2026-11-13 — PHPUnit 13 (dependencia de desarrollo):**
   - Se instaló `phpunit/phpunit ^13.0` (resuelto en 13.4.7) con Composer, en `require-dev`, sin mover PhpSpreadsheet ni phpdotenv. El `vendor-dir` sigue siendo `librerias/`.
   - PHPUnit 13 exige PHP >= 8.4. En esta máquina el CLI de XAMPP es 8.2.12; las pruebas se ejecutan con PHP 8.4.27 (instalación de usuario). El `platform_check.php` de Composer quedó en `>= 8.2.0`, así que la aplicación en Apache/XAMPP no sube su requisito de PHP.
-  - La suite queda en `tests/Unit` (sin base de datos) y `tests/Integration` (MySQL de pruebas). Aún no hay casos de prueba.
+  - La suite queda en `tests/Unit` (sin base de datos) y `tests/Integration` (MySQL de pruebas). ~~Aún no hay casos de prueba.~~
+- **2026-11-13 — Pruebas de AprendizController, UsuarioController y HorarioReporte:**
+  - `HorarioReporte::generarReporte()` se prueba en el mismo proceso: arreglos vacíos, nulos y un conteo que no es número. Si `bloques` no es un arreglo, la función lanza `TypeError` (es lo que hace hoy `count()`).
+  - Los controladores no devuelven un valor y terminan con `exit()`. Cada acción corre en un PHP aparte (`tests/Support/ejecutar_accion.php`) con SQLite en memoria, sin abrir MySQL. Se comprueba redirección, mensaje flash y el SQL que sí se ejecuta.
+  - Un caso por rol en `UsuarioController::index()` y `guardar()`. Quien no es administrador no escribe en la base.
+  - La vista de integrantes de una ficha queda fuera: `Ficha::getInstructoresPorFicha()` usa `GROUP_CONCAT ... SEPARATOR`, que es SQL de MySQL.
 - **2026-11-10 — Nombres de tabla en minúsculas en el SQL:**
   - En MySQL de Linux (la base `u137387537_duna`) `Usuario` no es la misma tabla que `usuario`. El esquema de `migrations/db_ingreso_aprendices_27_08.sql` usa minúsculas. Se alinearon los identificadores de tabla en los modelos (`usuario`, `ficha`, `programa`, `rol`) sin cambiar columnas (`Usuario_id`, `Ficha_id`, `Rol_id`) ni nombres de clases PHP.
